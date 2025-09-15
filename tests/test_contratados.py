@@ -8,6 +8,10 @@ async def test_full_crud_workflow(async_client: AsyncClient):
     """
     Testa o fluxo completo de CRUD (Create, Read, Update, Delete)
     para o endpoint de contratados em uma única função para garantir a ordem.
+    
+    NOTA: Atualmente, estes endpoints são públicos. Em um próximo passo, 
+    eles serão protegidos e estes testes precisarão ser atualizados para
+    incluir um token de autenticação de administrador.
     """
 
     # --- 1. CREATE (POST /contratados) ---
