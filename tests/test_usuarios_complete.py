@@ -120,10 +120,14 @@ class TestUsuariosCRUD:
         user_id = getattr(pytest, "created_user_id", None)
         assert user_id, "Usuário não foi criado"
         
+        # --- CORREÇÃO APLICADA AQUI ---
+        # Gera uma matrícula única para a atualização
+        unique_id_update = str(uuid.uuid4())[:8]
         update_data = {
             "nome": "Nome Atualizado",
-            "matricula": "MAT999"
+            "matricula": f"UPD{unique_id_update}"
         }
+        # --- FIM DA CORREÇÃO ---
         
         response = await async_client.patch(
             f"/usuarios/{user_id}",

@@ -1,8 +1,7 @@
 # app/main.py
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-
-from app.api.routers import contratado_router, auth_router, usuario_router
+from app.api.routers import contratado_router, auth_router, usuario_router, perfil_router
 from app.core.database import get_db_pool, close_db_pool
 
 # Gerenciador de contexto para o ciclo de vida da aplicação
@@ -21,9 +20,11 @@ app = FastAPI(
     lifespan=lifespan 
 )
 
+# Registrando os routers
 app.include_router(contratado_router.router)
 app.include_router(auth_router.router)
 app.include_router(usuario_router.router)
+app.include_router(perfil_router.router)
 
 @app.get("/", tags=["Root"])
 def read_root():
