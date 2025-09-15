@@ -12,13 +12,22 @@ dependencies = [
     "python-dotenv",
     "passlib[bcrypt]",
     "python-jose[cryptography]",
-    "pydantic-settings", # Para ler as configurações do .env
+    "pydantic-settings",
 ]
 
 [project.optional-dependencies]
 # Dependências usadas apenas para desenvolvimento e testes
 dev = [
     "pytest",
-    "pytest-asyncio",
-    "httpx", # Cliente HTTP assíncrono para testes
+    "httpx",
+    "anyio"
+]
+
+# --- SEÇÃO CORRIGIDA ---
+[tool.pytest.ini_options]
+# Adiciona opções padrão ao comando pytest
+addopts = [
+    "-sv",          # Mostra prints e detalhes (verbose)
+    "-p",           # Usa a opção de plugin
+    "no:asyncio",   # DESATIVA o plugin 'asyncio'
 ]

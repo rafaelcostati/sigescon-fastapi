@@ -1,8 +1,11 @@
 # app/core/config.py
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict # <-- IMPORTAR SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
+    # Dicionário de configuração do Pydantic v2
+    model_config = SettingsConfigDict(env_file=".env", extra='ignore') # <-- ADICIONAR ESTA LINHA
+
     # Configuração do Banco de Dados
     DATABASE_URL: str
 
@@ -21,7 +24,6 @@ class Settings(BaseSettings):
     SENDER_EMAIL: Optional[str] = None
     SENDER_PASSWORD: Optional[str] = None
 
-    class Config:
-        env_file = ".env"
+ 
 
 settings = Settings()
