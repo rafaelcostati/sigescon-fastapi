@@ -13,14 +13,15 @@ dependencies = [
     "passlib[bcrypt]",
     "python-jose[cryptography]",
     "pydantic-settings",
-    "Werkzeug>=2.0,<4.0"  # Versão mais flexível do Werkzeug
+    "Werkzeug>=2.0,<4.0",
+    "aiofiles"
 ]
 
 [project.optional-dependencies]
 # Dependências usadas apenas para desenvolvimento e testes
 dev = [
     "pytest",
-    "pytest-asyncio",    # Plugin para testes async
+    "pytest-asyncio",    
     "httpx",
     "anyio"
 ]
