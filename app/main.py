@@ -1,6 +1,6 @@
 # app/main.py
 from fastapi import FastAPI
-from app.api.routers import contratado_router # <-- IMPORTAR
+from app.api.routers import contratado_router, auth_router
 
 app = FastAPI(
     title="SIGESCON API",
@@ -8,8 +8,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# REGISTRAR O NOVO ROUTER
 app.include_router(contratado_router.router)
+app.include_router(auth_router.router)
 
 @app.get("/", tags=["Root"])
 def read_root():

@@ -13,6 +13,7 @@ dependencies = [
     "passlib[bcrypt]",
     "python-jose[cryptography]",
     "pydantic-settings",
+    "Werkzeug>=2.0,<4.0"
 ]
 
 [project.optional-dependencies]
@@ -23,7 +24,6 @@ dev = [
     "anyio"
 ]
 
-# --- SEÇÃO CORRIGIDA ---
 [tool.pytest.ini_options]
 # Adiciona opções padrão ao comando pytest
 addopts = [
