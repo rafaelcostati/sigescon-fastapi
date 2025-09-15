@@ -1,11 +1,17 @@
 # tests/conftest.py
+import sys
+from pathlib import Path
 import pytest
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 import asyncpg
 import os
 
-# Importa as configurações para ler o .env
+# Adiciona o diretório raiz do projeto ao path do Python
+# Isso permite que os imports de 'app' funcionem corretamente
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Agora podemos importar as configurações normalmente
 from app.core.config import settings
 from app.core.database import get_db_pool, close_db_pool
 from app.seeder import seed_data

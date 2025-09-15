@@ -1,6 +1,7 @@
 # tests/test_contratados.py
 import pytest
 from httpx import AsyncClient
+import random
 
 @pytest.mark.asyncio
 async def test_full_crud_workflow(async_client: AsyncClient):
@@ -12,13 +13,16 @@ async def test_full_crud_workflow(async_client: AsyncClient):
     eles serão protegidos e estes testes precisarão ser atualizados para
     incluir um token de autenticação de administrador.
     """
-
+    # Gera um identificador único para este teste
+    import random
+    unique_num = str(random.randint(10000000, 99999999))  # 8 dígitos
+    
     # --- 1. CREATE (POST /contratados) ---
     print("\n--- Testando CREATE ---")
     create_data = {
-        "nome": "Contratado de Teste LTDA",
-        "email": "rafael.costa@pgr.com",  # Corrigido para email válido
-        "cnpj": "12345678000199",
+        "nome": f"Contratado Teste {unique_num} LTDA",
+        "email": f"teste_{unique_num}@example.com",
+        "cnpj": f"{unique_num}000199",  # CNPJ de 14 dígitos
         "cpf": None,
         "telefone": "91988887777"
     }
@@ -57,7 +61,7 @@ async def test_full_crud_workflow(async_client: AsyncClient):
     # --- 4. UPDATE (PATCH /contratados/{id}) ---
     print("\n--- Testando UPDATE ---")
     update_data = {
-        "nome": "Nome Atualizado SA",
+        "nome": f"Nome Atualizado {unique_num} SA",
         "telefone": "91955554444"
     }
     response = await async_client.patch(f"/contratados/{contratado_id}", json=update_data)

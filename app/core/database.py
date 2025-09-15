@@ -34,26 +34,13 @@ async def get_connection():
     Obtém uma conexão do pool.
     """
     db_pool = await get_db_pool()
-    connection = None
     try:
         async with db_pool.acquire() as connection:
             yield connection
+            # A conexão é automaticamente devolvida ao pool aqui
     except Exception as e:
         logger.error(f"Erro ao obter conexão do pool: {e}")
-        if connection:
-            # Força o fechamento da conexão problemática
-            try:
-                await connection.close()
-            except:
-                pass
         raise
-    finally:
-        # Garante que a conexão seja devolvida ao pool
-        if connection and not connection.is_closed():
-            try:
-                await db_pool.release(connection)
-            except:
-                pass
 
 async def close_db_pool():
     """

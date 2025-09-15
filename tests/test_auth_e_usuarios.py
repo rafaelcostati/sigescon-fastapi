@@ -4,6 +4,7 @@ from httpx import AsyncClient
 from typing import Dict
 import dotenv
 import os 
+import uuid
 
 dotenv.load_dotenv()
 
@@ -12,13 +13,15 @@ dotenv.load_dotenv()
 def admin_user_data() -> Dict:
     return {"username": os.getenv("ADMIN_EMAIL"), "password": os.getenv("ADMIN_PASSWORD")}
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def common_user_data() -> Dict:
+    # Gera um email único para cada teste usando UUID
+    unique_id = str(uuid.uuid4())[:8]
     return {
-        "nome": "Usuario Comum Teste",
-        "email": "comum@teste.com",
-        "cpf": "11122233344",
-        "senha": "senha_comum_123",
+        "nome": f"Usuario Teste {unique_id}",
+        "email": f"teste_{unique_id}@example.com",
+        "cpf": f"111{unique_id[:8]}",
+        "senha": "senha_teste_123",
         "perfil_id": 3  # Fiscal
     }
 
