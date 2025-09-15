@@ -18,7 +18,7 @@ async def test_full_crud_workflow(async_client: AsyncClient):
     print("\n--- Testando CREATE ---")
     create_data = {
         "nome": "Contratado de Teste LTDA",
-        "email": "rafael.costa@pge.pa.gov.br",
+        "email": "rafael.costa@pgr",
         "cnpj": "12345678000199",
         "cpf": None,
         "telefone": "91988887777"

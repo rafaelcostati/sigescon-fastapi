@@ -8,18 +8,17 @@ from app.core.database import get_db_pool, close_db_pool
 # Gerenciador de contexto para o ciclo de vida da aplicação
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Código a ser executado antes da aplicação iniciar
     print("Iniciando aplicação e criando pool de DB...")
     await get_db_pool()
     yield
-    # Código a ser executado após a aplicação parar
     print("Fechando pool de DB...")
     await close_db_pool()
     
 app = FastAPI(
     title="SIGESCON API",
     description="Sistema de Gestão de Contratos",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan 
 )
 
 app.include_router(contratado_router.router)
