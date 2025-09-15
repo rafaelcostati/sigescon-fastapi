@@ -14,7 +14,9 @@ dependencies = [
     "python-jose[cryptography]",
     "pydantic-settings",
     "Werkzeug>=2.0,<4.0",
-    "aiofiles"
+    "aiofiles",
+    "aiosmtplib",
+    "apscheduler"
 ]
 
 [project.optional-dependencies]
@@ -26,8 +28,11 @@ dev = [
     "anyio"
 ]
 
+[tool.setuptools]
+packages = ["app"]
+
+
 [tool.pytest.ini_options]
-# Configuração para pytest com suporte assíncrono
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]

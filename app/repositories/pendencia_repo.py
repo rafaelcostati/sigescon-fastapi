@@ -57,3 +57,19 @@ class PendenciaRepository:
         """Atualiza o status de uma pendência (ex: para 'Concluída')."""
         query = "UPDATE pendenciarelatorio SET status_pendencia_id = $1, updated_at = NOW() WHERE id = $2"
         await self.conn.execute(query, status_id, pendencia_id)
+        
+    async def get_due_pendencias(self) -> List[Dict]:
+        """Busca todas as pendências com status 'Pendente'."""
+        query = """
+            SELECT 
+                p.id, p.descricao, p.data_prazo,
+                c.nr_contrato,
+                u.nome as fiscal_nome, u.email as fiscal_email
+            FROM pendenciarelatorio p
+            JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
+            JOIN contrato c ON p.contrato_id = c.id
+            JOIN usuario u ON c.fiscal_id = u.id
+            WHERE sp.nome = 'Pendente' AND c.ativo = TRUE
+        """
+        records = await self.conn.fetch(query)
+        return [dict(r) for r in records]

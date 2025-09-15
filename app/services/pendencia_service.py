@@ -1,5 +1,5 @@
 # app/services/pendencia_service.py
-from typing import List, Optional
+from typing import List
 from fastapi import HTTPException, status
 
 # Repositórios
@@ -10,6 +10,9 @@ from app.repositories.status_pendencia_repo import StatusPendenciaRepository
 
 # Schemas
 from app.schemas.pendencia_schema import Pendencia, PendenciaCreate
+
+# --- INTEGRAÇÃO ---
+from app.services.email_service import EmailService
 
 class PendenciaService:
     def __init__(self,
@@ -23,7 +26,6 @@ class PendenciaService:
         self.status_pendencia_repo = status_pendencia_repo
 
     async def _validate_foreign_keys(self, pendencia: PendenciaCreate, contrato_id: int):
-        """Valida a existência de IDs antes de criar a pendência."""
         if not await self.contrato_repo.find_contrato_by_id(contrato_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
         
@@ -34,16 +36,31 @@ class PendenciaService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status de pendência não encontrado")
 
     async def create_pendencia(self, contrato_id: int, pendencia_create: PendenciaCreate) -> Pendencia:
-        """Cria uma nova pendência para um contrato."""
         await self._validate_foreign_keys(pendencia_create, contrato_id)
         
-        # Lógica de notificação por e-mail pode ser adicionada aqui no futuro
-        
         new_pendencia_data = await self.pendencia_repo.create_pendencia(contrato_id, pendencia_create)
+        
+        # --- LÓGICA DE E-MAIL ADICIONADA ---
+        contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
+        if contrato and contrato.get('fiscal_id'):
+            fiscal = await self.usuario_repo.get_user_by_id(contrato['fiscal_id'])
+            if fiscal:
+                subject = "Nova pendência de relatório registada para si"
+                body = f"""
+Olá, {fiscal['nome']},
+
+Uma nova pendência de relatório foi registada para o contrato '{contrato['nr_contrato']}':
+
+- Descrição: {new_pendencia_data['descricao']}
+- Prazo para envio: {new_pendencia_data['data_prazo'].strftime('%d/%m/%Y')}
+
+Por favor, aceda ao sistema para submeter o relatório.
+                """
+                await EmailService.send_email(fiscal['email'], subject, body)
+        
         return Pendencia.model_validate(new_pendencia_data)
 
     async def get_pendencias_by_contrato_id(self, contrato_id: int) -> List[Pendencia]:
-        """Lista todas as pendências de um contrato específico."""
         if not await self.contrato_repo.find_contrato_by_id(contrato_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
             
