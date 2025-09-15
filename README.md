@@ -271,7 +271,7 @@ python app/scheduler.py
 ### Executar todos os testes
 ```bash
 # Testes básicos
-pytest
+pytest -sv --asyncio-mode=auto
 
 # Com cobertura
 pytest --cov=app tests/
