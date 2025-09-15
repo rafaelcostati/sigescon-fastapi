@@ -31,3 +31,12 @@ class UsuarioRepository:
             user.matricula, hashed_password, user.perfil_id
         )
         return dict(new_user)
+
+    async def update_user_password_hash(self, user_id: int, new_hash: str) -> bool:
+        """
+        Atualiza o hash da senha de um usuário.
+        Usado para migração de senhas antigas do Flask para bcrypt.
+        """
+        query = "UPDATE usuario SET senha = $2 WHERE id = $1"
+        result = await self.conn.execute(query, user_id, new_hash)
+        return result.endswith('1')  # Retorna True se uma linha foi afetada

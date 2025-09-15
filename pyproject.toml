@@ -13,13 +13,14 @@ dependencies = [
     "passlib[bcrypt]",
     "python-jose[cryptography]",
     "pydantic-settings",
-    "Werkzeug>=2.0,<4.0"
+    "Werkzeug>=2.0,<4.0"  # Versão mais flexível do Werkzeug
 ]
 
 [project.optional-dependencies]
 # Dependências usadas apenas para desenvolvimento e testes
 dev = [
     "pytest",
+    "pytest-asyncio",    # Plugin para testes async
     "httpx",
     "anyio"
 ]
@@ -30,4 +31,9 @@ addopts = [
     "-sv",          # Mostra prints e detalhes (verbose)
     "-p",           # Usa a opção de plugin
     "no:asyncio",   # DESATIVA o plugin 'asyncio'
+]
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.2.0",
 ]

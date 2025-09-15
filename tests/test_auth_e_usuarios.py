@@ -10,8 +10,7 @@ dotenv.load_dotenv()
 # Fixture para reutilizar os dados do admin e do usuário comum nos testes
 @pytest.fixture(scope="module")
 def admin_user_data() -> Dict:
-    
-    return {"username":os.getenv("ADMIN_EMAIL"), "password": os.getenv("ADMIN_PASSWORD")}
+    return {"username": os.getenv("ADMIN_EMAIL"), "password": os.getenv("ADMIN_PASSWORD")}
 
 @pytest.fixture(scope="module")
 def common_user_data() -> Dict:
@@ -20,10 +19,10 @@ def common_user_data() -> Dict:
         "email": "comum@teste.com",
         "cpf": "11122233344",
         "senha": "senha_comum_123",
-        "perfil_id": 3 # Fiscal
+        "perfil_id": 3  # Fiscal
     }
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_admin_login_and_get_token(async_client: AsyncClient, admin_user_data: Dict):
     """Testa se o admin consegue fazer login e obter um token."""
     print("\n--- Testando Login do Admin ---")
@@ -35,7 +34,7 @@ async def test_admin_login_and_get_token(async_client: AsyncClient, admin_user_d
     assert response_data["token_type"] == "bearer"
     print("--> Login de Admin bem-sucedido.")
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_admin_can_create_user(async_client: AsyncClient, admin_user_data: Dict, common_user_data: Dict):
     """Testa se um admin autenticado pode criar um novo usuário."""
     print("\n--- Testando Criação de Usuário pelo Admin ---")
@@ -54,7 +53,7 @@ async def test_admin_can_create_user(async_client: AsyncClient, admin_user_data:
     assert "id" in response_data
     print(f"--> Admin criou o usuário '{common_user_data['email']}' com sucesso.")
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_get_current_user_profile(async_client: AsyncClient, admin_user_data: Dict):
     """Testa o endpoint /usuarios/me para retornar o perfil do usuário logado."""
     print("\n--- Testando /usuarios/me ---")
@@ -71,11 +70,11 @@ async def test_get_current_user_profile(async_client: AsyncClient, admin_user_da
     assert response_data["email"] == admin_user_data["username"]
     print("--> Endpoint /me retornou o perfil correto.")
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_unauthorized_user_cannot_create_user(async_client: AsyncClient, common_user_data: Dict):
     """Testa se um usuário sem token (ou com token não-admin) não pode criar usuários."""
     print("\n--- Testando Bloqueio de Criação de Usuário (Sem Token) ---")
     # Tentativa sem token algum
     response = await async_client.post("/usuarios/", json=common_user_data)
-    assert response.status_code == 401 # Unauthorized
+    assert response.status_code == 401  # Unauthorized
     print("--> Rota de criação de usuário bloqueada para acesso sem token.")

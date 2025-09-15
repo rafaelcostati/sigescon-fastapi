@@ -4,7 +4,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Dicionário de configuração do Pydantic v2
-    model_config = SettingsConfigDict(env_file=".env", extra='ignore') # <-- ADICIONAR ESTA LINHA
+    model_config = SettingsConfigDict(env_file=".env", extra='ignore') 
 
     # Configuração do Banco de Dados
     DATABASE_URL: str

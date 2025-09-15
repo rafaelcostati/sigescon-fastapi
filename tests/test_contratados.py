@@ -2,8 +2,7 @@
 import pytest
 from httpx import AsyncClient
 
-# pytest.mark.asyncio diz ao pytest para rodar este teste de forma assíncrona
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_full_crud_workflow(async_client: AsyncClient):
     """
     Testa o fluxo completo de CRUD (Create, Read, Update, Delete)
@@ -18,7 +17,7 @@ async def test_full_crud_workflow(async_client: AsyncClient):
     print("\n--- Testando CREATE ---")
     create_data = {
         "nome": "Contratado de Teste LTDA",
-        "email": "rafael.costa@pgr",
+        "email": "rafael.costa@pgr.com",  # Corrigido para email válido
         "cnpj": "12345678000199",
         "cpf": None,
         "telefone": "91988887777"
@@ -67,18 +66,18 @@ async def test_full_crud_workflow(async_client: AsyncClient):
     response_data = response.json()
     assert response_data["nome"] == update_data["nome"]
     assert response_data["telefone"] == update_data["telefone"]
-    assert response_data["email"] == create_data["email"] # Garante que o email não mudou
+    assert response_data["email"] == create_data["email"]  # Garante que o email não mudou
     print(f"--> Contratado ID {contratado_id} atualizado com sucesso.")
 
     # --- 5. DELETE (DELETE /contratados/{id}) ---
     print("\n--- Testando DELETE ---")
     response = await async_client.delete(f"/contratados/{contratado_id}")
 
-    assert response.status_code == 204 # No Content
+    assert response.status_code == 204  # No Content
 
     # --- 6. VERIFY DELETE ---
     print("\n--- Verificando DELETE ---")
     response = await async_client.get(f"/contratados/{contratado_id}")
 
-    assert response.status_code == 404 # Not Found
+    assert response.status_code == 404  # Not Found
     print(f"--> Contratado ID {contratado_id} deletado e não é mais encontrado.")
