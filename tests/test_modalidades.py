@@ -86,11 +86,11 @@ async def test_non_admin_cannot_write(async_client: AsyncClient, admin_headers: 
         "perfil_id": 3
     }
     
-    # --- CORREÇÃO APLICADA AQUI ---
+    
     # Gerar CPF aleatório corretamente
     cpf_numerico = ''.join([str(random.randint(0, 9)) for _ in range(11)])
     fiscal_data["cpf"] = cpf_numerico
-    # --- FIM DA CORREÇÃO ---
+    
 
     create_user_response = await async_client.post("/usuarios/", json=fiscal_data, headers=admin_headers)
     assert create_user_response.status_code == 201, f"Falha ao criar usuário fiscal de teste: {create_user_response.text}"

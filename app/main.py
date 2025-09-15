@@ -1,7 +1,7 @@
 # app/main.py
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from app.api.routers import contratado_router, auth_router, usuario_router, perfil_router, modalidade_router, status_router, status_relatorio_router, status_pendencia_router, contrato_router, pendencia_router
+from app.api.routers import contratado_router, auth_router, usuario_router, perfil_router, modalidade_router, status_router, status_relatorio_router, status_pendencia_router, contrato_router, pendencia_router, relatorio_router
 from app.core.database import get_db_pool, close_db_pool
 
 # Gerenciador de contexto para o ciclo de vida da aplicação
@@ -31,6 +31,7 @@ app.include_router(status_relatorio_router.router)
 app.include_router(status_pendencia_router.router)
 app.include_router(contrato_router.router)
 app.include_router(pendencia_router.router)
+app.include_router(relatorio_router.router)
 
 @app.get("/", tags=["Root"])
 def read_root():

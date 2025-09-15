@@ -69,10 +69,8 @@ async def setup_contract(async_client: AsyncClient, admin_headers: Dict, admin_u
         "fiscal_id": fiscal['id']
     }
     
-    # --- CORREÇÃO APLICADA AQUI ---
     # Enviando como 'data' para corresponder ao endpoint de formulário
     contrato_resp = await async_client.post("/contratos/", data=contrato_data, headers=admin_headers)
-    # --- FIM DA CORREÇÃO ---
     
     assert contrato_resp.status_code == 201
     contrato = contrato_resp.json()

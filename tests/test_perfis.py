@@ -47,10 +47,8 @@ async def test_get_all_perfis(async_client: AsyncClient, admin_headers: dict):
 @pytest.mark.asyncio
 async def test_admin_can_create_perfil(async_client: AsyncClient, admin_headers: dict):
     """Testa se um admin pode criar um novo perfil."""
-    # --- CORREÇÃO APLICADA AQUI ---
     unique_name = f"Perfil Teste {uuid.uuid4().hex[:6]}"
     new_perfil = {"nome": unique_name}
-    # --- FIM DA CORREÇÃO ---
     
     response = await async_client.post("/perfis/", json=new_perfil, headers=admin_headers)
     assert response.status_code == 201
