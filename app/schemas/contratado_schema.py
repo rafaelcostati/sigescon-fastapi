@@ -1,6 +1,6 @@
 # app/schemas/contratado_schema.py
 from pydantic import BaseModel, EmailStr, ConfigDict
-from typing import Optional
+from typing import List, Optional
 
 # Campos compartilhados por outros schemas
 class ContratadoBase(BaseModel):
@@ -31,3 +31,10 @@ class Contratado(ContratadoBase):
     # Habilita o modo "ORM" para que o Pydantic consiga ler
     # os dados vindos do banco (que não são um dict puro)
     model_config = ConfigDict(from_attributes=True)
+    
+class ContratadoPaginated(BaseModel):
+    data: List[Contratado]
+    total_items: int
+    total_pages: int
+    current_page: int
+    per_page: int
