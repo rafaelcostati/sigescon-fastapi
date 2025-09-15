@@ -10,3 +10,4 @@ __pycache__/
 teste_token.py
 criar_tudo.py
 /sigescon_fastapi.egg-info
+/.venv
