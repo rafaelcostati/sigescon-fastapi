@@ -5,6 +5,7 @@ from typing import Dict
 import os
 import uuid
 from dotenv import load_dotenv
+import random
 
 load_dotenv()
 
@@ -32,10 +33,11 @@ async def admin_headers(admin_token: str) -> Dict:
 def unique_user_data() -> Dict:
     """Gera dados únicos para criar um usuário"""
     unique_id = str(uuid.uuid4())[:8]
+    cpf_numerico = ''.join([str(random.randint(0, 9)) for _ in range(11)])
     return {
         "nome": f"Teste User {unique_id}",
         "email": f"teste_{unique_id}@example.com",
-        "cpf": f"111{unique_id[:8]}",
+        "cpf": cpf_numerico,
         "matricula": f"MAT{unique_id}",
         "senha": "senha123",
         "perfil_id": 3  # Fiscal
@@ -285,6 +287,7 @@ class TestPermissions:
         # Tenta criar outro usuário (deve falhar)
         new_user_data = unique_user_data.copy()
         new_user_data["email"] = "outro@example.com"
+        new_user_data["cpf"] = ''.join([str(random.randint(0, 9)) for _ in range(11)])
         response = await async_client.post(
             "/usuarios/",
             json=new_user_data,
@@ -306,14 +309,14 @@ class TestPermissions:
         user1_data = {
             "nome": "User 1",
             "email": f"user1_{uuid.uuid4().hex[:8]}@test.com",
-            "cpf": "11111111111",
+            "cpf": ''.join([str(random.randint(0, 9)) for _ in range(11)]),
             "senha": "senha1",
             "perfil_id": 3
         }
         user2_data = {
             "nome": "User 2",
             "email": f"user2_{uuid.uuid4().hex[:8]}@test.com",
-            "cpf": "22222222222",
+            "cpf": ''.join([str(random.randint(0, 9)) for _ in range(11)]),
             "senha": "senha2",
             "perfil_id": 3
         }
@@ -321,6 +324,8 @@ class TestPermissions:
         # Cria ambos
         response1 = await async_client.post("/usuarios/", json=user1_data, headers=admin_headers)
         response2 = await async_client.post("/usuarios/", json=user2_data, headers=admin_headers)
+        assert response1.status_code == 201
+        assert response2.status_code == 201
         user1_id = response1.json()["id"]
         user2_id = response2.json()["id"]
         

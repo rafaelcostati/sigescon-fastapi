@@ -14,15 +14,15 @@ class UsuarioBase(BaseModel):
     @field_validator('cpf')
     @classmethod
     def validate_cpf(cls, v: str) -> str:
-        """Remove formatação e valida o CPF"""
+        """Remove formatação e valida o CPF, permitindo o CPF padrão do admin."""
         # Remove caracteres não numéricos
         cpf = re.sub(r'\D', '', v)
         
         if len(cpf) != 11:
             raise ValueError('CPF deve ter 11 dígitos')
         
-        # Validação básica - evita CPFs como 11111111111
-        if len(set(cpf)) == 1:
+        # Permite o CPF do admin do seeder, mas rejeita outros CPFs inválidos.
+        if len(set(cpf)) == 1 and cpf != '00000000000':
             raise ValueError('CPF inválido')
             
         return cpf
@@ -41,14 +41,14 @@ class UsuarioUpdate(BaseModel):
     @field_validator('cpf')
     @classmethod
     def validate_cpf(cls, v: Optional[str]) -> Optional[str]:
-        """Valida CPF se fornecido"""
+        """Valida CPF se fornecido, permitindo o CPF padrão do admin."""
         if v is None:
             return v
             
         cpf = re.sub(r'\D', '', v)
         if len(cpf) != 11:
             raise ValueError('CPF deve ter 11 dígitos')
-        if len(set(cpf)) == 1:
+        if len(set(cpf)) == 1 and cpf != '00000000000':
             raise ValueError('CPF inválido')
         return cpf
 

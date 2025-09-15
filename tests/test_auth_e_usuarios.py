@@ -5,6 +5,7 @@ from typing import Dict
 import dotenv
 import os 
 import uuid
+import random
 
 dotenv.load_dotenv()
 
@@ -15,12 +16,15 @@ def admin_user_data() -> Dict:
 
 @pytest.fixture(scope="function")
 def common_user_data() -> Dict:
-    # Gera um email único para cada teste usando UUID
+    """Gera um email e CPF únicos para cada teste."""
     unique_id = str(uuid.uuid4())[:8]
+    # Gera 11 dígitos numéricos aleatórios para o CPF
+    cpf_numerico = ''.join([str(random.randint(0, 9)) for _ in range(11)])
+    
     return {
         "nome": f"Usuario Teste {unique_id}",
         "email": f"teste_{unique_id}@example.com",
-        "cpf": f"111{unique_id[:8]}",
+        "cpf": cpf_numerico,
         "senha": "senha_teste_123",
         "perfil_id": 3  # Fiscal
     }

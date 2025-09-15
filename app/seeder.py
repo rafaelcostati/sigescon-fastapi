@@ -23,12 +23,15 @@ async def seed_data(conn: asyncpg.Connection):
             admin_pass_hash = get_password_hash(settings.ADMIN_PASSWORD)
             perfil_admin_id = await conn.fetchval("SELECT id FROM perfil WHERE nome = 'Administrador'")
             
+            # CPF do admin alterado para um valor que passa na validação
+            admin_cpf = "12345678901" 
+            
             await conn.execute(
                 """
                 INSERT INTO usuario (nome, email, cpf, senha, perfil_id)
                 VALUES ($1, $2, $3, $4, $5)
                 """,
-                'Admin de Teste', admin_email, '00000000000', admin_pass_hash, perfil_admin_id
+                'Admin de Teste', admin_email, admin_cpf, admin_pass_hash, perfil_admin_id
             )
             print(f"- Usuário Administrador '{admin_email}' criado.")
     
