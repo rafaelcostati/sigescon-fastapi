@@ -1,0 +1,12 @@
+/venv
+teste_full_workflow.py
+reset_database.py
+.env
+*.pyc
+uploads/
+__pycache__/
+*.pdf
+*.txt
+teste_token.py
+criar_tudo.py
+/sigescon_fastapi.egg-info

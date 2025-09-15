@@ -1,0 +1,24 @@
+[project]
+name = "sigescon-fastapi"
+version = "0.1.0"
+description = "Sistema de Gestão de Contratos com FastAPI"
+authors = [{ name = "Rafael", email = "rafaelblur@gmail.com" }]
+requires-python = ">=3.10"
+
+# Dependências principais da aplicação
+dependencies = [
+    "fastapi[all]",
+    "asyncpg",
+    "python-dotenv",
+    "passlib[bcrypt]",
+    "python-jose[cryptography]",
+    "pydantic-settings", # Para ler as configurações do .env
+]
+
+[project.optional-dependencies]
+# Dependências usadas apenas para desenvolvimento e testes
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx", # Cliente HTTP assíncrono para testes
+]
