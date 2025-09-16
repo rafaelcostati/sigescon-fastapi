@@ -1,10 +1,10 @@
-# tests/test_perfis.py
+# tests/test_perfis.py 
 import pytest
 from httpx import AsyncClient
 from typing import Dict
 import os
 from dotenv import load_dotenv
-import uuid # <-- IMPORTAÇÃO ADICIONADA
+import uuid
 
 # Carrega as variáveis de ambiente para os testes
 load_dotenv()
@@ -33,7 +33,7 @@ async def admin_headers(admin_token: str) -> Dict:
 @pytest.mark.asyncio
 async def test_get_all_perfis(async_client: AsyncClient, admin_headers: dict):
     """Testa a listagem de todos os perfis por um usuário autenticado."""
-    response = await async_client.get("/perfis/", headers=admin_headers)
+    response = await async_client.get("/api/v1/perfis/", headers=admin_headers)
     assert response.status_code == 200
     
     data = response.json()
@@ -50,7 +50,7 @@ async def test_admin_can_create_perfil(async_client: AsyncClient, admin_headers:
     unique_name = f"Perfil Teste {uuid.uuid4().hex[:6]}"
     new_perfil = {"nome": unique_name}
     
-    response = await async_client.post("/perfis/", json=new_perfil, headers=admin_headers)
+    response = await async_client.post("/api/v1/perfis/", json=new_perfil, headers=admin_headers)
     assert response.status_code == 201
     assert response.json()["nome"] == new_perfil["nome"]
     assert "id" in response.json()

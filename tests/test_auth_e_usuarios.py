@@ -1,4 +1,4 @@
-# tests/test_auth_e_usuarios.py - VERSÃO CORRIGIDA
+# tests/test_auth_e_usuarios.py
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
@@ -51,7 +51,7 @@ async def test_admin_can_create_user(async_client: AsyncClient, admin_user_data:
     token = login_response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 2. Tentar criar o usuário (CORRIGIDO: adicionar prefixo da API)
+    # 2. Criar um novo usuário
     response = await async_client.post("/api/v1/usuarios/", json=common_user_data, headers=headers)
     
     assert response.status_code == 201
@@ -70,7 +70,7 @@ async def test_get_current_user_profile(async_client: AsyncClient, admin_user_da
     token = login_response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 2. Acessar o endpoint /me (CORRIGIDO: adicionar prefixo da API)
+    
     response = await async_client.get("/api/v1/usuarios/me", headers=headers)
 
     assert response.status_code == 200
@@ -82,7 +82,7 @@ async def test_get_current_user_profile(async_client: AsyncClient, admin_user_da
 async def test_unauthorized_user_cannot_create_user(async_client: AsyncClient, common_user_data: Dict):
     """Testa se um usuário sem token (ou com token não-admin) não pode criar usuários."""
     print("\n--- Testando Bloqueio de Criação de Usuário (Sem Token) ---")
-    # Tentativa sem token algum (CORRIGIDO: adicionar prefixo da API)
+    
     response = await async_client.post("/api/v1/usuarios/", json=common_user_data)
     assert response.status_code == 401  # Unauthorized
     print("--> Rota de criação de usuário bloqueada para acesso sem token.")

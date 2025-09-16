@@ -1,4 +1,4 @@
-# app/api/permissions.py 
+# app/api/permissions.py - VERSÃO CORRIGIDA
 from typing import List
 from fastapi import HTTPException, status, Depends
 import asyncpg
@@ -66,3 +66,5 @@ async def require_admin_or_manager(
         )
     return current_user
 
+
+admin_required = require_admin  
