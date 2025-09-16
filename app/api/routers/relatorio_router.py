@@ -6,7 +6,7 @@ from datetime import date
 
 from app.core.database import get_connection
 from app.schemas.usuario_schema import Usuario
-from app.api.dependencies import get_current_user, get_current_admin_user
+from app.api.dependencies import get_current_user
 from app.api.permissions import admin_required, PermissionChecker
 
 # Repositórios
@@ -17,6 +17,7 @@ from app.repositories.contrato_repo import ContratoRepository
 from app.repositories.status_relatorio_repo import StatusRelatorioRepository
 from app.repositories.status_pendencia_repo import StatusPendenciaRepository
 from app.repositories.usuario_repo import UsuarioRepository
+from app.repositories.perfil_repo import PerfilRepository 
 
 # Services
 from app.services.relatorio_service import RelatorioService
@@ -30,7 +31,7 @@ router = APIRouter(
     tags=["Relatórios Fiscais"]
 )
 
-# --- Injeção de Dependências ---
+# --- INJEÇÃO DE DEPENDÊNCIAS ---
 def get_relatorio_service(conn: asyncpg.Connection = Depends(get_connection)) -> RelatorioService:
     return RelatorioService(
         relatorio_repo=RelatorioRepository(conn),
@@ -40,10 +41,11 @@ def get_relatorio_service(conn: asyncpg.Connection = Depends(get_connection)) ->
         status_relatorio_repo=StatusRelatorioRepository(conn),
         status_pendencia_repo=StatusPendenciaRepository(conn),
         usuario_repo=UsuarioRepository(conn),
+        perfil_repo=PerfilRepository(conn), 
         file_service=FileService()
     )
 
-# --- Endpoints ---
+# --- Endpoints (sem alteração) ---
 
 @router.post("/", response_model=Relatorio, status_code=status.HTTP_201_CREATED)
 async def submit_relatorio(
