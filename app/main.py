@@ -116,11 +116,7 @@ app = FastAPI(
 # 1. Middleware de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # React dev
-        "http://localhost:8080",  # Vue dev
-        "https://sigescon.gov.br",  # Produção
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
