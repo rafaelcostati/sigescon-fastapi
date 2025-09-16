@@ -16,7 +16,9 @@ dependencies = [
     "Werkzeug>=2.0,<4.0",
     "aiofiles",
     "aiosmtplib",
-    "apscheduler"
+    "apscheduler",
+    "requests",
+    "reportlab"
 ]
 
 [project.optional-dependencies]

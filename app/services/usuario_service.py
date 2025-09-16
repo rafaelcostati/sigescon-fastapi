@@ -1,10 +1,12 @@
 # app/services/usuario_service.py
+import math
 from typing import Optional, List, Dict
 from fastapi import HTTPException, status
 from app.repositories.usuario_repo import UsuarioRepository
 from app.schemas.usuario_schema import (
     Usuario, UsuarioCreate, UsuarioUpdate, 
-    UsuarioChangePassword, UsuarioResetPassword
+    UsuarioChangePassword, UsuarioResetPassword,
+    UsuarioPaginated, UsuarioList
 )
 from app.core.security import get_password_hash, verify_password
 
@@ -12,10 +14,24 @@ class UsuarioService:
     def __init__(self, usuario_repo: UsuarioRepository):
         self.usuario_repo = usuario_repo
 
-    async def get_all(self, filters: Optional[Dict] = None) -> List[Usuario]:
-        """Lista todos os usuários com filtros opcionais"""
-        users_data = await self.usuario_repo.get_all_users(filters)
-        return [Usuario.model_validate(u) for u in users_data]
+    async def get_all_paginated(
+        self, page: int, per_page: int, filters: Optional[Dict] = None
+    ) -> UsuarioPaginated:
+        """Lista todos os usuários com paginação e filtros."""
+        offset = (page - 1) * per_page
+        users_data, total_items = await self.usuario_repo.get_all_users_paginated(
+            filters=filters, limit=per_page, offset=offset
+        )
+        
+        total_pages = math.ceil(total_items / per_page) if total_items > 0 else 1
+        
+        return UsuarioPaginated(
+            data=[UsuarioList.model_validate(u) for u in users_data],
+            total_items=total_items,
+            total_pages=total_pages,
+            current_page=page,
+            per_page=per_page
+        )
 
     async def get_by_id(self, user_id: int) -> Optional[Usuario]:
         """Busca um usuário pelo ID"""

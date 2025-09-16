@@ -4,9 +4,9 @@ from typing import List, Optional
 
 from app.schemas.usuario_schema import (
     Usuario, UsuarioCreate, UsuarioUpdate,
-    UsuarioChangePassword, UsuarioResetPassword
+    UsuarioChangePassword, UsuarioResetPassword, UsuarioPaginated 
 )
-from app.api.dependencies import get_current_user, get_current_admin_user
+from app.api.dependencies import get_current_user
 from app.services.usuario_service import UsuarioService
 from app.repositories.usuario_repo import UsuarioRepository
 from app.core.database import get_connection
@@ -33,14 +33,16 @@ async def read_users_me(current_user: Usuario = Depends(get_current_user)):
     """
     return current_user
 
-@router.get("/", response_model=List[Usuario], summary="Listar todos os usuários")
+@router.get("/", response_model=UsuarioPaginated, summary="Listar todos os usuários")
 async def list_users(
+    page: int = Query(1, ge=1, description="Número da página"),
+    per_page: int = Query(10, ge=1, le=100, description="Itens por página"),
     nome: Optional[str] = Query(None, description="Filtrar por nome (busca parcial)"),
     service: UsuarioService = Depends(get_usuario_service),
     admin_user: Usuario = Depends(admin_required)
 ):
     """
-    Lista todos os usuários ativos do sistema.
+    Lista todos os usuários ativos do sistema com paginação.
     
     Permite filtrar por nome (busca parcial).
     
@@ -50,7 +52,7 @@ async def list_users(
     if nome:
         filters['nome'] = nome
     
-    return await service.get_all(filters)
+    return await service.get_all_paginated(page=page, per_page=per_page, filters=filters)
 
 @router.post("/", response_model=Usuario, status_code=status.HTTP_201_CREATED, summary="Criar novo usuário")
 async def create_user(

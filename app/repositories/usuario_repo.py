@@ -1,6 +1,6 @@
 # app/repositories/usuario_repo.py
 import asyncpg
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 from app.schemas.usuario_schema import UsuarioCreate, UsuarioUpdate
 
 class UsuarioRepository:
@@ -16,32 +16,53 @@ class UsuarioRepository:
     async def get_user_by_id(self, user_id: int) -> Optional[Dict]:
         """Retorna o usuário sem a senha"""
         query = """
-            SELECT id, nome, email, cpf, matricula, perfil_id, ativo, created_at, updated_at 
-            FROM usuario WHERE id = $1 AND ativo = TRUE
+            SELECT u.id, u.nome, u.email, u.cpf, u.matricula, u.perfil_id, u.ativo, u.created_at, u.updated_at, p.nome as perfil_nome 
+            FROM usuario u
+            LEFT JOIN perfil p ON u.perfil_id = p.id
+            WHERE u.id = $1 AND u.ativo = TRUE
         """
         user = await self.conn.fetchrow(query, user_id)
         return dict(user) if user else None
 
-    async def get_all_users(self, filters: Optional[Dict] = None) -> List[Dict]:
-        """Lista todos os usuários ativos com filtros opcionais"""
-        query = """
-            SELECT id, nome, email, cpf, matricula, perfil_id, ativo, created_at, updated_at 
-            FROM usuario WHERE ativo = TRUE
+    async def get_all_users_paginated(
+        self,
+        filters: Optional[Dict] = None,
+        limit: int = 10,
+        offset: int = 0
+    ) -> Tuple[List[Dict], int]:
+        """Lista usuários ativos com filtros e paginação, retornando os dados e o total."""
+        
+        base_query = """
+            FROM usuario u
+            LEFT JOIN perfil p ON u.perfil_id = p.id
         """
+        where_clauses = ["u.ativo = TRUE"]
         params = []
+        param_idx = 1
         
         if filters and filters.get('nome'):
-            query += " AND nome ILIKE $1"
+            where_clauses.append("u.nome ILIKE $1")
             params.append(f"%{filters['nome']}%")
-            
-        query += " ORDER BY nome"
+            param_idx += 1
         
-        if params:
-            users = await self.conn.fetch(query, *params)
-        else:
-            users = await self.conn.fetch(query)
+        where_sql = " WHERE " + " AND ".join(where_clauses)
+
+        # Query para contar o total de itens
+        count_query = f"SELECT COUNT(u.id) AS total {base_query}{where_sql}"
+        total_items = await self.conn.fetchval(count_query, *params)
+        
+        # Query para buscar os dados paginados
+        data_query = f"""
+            SELECT u.id, u.nome, u.email, u.matricula, p.nome as perfil_nome
+            {base_query}
+            {where_sql}
+            ORDER BY u.nome
+            LIMIT ${param_idx} OFFSET ${param_idx + 1}
+        """
+        paginated_params = params + [limit, offset]
+        users = await self.conn.fetch(data_query, *paginated_params)
             
-        return [dict(u) for u in users]
+        return [dict(u) for u in users], total_items or 0
 
     async def create_user(self, user: UsuarioCreate, hashed_password: str) -> Dict:
         """Cria um novo usuário"""
@@ -64,7 +85,6 @@ class UsuarioRepository:
         if not update_data:
             return await self.get_user_by_id(user_id)
         
-        # Monta a query dinamicamente
         fields = ", ".join([f"{key} = ${i+2}" for i, key in enumerate(update_data.keys())])
         query = f"""
             UPDATE usuario SET {fields}, updated_at = NOW() 
@@ -86,10 +106,6 @@ class UsuarioRepository:
         query = "UPDATE usuario SET senha = $2, updated_at = NOW() WHERE id = $1 AND ativo = TRUE"
         result = await self.conn.execute(query, user_id, new_hash)
         return result.endswith('1')
-
-    async def update_user_password_hash(self, user_id: int, new_hash: str) -> bool:
-        """Alias para compatibilidade - atualiza o hash da senha"""
-        return await self.update_user_password(user_id, new_hash)
 
     async def get_user_with_password(self, user_id: int) -> Optional[Dict]:
         """Retorna o usuário com a senha para verificação de senha antiga"""

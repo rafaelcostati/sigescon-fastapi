@@ -1,6 +1,6 @@
 # app/schemas/usuario_schema.py
 from pydantic import BaseModel, EmailStr, ConfigDict, Field, field_validator
-from typing import Optional
+from typing import Optional, List 
 from datetime import datetime
 import re
 
@@ -74,3 +74,20 @@ class UsuarioWithPerfil(Usuario):
 class UsuarioLogin(BaseModel):
     email: EmailStr
     senha: str
+class UsuarioList(BaseModel):
+    """Schema simplificado para listagem de usuários."""
+    id: int
+    nome: str
+    email: EmailStr
+    matricula: Optional[str] = None
+    perfil_nome: Optional[str] = None 
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class UsuarioPaginated(BaseModel):
+    """Schema para a resposta paginada de usuários."""
+    data: List[UsuarioList]
+    total_items: int
+    total_pages: int
+    current_page: int
+    per_page: int
