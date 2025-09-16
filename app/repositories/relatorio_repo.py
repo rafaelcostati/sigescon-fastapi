@@ -35,9 +35,10 @@ class RelatorioRepository:
     async def get_relatorios_by_contrato_id(self, contrato_id: int) -> List[Dict]:
         query = """
             SELECT
-                rf.id, rf.mes_competencia, rf.observacoes_fiscal,
-                rf.created_at as data_envio, u.nome as enviado_por,
-                s.nome as status_relatorio, a.id as arquivo_id, a.nome_arquivo
+                rf.*, -- Seleciona todos os campos da tabela relatoriofiscal
+                u.nome as enviado_por,
+                s.nome as status_relatorio,
+                a.nome_arquivo
             FROM relatoriofiscal rf
             LEFT JOIN usuario u ON rf.fiscal_usuario_id = u.id
             LEFT JOIN statusrelatorio s ON rf.status_id = s.id
