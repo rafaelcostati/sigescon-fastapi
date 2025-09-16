@@ -246,11 +246,7 @@ async def get_metrics():
             "details": str(e)
         }
 
-# Inicializa timestamp de startup
-@app.on_event("startup")
-async def set_startup_time():
-    """Define o tempo de início da aplicação para cálculo de uptime"""
-    app.state.start_time = time.time()
+
 
 # === CONFIGURAÇÕES ADICIONAIS ===
 
