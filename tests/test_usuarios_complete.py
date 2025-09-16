@@ -1,5 +1,6 @@
-# tests/test_usuarios_complete.py
+# tests/test_usuarios_complete.py - VERSÃO CORRIGIDA
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from typing import Dict
 import os
@@ -9,27 +10,27 @@ import random
 
 load_dotenv()
 
-@pytest.fixture(scope="module")
-def admin_credentials() -> Dict:
+@pytest_asyncio.fixture(scope="module")
+async def admin_credentials() -> Dict:
     """Credenciais do admin do .env"""
     return {
         "username": os.getenv("ADMIN_EMAIL"),
         "password": os.getenv("ADMIN_PASSWORD")
     }
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def admin_token(async_client: AsyncClient, admin_credentials: Dict) -> str:
     """Obtém um token de admin válido"""
     response = await async_client.post("/auth/login", data=admin_credentials)
     assert response.status_code == 200
     return response.json()["access_token"]
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def admin_headers(admin_token: str) -> Dict:
     """Headers com autenticação de admin"""
     return {"Authorization": f"Bearer {admin_token}"}
 
-@pytest.fixture
+@pytest_asyncio.fixture
 def unique_user_data() -> Dict:
     """Gera dados únicos para criar um usuário"""
     unique_id = str(uuid.uuid4())[:8]
@@ -52,7 +53,7 @@ class TestUsuariosCRUD:
         print("\n--- Testando CREATE de Usuário ---")
         
         response = await async_client.post(
-            "/usuarios/",
+            "/api/v1/usuarios/",
             json=unique_user_data,
             headers=admin_headers
         )
@@ -79,7 +80,7 @@ class TestUsuariosCRUD:
         assert user_id, "Usuário não foi criado no teste anterior"
         
         response = await async_client.get(
-            f"/usuarios/{user_id}",
+            f"/api/v1/usuarios/{user_id}",
             headers=admin_headers
         )
         
@@ -94,7 +95,7 @@ class TestUsuariosCRUD:
         """Testa listagem de usuários"""
         print("\n--- Testando LIST de Usuários ---")
         
-        response = await async_client.get("/usuarios/", headers=admin_headers)
+        response = await async_client.get("/api/v1/usuarios/", headers=admin_headers)
         
         assert response.status_code == 200
         data = response.json()
@@ -104,7 +105,7 @@ class TestUsuariosCRUD:
         
         # Testa filtro por nome
         response = await async_client.get(
-            "/usuarios/?nome=Teste",
+            "/api/v1/usuarios/?nome=Teste",
             headers=admin_headers
         )
         assert response.status_code == 200
@@ -128,7 +129,7 @@ class TestUsuariosCRUD:
         }
         
         response = await async_client.patch(
-            f"/usuarios/{user_id}",
+            f"/api/v1/usuarios/{user_id}",
             json=update_data,
             headers=admin_headers
         )
@@ -149,7 +150,7 @@ class TestUsuariosCRUD:
         assert user_id, "Usuário não foi criado"
         
         response = await async_client.delete(
-            f"/usuarios/{user_id}",
+            f"/api/v1/usuarios/{user_id}",
             headers=admin_headers
         )
         
@@ -158,7 +159,7 @@ class TestUsuariosCRUD:
         
         # Verifica que o usuário não aparece mais na busca
         response = await async_client.get(
-            f"/usuarios/{user_id}",
+            f"/api/v1/usuarios/{user_id}",
             headers=admin_headers
         )
         assert response.status_code == 404
@@ -175,7 +176,7 @@ class TestPasswordManagement:
         
         # Cria um usuário novo para este teste
         response = await async_client.post(
-            "/usuarios/",
+            "/api/v1/usuarios/",
             json=unique_user_data,
             headers=admin_headers
         )
@@ -198,7 +199,7 @@ class TestPasswordManagement:
             "nova_senha": "nova_senha_123"
         }
         response = await async_client.patch(
-            f"/usuarios/{user_id}/alterar-senha",
+            f"/api/v1/usuarios/{user_id}/alterar-senha",
             json=password_change,
             headers=user_headers
         )
@@ -217,7 +218,7 @@ class TestPasswordManagement:
         print(f"✓ Login com nova senha funcionou")
         
         # Limpa o usuário criado
-        await async_client.delete(f"/usuarios/{user_id}", headers=admin_headers)
+        await async_client.delete(f"/api/v1/usuarios/{user_id}", headers=admin_headers)
     
     @pytest.mark.asyncio
     async def test_admin_reset_password(self, async_client: AsyncClient, admin_headers: Dict, unique_user_data: Dict):
@@ -226,7 +227,7 @@ class TestPasswordManagement:
         
         # Cria um usuário para o teste
         response = await async_client.post(
-            "/usuarios/",
+            "/api/v1/usuarios/",
             json=unique_user_data,
             headers=admin_headers
         )
@@ -236,7 +237,7 @@ class TestPasswordManagement:
         # Admin reseta a senha
         reset_data = {"nova_senha": "senha_resetada_123"}
         response = await async_client.patch(
-            f"/usuarios/{user_id}/resetar-senha",
+            f"/api/v1/usuarios/{user_id}/resetar-senha",
             json=reset_data,
             headers=admin_headers
         )
@@ -255,7 +256,7 @@ class TestPasswordManagement:
         print(f"✓ Login com senha resetada funcionou")
         
         # Limpa o usuário criado
-        await async_client.delete(f"/usuarios/{user_id}", headers=admin_headers)
+        await async_client.delete(f"/api/v1/usuarios/{user_id}", headers=admin_headers)
 
 
 class TestPermissions:
@@ -270,7 +271,7 @@ class TestPermissions:
         fiscal_data = unique_user_data.copy()
         fiscal_data["perfil_id"] = 3  # Fiscal
         response = await async_client.post(
-            "/usuarios/",
+            "/api/v1/usuarios/",
             json=fiscal_data,
             headers=admin_headers
         )
@@ -291,7 +292,7 @@ class TestPermissions:
         new_user_data["email"] = "outro@example.com"
         new_user_data["cpf"] = ''.join([str(random.randint(0, 9)) for _ in range(11)])
         response = await async_client.post(
-            "/usuarios/",
+            "/api/v1/usuarios/",
             json=new_user_data,
             headers=fiscal_headers
         )
@@ -300,7 +301,7 @@ class TestPermissions:
         print(f"✓ Fiscal bloqueado de criar usuários")
         
         # Limpa
-        await async_client.delete(f"/usuarios/{fiscal_id}", headers=admin_headers)
+        await async_client.delete(f"/api/v1/usuarios/{fiscal_id}", headers=admin_headers)
     
     @pytest.mark.asyncio
     async def test_user_cannot_change_others_password(self, async_client: AsyncClient, admin_headers: Dict):
@@ -324,8 +325,8 @@ class TestPermissions:
         }
         
         # Cria ambos
-        response1 = await async_client.post("/usuarios/", json=user1_data, headers=admin_headers)
-        response2 = await async_client.post("/usuarios/", json=user2_data, headers=admin_headers)
+        response1 = await async_client.post("/api/v1/usuarios/", json=user1_data, headers=admin_headers)
+        response2 = await async_client.post("/api/v1/usuarios/", json=user2_data, headers=admin_headers)
         assert response1.status_code == 201
         assert response2.status_code == 201
         user1_id = response1.json()["id"]
@@ -343,7 +344,7 @@ class TestPermissions:
             "nova_senha": "hackeada"
         }
         response = await async_client.patch(
-            f"/usuarios/{user2_id}/alterar-senha",
+            f"/api/v1/usuarios/{user2_id}/alterar-senha",
             json=password_change,
             headers=user1_headers
         )
@@ -352,5 +353,5 @@ class TestPermissions:
         print(f"✓ Usuário impedido de alterar senha de outros")
         
         # Limpa
-        await async_client.delete(f"/usuarios/{user1_id}", headers=admin_headers)
-        await async_client.delete(f"/usuarios/{user2_id}", headers=admin_headers)
+        await async_client.delete(f"/api/v1/usuarios/{user1_id}", headers=admin_headers)
+        await async_client.delete(f"/api/v1/usuarios/{user2_id}", headers=admin_headers)

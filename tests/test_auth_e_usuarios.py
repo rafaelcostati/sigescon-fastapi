@@ -1,5 +1,6 @@
-# tests/test_auth_e_usuarios.py
+# tests/test_auth_e_usuarios.py - VERSÃO CORRIGIDA
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from typing import Dict
 import dotenv
@@ -10,11 +11,11 @@ import random
 dotenv.load_dotenv()
 
 # Fixture para reutilizar os dados do admin e do usuário comum nos testes
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module")
 def admin_user_data() -> Dict:
     return {"username": os.getenv("ADMIN_EMAIL"), "password": os.getenv("ADMIN_PASSWORD")}
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 def common_user_data() -> Dict:
     """Gera um email e CPF únicos para cada teste."""
     unique_id = str(uuid.uuid4())[:8]
@@ -50,8 +51,8 @@ async def test_admin_can_create_user(async_client: AsyncClient, admin_user_data:
     token = login_response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 2. Tentar criar o usuário
-    response = await async_client.post("/usuarios/", json=common_user_data, headers=headers)
+    # 2. Tentar criar o usuário (CORRIGIDO: adicionar prefixo da API)
+    response = await async_client.post("/api/v1/usuarios/", json=common_user_data, headers=headers)
     
     assert response.status_code == 201
     response_data = response.json()
@@ -69,8 +70,8 @@ async def test_get_current_user_profile(async_client: AsyncClient, admin_user_da
     token = login_response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 2. Acessar o endpoint /me
-    response = await async_client.get("/usuarios/me", headers=headers)
+    # 2. Acessar o endpoint /me (CORRIGIDO: adicionar prefixo da API)
+    response = await async_client.get("/api/v1/usuarios/me", headers=headers)
 
     assert response.status_code == 200
     response_data = response.json()
@@ -81,7 +82,7 @@ async def test_get_current_user_profile(async_client: AsyncClient, admin_user_da
 async def test_unauthorized_user_cannot_create_user(async_client: AsyncClient, common_user_data: Dict):
     """Testa se um usuário sem token (ou com token não-admin) não pode criar usuários."""
     print("\n--- Testando Bloqueio de Criação de Usuário (Sem Token) ---")
-    # Tentativa sem token algum
-    response = await async_client.post("/usuarios/", json=common_user_data)
+    # Tentativa sem token algum (CORRIGIDO: adicionar prefixo da API)
+    response = await async_client.post("/api/v1/usuarios/", json=common_user_data)
     assert response.status_code == 401  # Unauthorized
     print("--> Rota de criação de usuário bloqueada para acesso sem token.")
