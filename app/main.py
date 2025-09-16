@@ -1,41 +1,335 @@
-# app/main.py
-from fastapi import FastAPI
+# app/main.py 
+import time
 from contextlib import asynccontextmanager
-from app.api.routers import contratado_router, auth_router, usuario_router, perfil_router, modalidade_router, status_router, status_relatorio_router, status_pendencia_router, contrato_router, pendencia_router, relatorio_router
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+import asyncpg
+
+# Imports dos routers existentes
+from app.api.routers import (
+    contratado_router, auth_router, usuario_router, perfil_router,
+    modalidade_router, status_router, status_relatorio_router,
+    status_pendencia_router, contrato_router, pendencia_router, relatorio_router
+)
+
+# Imports dos sistemas avançados
 from app.core.database import get_db_pool, close_db_pool
+from app.middleware.audit import AuditMiddleware
+from app.middleware.logging import setup_logging
+from app.services.notification_service import NotificationScheduler
+from app.api.exception_handlers import (
+    sigescon_exception_handler,
+    database_exception_handler,
+    validation_exception_handler,
+    http_exception_handler,
+    generic_exception_handler
+)
+from app.core.exceptions import SigesconException
+
+# Configuração de logging
+setup_logging()
+
+# Instância do scheduler de notificações
+notification_scheduler = NotificationScheduler()
 
 # Gerenciador de contexto para o ciclo de vida da aplicação
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Iniciando aplicação e criando pool de DB...")
-    await get_db_pool()
-    yield
-    print("Fechando pool de DB...")
-    await close_db_pool()
+    """Gerencia o ciclo de vida da aplicação"""
+    print("🚀 Iniciando aplicação SIGESCON...")
     
+    # === STARTUP ===
+    try:
+        # 1. Conexão com banco de dados
+        print("📊 Conectando ao banco de dados...")
+        await get_db_pool()
+        
+        # 2. Configuração do scheduler de notificações
+        print("⏰ Configurando scheduler de notificações...")
+        await notification_scheduler.setup_services()
+        notification_scheduler.start_scheduler()
+        
+        print("✅ Aplicação iniciada com sucesso!")
+        
+        yield  # Aplicação está rodando
+        
+    except Exception as e:
+        print(f"❌ Erro durante inicialização: {e}")
+        raise
+    
+    # === SHUTDOWN ===
+    print("🛑 Encerrando aplicação...")
+    
+    try:
+        # 1. Para o scheduler
+        print("⏰ Parando scheduler...")
+        notification_scheduler.stop_scheduler()
+        
+        # 2. Fecha conexões do banco
+        print("📊 Fechando conexões do banco...")
+        await close_db_pool()
+        
+        print("✅ Aplicação encerrada com sucesso!")
+    
+    except Exception as e:
+        print(f"⚠️ Erro durante encerramento: {e}")
+
+# Criação da aplicação FastAPI
 app = FastAPI(
     title="SIGESCON API",
-    description="Sistema de Gestão de Contratos",
-    version="1.0.0",
-    lifespan=lifespan 
+    description="""
+    Sistema de Gestão de Contratos - API RESTful
+    
+    ## Funcionalidades Principais:
+    
+    * **Autenticação JWT** - Sistema seguro de login
+    * **Gestão de Usuários** - CRUD completo com perfis
+    * **Gestão de Contratos** - Ciclo completo com upload de arquivos
+    * **Relatórios Fiscais** - Workflow de submissão e aprovação
+    * **Notificações** - Sistema automatizado de lembretes
+    * **Auditoria** - Log completo de todas as ações
+    
+    ## Permissões:
+    
+    * **Administrador** - Acesso total ao sistema
+    * **Gestor** - Visualização de contratos sob sua gestão
+    * **Fiscal** - Submissão de relatórios e consulta de pendências
+    """,
+    version="2.0.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
-# Registrando os routers
-app.include_router(contratado_router.router)
+# === MIDDLEWARE ===
+
+# 1. Middleware de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",  # React dev
+        "http://localhost:8080",  # Vue dev
+        "https://sigescon.gov.br",  # Produção
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 2. Middleware de auditoria
+app.add_middleware(AuditMiddleware)
+
+# 3. Middleware para adicionar timestamp na request
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    """Adiciona informações de timing e request ID"""
+    start_time = time.time()
+    request.state.timestamp = start_time
+    
+    # Adiciona ID único para rastreamento
+    import uuid
+    request.state.request_id = str(uuid.uuid4())[:8]
+    
+    response = await call_next(request)
+    
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    response.headers["X-Request-ID"] = request.state.request_id
+    
+    return response
+
+# === EXCEPTION HANDLERS ===
+
+# Handlers customizados (ordem importante - mais específico primeiro)
+app.add_exception_handler(SigesconException, sigescon_exception_handler)
+app.add_exception_handler(asyncpg.PostgresError, database_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
+
+# === ROUTERS ===
+
+# Routers de autenticação (sem prefixo)
 app.include_router(auth_router.router)
-app.include_router(usuario_router.router)
-app.include_router(perfil_router.router)
-app.include_router(modalidade_router.router)
-app.include_router(status_router.router)
-app.include_router(status_relatorio_router.router)
-app.include_router(status_pendencia_router.router)
-app.include_router(contrato_router.router)
-app.include_router(pendencia_router.router)
-app.include_router(relatorio_router.router)
+
+# Routers principais com prefixo /api/v1
+API_PREFIX = "/api/v1"
+
+app.include_router(usuario_router.router, prefix=API_PREFIX)
+app.include_router(contratado_router.router, prefix=API_PREFIX)
+app.include_router(contrato_router.router, prefix=API_PREFIX)
+app.include_router(pendencia_router.router, prefix=API_PREFIX)
+app.include_router(relatorio_router.router, prefix=API_PREFIX)
+
+# Routers de tabelas auxiliares
+app.include_router(perfil_router.router, prefix=API_PREFIX)
+app.include_router(modalidade_router.router, prefix=API_PREFIX)
+app.include_router(status_router.router, prefix=API_PREFIX)
+app.include_router(status_relatorio_router.router, prefix=API_PREFIX)
+app.include_router(status_pendencia_router.router, prefix=API_PREFIX)
+
+# === ENDPOINTS ADICIONAIS ===
 
 @app.get("/", tags=["Root"])
-def read_root():
-    """
-    Endpoint raiz da API.
-    """
-    return {"message": "Bem-vindo à SIGESCON API!"}
+async def read_root():
+    """Endpoint raiz da API com informações básicas."""
+    return {
+        "message": "Bem-vindo à SIGESCON API v2.0!",
+        "status": "operational",
+        "features": [
+            "Autenticação JWT",
+            "Gestão de Contratos",
+            "Upload de Arquivos",
+            "Notificações Automáticas",
+            "Sistema de Auditoria",
+            "Performance Monitoring",
+            "Permissões Granulares"
+        ],
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "version": "2.0.0"
+    }
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Endpoint de health check para monitoramento."""
+    try:
+        # Testa conexão com banco
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            await conn.fetchval("SELECT 1")
+        db_status = "healthy"
+    except:
+        db_status = "unhealthy"
+    
+    # Status geral
+    overall_status = "healthy" if db_status == "healthy" else "degraded"
+    
+    return {
+        "status": overall_status,
+        "timestamp": time.time(),
+        "services": {
+            "database": db_status,
+            "notifications": "healthy" if notification_scheduler.scheduler.running else "stopped"
+        }
+    }
+
+@app.get("/metrics", tags=["Monitoring"])
+async def get_metrics():
+    """Endpoint básico de métricas para monitoramento."""
+    try:
+        pool = await get_db_pool()
+        
+        # Estatísticas do pool de conexões
+        pool_stats = {
+            "max_size": pool.get_max_size(),
+            "min_size": pool.get_min_size(),
+            "size": pool.get_size(),
+            "idle_size": pool.get_idle_size()
+        }
+        
+        return {
+            "database": {
+                "connection_pool": pool_stats
+            },
+            "application": {
+                "version": "2.0.0",
+                "uptime": time.time() - app.state.start_time if hasattr(app.state, 'start_time') else 0
+            }
+        }
+    except Exception as e:
+        return {
+            "error": "Failed to collect metrics",
+            "details": str(e)
+        }
+
+# Inicializa timestamp de startup
+@app.on_event("startup")
+async def set_startup_time():
+    """Define o tempo de início da aplicação para cálculo de uptime"""
+    app.state.start_time = time.time()
+
+# === CONFIGURAÇÕES ADICIONAIS ===
+
+# Configuração de tags para documentação
+tags_metadata = [
+    {
+        "name": "Root",
+        "description": "Endpoints básicos da API",
+    },
+    {
+        "name": "Autenticação",
+        "description": "Login e gerenciamento de tokens JWT",
+    },
+    {
+        "name": "Usuários",
+        "description": "CRUD de usuários e gerenciamento de perfis",
+    },
+    {
+        "name": "Contratos",
+        "description": "Gestão completa do ciclo de vida de contratos",
+    },
+    {
+        "name": "Contratados",
+        "description": "Cadastro de empresas e pessoas contratadas",
+    },
+    {
+        "name": "Relatórios Fiscais",
+        "description": "Submissão e aprovação de relatórios de fiscalização",
+    },
+    {
+        "name": "Pendências",
+        "description": "Criação e acompanhamento de pendências de relatórios",
+    },
+    {
+        "name": "Perfis",
+        "description": "Tipos de perfil de usuário no sistema",
+    },
+    {
+        "name": "Modalidades",
+        "description": "Modalidades de contratação",
+    },
+    {
+        "name": "Status de Contratos",
+        "description": "Status possíveis para contratos",
+    },
+    {
+        "name": "Status de Relatórios",
+        "description": "Status possíveis para relatórios fiscais",
+    },
+    {
+        "name": "Status de Pendências",
+        "description": "Status possíveis para pendências",
+    },
+    {
+        "name": "Health",
+        "description": "Monitoramento de saúde da aplicação",
+    },
+    {
+        "name": "Monitoring",
+        "description": "Métricas e estatísticas do sistema",
+    }
+]
+
+app.openapi_tags = tags_metadata
+
+# === DESENVOLVIMENTO ===
+if __name__ == "__main__":
+    import uvicorn
+    
+    print("🔧 Modo de desenvolvimento detectado")
+    print("📚 Documentação disponível em: http://localhost:8000/docs")
+    print("🔍 ReDoc disponível em: http://localhost:8000/redoc")
+    print("❤️ Health check em: http://localhost:8000/health")
+    print("📊 Métricas em: http://localhost:8000/metrics")
+    
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )

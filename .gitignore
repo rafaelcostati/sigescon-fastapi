@@ -12,3 +12,5 @@ criar_tudo.py
 /sigescon_fastapi.egg-info
 /.venv
 uv.lock
+*.logs
+/logs
