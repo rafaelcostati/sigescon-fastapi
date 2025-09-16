@@ -67,3 +67,28 @@ async def db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
         yield conn
     finally:
         await conn.close()
+        
+@pytest.fixture
+async def outro_fiscal_user_id(get_db_connection):
+    """Cria um segundo usuário fiscal para testes de transferência"""
+    conn = await get_db_connection()
+    
+    # Busca o perfil Fiscal
+    perfil_fiscal = await conn.fetchrow("SELECT id FROM perfil WHERE nome = 'Fiscal'")
+    
+    # Hash da senha
+    from app.core.security import get_password_hash
+    senha_hash = get_password_hash("senha123")
+    
+    # Cria o segundo fiscal
+    fiscal_id = await conn.fetchval(
+        """INSERT INTO usuario (nome, email, cpf, senha, perfil_id) 
+           VALUES ($1, $2, $3, $4, $5) RETURNING id""",
+        "Carlos Fiscal Substituto", "carlos.fiscal@test.com", "98765432100", 
+        senha_hash, perfil_fiscal['id']
+    )
+    
+    yield fiscal_id
+    
+    # Cleanup
+    await conn.execute("UPDATE usuario SET ativo = FALSE WHERE id = $1", fiscal_id)

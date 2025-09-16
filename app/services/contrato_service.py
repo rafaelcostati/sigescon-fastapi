@@ -13,6 +13,7 @@ from app.repositories.arquivo_repo import ArquivoRepository
 
 # Services
 from app.services.file_service import FileService
+from app.services.email_service import EmailService
 
 # Schemas
 from app.schemas.contrato_schema import (
@@ -28,7 +29,7 @@ class ContratoService:
                  modalidade_repo: ModalidadeRepository,
                  status_repo: StatusRepository,
                  arquivo_repo: ArquivoRepository,
-                 file_service: FileService): # <-- Injeção de dependências adicionada
+                 file_service: FileService):
         self.contrato_repo = contrato_repo
         self.usuario_repo = usuario_repo
         self.contratado_repo = contratado_repo
@@ -38,7 +39,7 @@ class ContratoService:
         self.file_service = file_service
 
     async def _validate_foreign_keys(self, contrato: ContratoCreate | ContratoUpdate):
-        # (O corpo deste método permanece o mesmo)
+        """Valida se todas as chaves estrangeiras existem"""
         if hasattr(contrato, 'contratado_id') and contrato.contratado_id and not await self.contratado_repo.get_contratado_by_id(contrato.contratado_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contratado não encontrado")
         if hasattr(contrato, 'modalidade_id') and contrato.modalidade_id and not await self.modalidade_repo.get_modalidade_by_id(contrato.modalidade_id):
@@ -52,16 +53,67 @@ class ContratoService:
         if hasattr(contrato, 'fiscal_substituto_id') and contrato.fiscal_substituto_id and not await self.usuario_repo.get_user_by_id(contrato.fiscal_substituto_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fiscal Substituto não encontrado")
 
-    # --- MÉTODO ATUALIZADO ---
+    async def _send_contract_assignment_email(self, contrato_data: Dict, fiscal_id: int, gestor_id: int, is_update: bool = False, old_fiscal_id: Optional[int] = None):
+        """Envia emails de notificação para fiscal e gestor quando um contrato é criado ou atualizado"""
+        from app.services.email_templates import EmailTemplates
+        
+        # Email para o fiscal (novo ou atual)
+        if fiscal_id:
+            fiscal = await self.usuario_repo.get_user_by_id(fiscal_id)
+            if fiscal:
+                subject, body = EmailTemplates.contract_assignment_fiscal(
+                    fiscal_nome=fiscal['nome'],
+                    contrato_data=contrato_data,
+                    is_new=not is_update
+                )
+                await EmailService.send_email(fiscal['email'], subject, body)
+
+        # Email para o gestor
+        if gestor_id:
+            gestor = await self.usuario_repo.get_user_by_id(gestor_id)
+            if gestor:
+                # Busca dados do fiscal para incluir no email do gestor
+                fiscal_data = None
+                if fiscal_id:
+                    fiscal = await self.usuario_repo.get_user_by_id(fiscal_id)
+                    if fiscal:
+                        fiscal_data = {'nome': fiscal['nome'], 'email': fiscal['email']}
+                
+                subject, body = EmailTemplates.contract_assignment_manager(
+                    gestor_nome=gestor['nome'],
+                    contrato_data=contrato_data,
+                    fiscal_data=fiscal_data,
+                    is_new=not is_update
+                )
+                await EmailService.send_email(gestor['email'], subject, body)
+
+        # Se houve mudança de fiscal, notifica o fiscal anterior
+        if is_update and old_fiscal_id and old_fiscal_id != fiscal_id:
+            old_fiscal = await self.usuario_repo.get_user_by_id(old_fiscal_id)
+            if old_fiscal:
+                # Busca nome do novo fiscal para incluir na notificação
+                novo_fiscal_nome = None
+                if fiscal_id:
+                    novo_fiscal = await self.usuario_repo.get_user_by_id(fiscal_id)
+                    if novo_fiscal:
+                        novo_fiscal_nome = novo_fiscal['nome']
+                
+                subject, body = EmailTemplates.contract_transfer_notification(
+                    fiscal_nome=old_fiscal['nome'],
+                    contrato_data=contrato_data,
+                    novo_fiscal_nome=novo_fiscal_nome
+                )
+                await EmailService.send_email(old_fiscal['email'], subject, body)
+
     async def create_contrato(self, contrato_create: ContratoCreate, file: Optional[UploadFile] = None) -> Contrato:
-        """Cria um novo contrato e, opcionalmente, anexa um ficheiro."""
+        """Cria um novo contrato e, opcionalmente, anexa um arquivo"""
         await self._validate_foreign_keys(contrato_create)
         
         # Cria o contrato primeiro para obter um ID
         new_contrato_data = await self.contrato_repo.create_contrato(contrato_create)
         contrato_id = new_contrato_data['id']
 
-        # Se um ficheiro foi enviado, guarda-o e associa-o ao contrato
+        # Se um arquivo foi enviado, guarda-o e associa-o ao contrato
         if file:
             nome_original, path, tamanho = await self.file_service.save_upload_file(contrato_id, file)
             
@@ -72,12 +124,26 @@ class ContratoService:
                 tamanho_bytes=tamanho,
                 contrato_id=contrato_id
             )
-            # Vincula o ID do ficheiro ao campo 'documento' do contrato
+            # Vincula o ID do arquivo ao campo 'documento' do contrato
             await self.arquivo_repo.link_arquivo_to_contrato(arquivo_data['id'], contrato_id)
         
-        # Retorna o contrato completo, agora com a informação do ficheiro, se houver
+        # Retorna o contrato completo, agora com a informação do arquivo, se houver
         contrato_final = await self.contrato_repo.find_contrato_by_id(contrato_id)
-        return Contrato.model_validate(contrato_final)
+        contrato_response = Contrato.model_validate(contrato_final)
+
+        # === NOVO: Enviar emails de notificação ===
+        try:
+            await self._send_contract_assignment_email(
+                contrato_data=contrato_final,
+                fiscal_id=contrato_create.fiscal_id,
+                gestor_id=contrato_create.gestor_id,
+                is_update=False
+            )
+        except Exception as e:
+            # Log do erro, mas não falha a criação do contrato
+            print(f"Erro ao enviar emails de notificação para contrato {contrato_id}: {e}")
+
+        return contrato_response
 
     async def get_contrato_by_id(self, contrato_id: int) -> Optional[Contrato]:
         contrato_data = await self.contrato_repo.find_contrato_by_id(contrato_id)
@@ -86,7 +152,6 @@ class ContratoService:
         return None
 
     async def get_all_contratos(self, page: int, per_page: int, filters: Optional[Dict] = None) -> ContratoPaginated:
-        # (O corpo deste método permanece o mesmo)
         offset = (page - 1) * per_page
         contratos_data, total_items = await self.contrato_repo.get_all_contratos(
             filters=filters,
@@ -103,14 +168,41 @@ class ContratoService:
         )
 
     async def update_contrato(self, contrato_id: int, contrato_update: ContratoUpdate) -> Optional[Contrato]:
-        # (A lógica de upload na atualização será implementada num próximo passo)
-        if not await self.contrato_repo.find_contrato_by_id(contrato_id):
+        """Atualiza um contrato e envia notificações se fiscal/gestor mudaram"""
+        contrato_atual = await self.contrato_repo.find_contrato_by_id(contrato_id)
+        if not contrato_atual:
             return None
+        
         await self._validate_foreign_keys(contrato_update)
+        
+        # Salva IDs atuais para comparação
+        fiscal_atual_id = contrato_atual.get('fiscal_id')
+        gestor_atual_id = contrato_atual.get('gestor_id')
+        
+        # Atualiza o contrato
         updated_contrato_data = await self.contrato_repo.update_contrato(contrato_id, contrato_update)
-        if updated_contrato_data:
-            return Contrato.model_validate(updated_contrato_data)
-        return None
+        if not updated_contrato_data:
+            return None
+
+        # === NOVO: Verificar se fiscal ou gestor mudaram e enviar notificações ===
+        try:
+            novo_fiscal_id = getattr(contrato_update, 'fiscal_id', fiscal_atual_id)
+            novo_gestor_id = getattr(contrato_update, 'gestor_id', gestor_atual_id)
+            
+            # Envia notificação apenas se fiscal ou gestor mudaram
+            if (novo_fiscal_id != fiscal_atual_id) or (novo_gestor_id != gestor_atual_id):
+                await self._send_contract_assignment_email(
+                    contrato_data=updated_contrato_data,
+                    fiscal_id=novo_fiscal_id,
+                    gestor_id=novo_gestor_id,
+                    is_update=True,
+                    old_fiscal_id=fiscal_atual_id if novo_fiscal_id != fiscal_atual_id else None
+                )
+        except Exception as e:
+            # Log do erro, mas não falha a atualização do contrato
+            print(f"Erro ao enviar emails de notificação para atualização do contrato {contrato_id}: {e}")
+
+        return Contrato.model_validate(updated_contrato_data)
 
     async def delete_contrato(self, contrato_id: int) -> bool:
         if not await self.contrato_repo.find_contrato_by_id(contrato_id):
