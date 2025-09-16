@@ -1,6 +1,6 @@
 # app/repositories/arquivo_repo.py
 import asyncpg
-from typing import Dict
+from typing import Dict, Optional 
 
 class ArquivoRepository:
     def __init__(self, conn: asyncpg.Connection):
@@ -28,3 +28,9 @@ class ArquivoRepository:
         """Define o arquivo como o documento principal do contrato."""
         query = "UPDATE contrato SET documento = $1 WHERE id = $2"
         await self.conn.execute(query, arquivo_id, contrato_id)
+        
+    async def find_arquivo_by_id(self, arquivo_id: int) -> Optional[Dict]:
+        """Busca um arquivo pelo seu ID."""
+        query = "SELECT * FROM arquivo WHERE id = $1"
+        record = await self.conn.fetchrow(query, arquivo_id)
+        return dict(record) if record else None

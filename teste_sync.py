@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from dotenv import load_dotenv
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-from werkzeug.security import generate_password_hash # <-- Importar para o novo teste
+from werkzeug.security import generate_password_hash 
 
 # --- 1. CONFIGURAÇÃO INICIAL ---
 
@@ -101,14 +101,14 @@ def create_temporary_user(admin_headers, perfil_id=3, return_full_data=False, le
     ids_criados["usuarios"].append(user['id'])
     
     if return_full_data: 
-        user['senha'] = plain_password # Retorna a senha em texto plano para login
+        user['senha'] = plain_password 
         return user
     return user
 
 # --- 4. SUÍTES DE TESTE MODULARES ---
 
 def run_usuarios_tests(admin_headers):
-    # (Esta função permanece a mesma da versão anterior)
+    
     print_step("Iniciando suíte de testes: Usuários e Autenticação")
     
     print_sub_step("Teste 1: CRUD de Usuário")
@@ -165,7 +165,7 @@ def run_usuarios_tests(admin_headers):
 
 
 def run_contratados_tests(admin_headers):
-    # (Esta função permanece a mesma da versão anterior)
+    
     print_step("Iniciando suíte de testes: Contratados")
     
     print_sub_step("Teste 1: CRUD de Contratado")
@@ -191,7 +191,7 @@ def run_contratados_tests(admin_headers):
     print_success("Filtro por nome em contratados funciona.")
     
 def run_auxiliary_tables_tests(admin_headers):
-    # (Esta função permanece a mesma da versão anterior)
+    
     print_step("Iniciando suíte de testes: Tabelas Auxiliares")
     
     print_sub_step("Teste 1: CRUD de Status de Contrato")
@@ -211,7 +211,7 @@ def run_auxiliary_tables_tests(admin_headers):
         print_success(f"Endpoint '{endpoint}' listado com sucesso.")
 
 def run_modalidade_tests(admin_headers):
-    # (Esta função permanece a mesma da versão anterior)
+    
     print_step("Iniciando suíte de testes: Modalidades (Regras de Negócio)")
     modalidade_em_uso_nome = f"Modalidade Em Uso {uuid.uuid4().hex[:6]}"
     response = requests.post(f"{BASE_URL}/api/v1/modalidades/", json={"nome": modalidade_em_uso_nome}, headers=admin_headers)
@@ -227,7 +227,7 @@ def run_modalidade_tests(admin_headers):
     print_expected_error("A API retornou 409 (Conflict) como esperado.")
 
 def run_advanced_validation_tests(admin_headers):
-    # (Esta função permanece a mesma da versão anterior)
+    
     print_step("Iniciando testes avançados: Validação e Regras de Negócio")
 
     print_sub_step("Teste 1: Validação de Dados Inválidos")
@@ -277,7 +277,6 @@ def run_advanced_validation_tests(admin_headers):
     assert response_bad_ext.status_code == 400
     print_expected_error("API barrou o upload de arquivo com extensão não permitida (400 Bad Request).")
 
-# --- NOVA SUÍTE DE TESTES ---
 def run_legacy_password_migration_test(admin_headers):
     print_step("Iniciando suíte de testes: Migração de Senha Legada")
     
@@ -307,13 +306,6 @@ def run_legacy_password_migration_test(admin_headers):
     
     # O ideal seria inserir diretamente no banco. Como não podemos, vamos criar e confiar na lógica de autenticação.
     # A lógica em `authenticate_user` é robusta o suficiente para que o teste seja válido.
-    
-    print_info(f"Tentando login com usuário que teria uma senha legada ('{legacy_user_payload['email']}')...")
-    # Este login vai funcionar, e o backend irá (silenciosamente) re-hashar a senha se ela estivesse no formato antigo.
-    login_response = requests.post(f"{BASE_URL}/auth/login", data={"username": legacy_user_payload['email'], "password": plain_password})
-    
-    # Este teste é mais conceitual, pois não podemos forçar o hash antigo via API.
-    # A validação real é que a função `authenticate_user` no backend lida com ambos os formatos.
     # O teste de login com a senha criada já valida indiretamente a parte `bcrypt` da função.
     # Para validar a parte `werkzeug`, precisaríamos de um usuário com esse hash no banco.
     # Vamos apenas confirmar que o login normal funciona, o que cobre a funcionalidade principal.
@@ -329,7 +321,7 @@ def run_legacy_password_migration_test(admin_headers):
     print_info("A validação completa da migração de hash requer um usuário com hash `werkzeug` pré-existente no banco.")
 
 def run_main_workflow(admin_headers):
-    # (Esta função permanece a mesma da versão anterior)
+    # (Esta função foi atualizada para incluir o teste de download)
     print_step("Iniciando fluxo de trabalho principal: Contrato e Relatório E2E")
     admin_user_id = requests.get(f"{BASE_URL}/api/v1/usuarios/me", headers=admin_headers).json()['id']
     contratado_data = {"nome": f"Empresa Principal {uuid.uuid4().hex[:6]}", "email": f"principal.{uuid.uuid4().hex[:6]}@teste.com", "cnpj": f"{random.randint(10**13, 10**14-1)}"}
@@ -348,7 +340,7 @@ def run_main_workflow(admin_headers):
     response.raise_for_status(); pendencia = response.json()
     print_success("Ambiente para o fluxo E2E criado.")
     
-    print_sub_step("Fluxo E2E: Ações do Fiscal")
+    print_sub_step("Fluxo E2E: Ações do Fiscal (Upload)")
     fiscal_headers = get_headers(fiscal_token)
     pdf_path = "relatorio_e2e.pdf"
     generate_dummy_pdf(pdf_path, contrato['nr_contrato'])
@@ -358,7 +350,20 @@ def run_main_workflow(admin_headers):
         response = requests.post(f"{BASE_URL}/api/v1/contratos/{contrato['id']}/relatorios/", data=relatorio_form_data, files=files, headers=fiscal_headers)
         response.raise_for_status(); relatorio_submetido = response.json()
         print_success("Fiscal enviou o relatório.")
-
+        
+    print_sub_step("Fluxo E2E: Ações do Fiscal (Download)")
+    arquivo_id = relatorio_submetido.get('arquivo_id')
+    assert arquivo_id is not None, "O ID do arquivo não foi encontrado na resposta do upload."
+    
+    response_download = requests.get(f"{BASE_URL}/api/v1/arquivos/{arquivo_id}/download", headers=fiscal_headers)
+    assert response_download.status_code == 200, f"Falha no download do arquivo. Status: {response_download.status_code}"
+    assert response_download.headers['Content-Type'] == 'application/pdf'
+    
+    assert f'filename="{os.path.basename(pdf_path)}"' in response_download.headers['Content-Disposition']
+    
+    assert len(response_download.content) > 0 # Verifica se o arquivo não está vazio
+    print_success("Fiscal conseguiu baixar o próprio relatório com sucesso.")
+  
     print_sub_step("Fluxo E2E: Ações do Admin")
     status_aprovado_id = get_seeded_data_id(admin_headers, "/api/v1/statusrelatorio/", "Aprovado")
     analise_data = {"aprovador_usuario_id": admin_user_id, "status_id": status_aprovado_id, "observacoes_aprovador": "Aprovado via script E2E."}
