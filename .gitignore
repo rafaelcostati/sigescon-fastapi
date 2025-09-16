@@ -13,4 +13,5 @@ criar_tudo.py
 /.venv
 uv.lock
 *.logs
-/logs
+/logs 
+teste_email.py
