@@ -1,9 +1,12 @@
 # app/main.py 
 import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.utils import get_openapi
+from starlette.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import asyncpg
 
@@ -27,6 +30,9 @@ from app.api.exception_handlers import (
     generic_exception_handler
 )
 from app.core.exceptions import SigesconException
+
+from app.api.doc_dependencies import get_admin_for_docs
+
 
 # Configuração de logging
 setup_logging()
@@ -99,9 +105,9 @@ app = FastAPI(
     """,
     version="2.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None
 )
 
 # === MIDDLEWARE ===
@@ -172,6 +178,21 @@ app.include_router(status_relatorio_router.router, prefix=API_PREFIX)
 app.include_router(status_pendencia_router.router, prefix=API_PREFIX)
 
 # === ENDPOINTS ADICIONAIS ===
+
+@app.get("/docs", include_in_schema=False)
+async def get_protected_docs(is_admin: bool = Depends(get_admin_for_docs)):
+    """Rota protegida para a UI do Swagger."""
+    return get_swagger_ui_html(openapi_url="/openapi.json", title=app.title + " - Swagger UI")
+
+@app.get("/redoc", include_in_schema=False)
+async def get_protected_redoc(is_admin: bool = Depends(get_admin_for_docs)):
+    """Rota protegida para a UI do ReDoc."""
+    return get_redoc_html(openapi_url="/openapi.json", title=app.title + " - ReDoc")
+
+@app.get("/openapi.json", include_in_schema=False)
+async def get_protected_openapi(is_admin: bool = Depends(get_admin_for_docs)):
+    """Rota protegida para o schema OpenAPI."""
+    return JSONResponse(get_openapi(title=app.title, version=app.version, routes=app.routes))
 
 @app.get("/", tags=["Root"])
 async def read_root():

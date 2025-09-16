@@ -137,7 +137,8 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
             "message": exc.detail,
             "details": {},
             "path": request.url.path
-        }
+        },
+        headers=exc.headers
     )
 
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
