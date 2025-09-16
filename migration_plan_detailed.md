@@ -243,15 +243,3 @@ app/
 | Bugs em produção | Média | Alto | Testes abrangentes e staging env |
 | Atraso no cronograma | Média | Médio | Priorização e entregas incrementais |
 
-## 📅 Próximas Ações Imediatas
-
-1. **Hoje**: Implementar sistema de permissões
-2. **Amanhã**: Começar módulo de Perfis
-3. **Esta semana**: Completar todas as tabelas auxiliares
-4. **Próxima semana**: Iniciar módulo de Contratos
-
----
-
-**Última atualização**: Dezembro 2024
-**Responsável**: Equipe de Desenvolvimento
-**Status**: 🟡 Em Progresso
