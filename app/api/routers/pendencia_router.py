@@ -6,7 +6,7 @@ from typing import List
 from app.core.database import get_connection
 from app.schemas.usuario_schema import Usuario
 from app.api.dependencies import get_current_user, get_current_admin_user
-from app.api.permissions import admin_required, require_contract_access
+from app.api.permissions import admin_required, PermissionChecker
 
 
 # Repositórios e Serviços
@@ -49,7 +49,15 @@ async def create_pendencia(
 async def list_pendencias(
     contrato_id: int,
     service: PendenciaService = Depends(get_pendencia_service),
-    current_user: Usuario = Depends(require_contract_access)
+    current_user: Usuario = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_connection)
 ):
-    """Lista todas as pendências de um contrato específico."""
+    # Verificação manual de permissão
+    checker = PermissionChecker(conn)
+    if not await checker.can_access_contract(current_user, contrato_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para acessar este contrato"
+        )
+    
     return await service.get_pendencias_by_contrato_id(contrato_id)

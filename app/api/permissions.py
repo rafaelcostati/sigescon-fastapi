@@ -1,4 +1,4 @@
-# app/api/permissions.py
+# app/api/permissions.py 
 from typing import List
 from fastapi import HTTPException, status, Depends
 import asyncpg
@@ -40,7 +40,7 @@ class PermissionChecker:
 
 # === DEPENDÊNCIAS DE PERMISSÃO ===
 
-async def admin_required(
+async def require_admin(
     current_user: Usuario = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_connection)
 ) -> Usuario:
@@ -66,16 +66,3 @@ async def require_admin_or_manager(
         )
     return current_user
 
-async def require_contract_access(
-    contrato_id: int,
-    current_user: Usuario = Depends(get_current_user),
-    conn: asyncpg.Connection = Depends(get_connection)
-) -> Usuario:
-    """Requer acesso ao contrato específico"""
-    checker = PermissionChecker(conn)
-    if not await checker.can_access_contract(current_user, contrato_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem permissão para acessar este contrato"
-        )
-    return current_user

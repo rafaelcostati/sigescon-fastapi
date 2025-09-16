@@ -15,7 +15,7 @@ from app.repositories.contratado_repo import ContratadoRepository as ContratadoR
 from app.repositories.modalidade_repo import ModalidadeRepository
 from app.repositories.status_repo import StatusRepository
 from app.repositories.arquivo_repo import ArquivoRepository
-from app.api.permissions import admin_required, require_contract_access
+from app.api.permissions import admin_required, PermissionChecker
 
 # Services
 from app.services.contrato_service import ContratoService
@@ -117,7 +117,22 @@ async def list_contratos(
     return await service.get_all_contratos(page=page, per_page=per_page, filters=active_filters)
 
 @router.get("/{contrato_id}", response_model=Contrato)
-async def get_contrato_by_id(contrato_id: int, service: ContratoService = Depends(get_contrato_service), current_user: Usuario = Depends(get_current_user)):
+async def get_contrato_by_id(
+    contrato_id: int, 
+    service: ContratoService = Depends(get_contrato_service), 
+    current_user: Usuario = Depends(get_current_user),  
+    conn: asyncpg.Connection = Depends(get_connection)  
+):
+    
+    from app.api.permissions import PermissionChecker
+    
+    checker = PermissionChecker(conn)
+    if not await checker.can_access_contract(current_user, contrato_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para acessar este contrato"
+        )
+    
     contrato = await service.get_contrato_by_id(contrato_id)
     if not contrato:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
