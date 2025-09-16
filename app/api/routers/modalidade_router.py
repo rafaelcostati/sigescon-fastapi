@@ -9,6 +9,7 @@ from app.services.modalidade_service import ModalidadeService
 from app.repositories.modalidade_repo import ModalidadeRepository
 from app.api.dependencies import get_current_user, get_current_admin_user
 from app.schemas.usuario_schema import Usuario
+from app.api.permissions import admin_required
 
 router = APIRouter(
     prefix="/modalidades",
@@ -23,7 +24,7 @@ def get_modalidade_service(conn: asyncpg.Connection = Depends(get_connection)):
 async def create_modalidade(
     modalidade: ModalidadeCreate,
     service: ModalidadeService = Depends(get_modalidade_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     try:
         return await service.create(modalidade)
@@ -45,7 +46,7 @@ async def update_modalidade(
     modalidade_id: int,
     modalidade: ModalidadeUpdate,
     service: ModalidadeService = Depends(get_modalidade_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     updated = await service.update(modalidade_id, modalidade)
     if not updated:
@@ -59,7 +60,7 @@ async def update_modalidade(
 async def delete_modalidade(
     modalidade_id: int,
     service: ModalidadeService = Depends(get_modalidade_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     await service.delete(modalidade_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -15,6 +15,7 @@ from app.repositories.contratado_repo import ContratadoRepository as ContratadoR
 from app.repositories.modalidade_repo import ModalidadeRepository
 from app.repositories.status_repo import StatusRepository
 from app.repositories.arquivo_repo import ArquivoRepository
+from app.api.permissions import admin_required, require_contract_access
 
 # Services
 from app.services.contrato_service import ContratoService
@@ -44,7 +45,6 @@ def get_contrato_service(conn: asyncpg.Connection = Depends(get_connection)) -> 
 
 # --- Endpoints ---
 
-# --- ENDPOINT DE CRIAÇÃO CORRIGIDO ---
 @router.post("/", response_model=Contrato, status_code=status.HTTP_201_CREATED)
 async def create_contrato(
     # Declara cada campo do formulário explicitamente
@@ -67,7 +67,7 @@ async def create_contrato(
     data_doe: Optional[date] = Form(None),
     documento_contrato: Optional[UploadFile] = File(None),
     service: ContratoService = Depends(get_contrato_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     """
     Cria um novo contrato. Aceita dados de formulário e um ficheiro opcional.
@@ -124,13 +124,13 @@ async def get_contrato_by_id(contrato_id: int, service: ContratoService = Depend
     return contrato
 
 @router.patch("/{contrato_id}", response_model=Contrato)
-async def update_contrato(contrato_id: int, contrato_update: ContratoUpdate, service: ContratoService = Depends(get_contrato_service), admin_user: Usuario = Depends(get_current_admin_user)):
+async def update_contrato(contrato_id: int, contrato_update: ContratoUpdate, service: ContratoService = Depends(get_contrato_service), admin_user: Usuario = Depends(admin_required)):
     updated_contrato = await service.update_contrato(contrato_id, contrato_update)
     if not updated_contrato:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado para atualização")
     return updated_contrato
 
 @router.delete("/{contrato_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_contrato(contrato_id: int, service: ContratoService = Depends(get_contrato_service), admin_user: Usuario = Depends(get_current_admin_user)):
+async def delete_contrato(contrato_id: int, service: ContratoService = Depends(get_contrato_service), admin_user: Usuario = Depends(admin_required)):
     await service.delete_contrato(contrato_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

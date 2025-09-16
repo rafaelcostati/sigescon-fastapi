@@ -9,6 +9,7 @@ from app.services.perfil_service import PerfilService
 from app.repositories.perfil_repo import PerfilRepository
 from app.api.dependencies import get_current_user, get_current_admin_user
 from app.schemas.usuario_schema import Usuario
+from app.api.permissions import admin_required
 
 router = APIRouter(
     prefix="/perfis",
@@ -23,7 +24,7 @@ def get_perfil_service(conn: asyncpg.Connection = Depends(get_connection)):
 async def create_perfil(
     perfil: PerfilCreate,
     service: PerfilService = Depends(get_perfil_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     return await service.create(perfil)
 

@@ -7,6 +7,7 @@ from datetime import date
 from app.core.database import get_connection
 from app.schemas.usuario_schema import Usuario
 from app.api.dependencies import get_current_user, get_current_admin_user
+from app.api.permissions import admin_required, require_contract_access
 
 # Repositórios
 from app.repositories.relatorio_repo import RelatorioRepository
@@ -68,7 +69,7 @@ async def submit_relatorio(
 async def list_relatorios(
     contrato_id: int,
     service: RelatorioService = Depends(get_relatorio_service),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(require_contract_access)
 ):
     """Lista todos os relatórios de um contrato específico."""
     return await service.get_relatorios_by_contrato_id(contrato_id)
@@ -80,7 +81,7 @@ async def analisar_relatorio(
     relatorio_id: int,
     analise_data: RelatorioAnalise,
     service: RelatorioService = Depends(get_relatorio_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     """Aprova ou rejeita um relatório. Requer permissão de administrador."""
     return await service.analisar_relatorio(relatorio_id, analise_data)

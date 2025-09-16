@@ -11,6 +11,8 @@ from app.services.usuario_service import UsuarioService
 from app.repositories.usuario_repo import UsuarioRepository
 from app.core.database import get_connection
 import asyncpg
+from app.api.permissions import admin_required, require_admin_or_manager
+
 
 router = APIRouter(
     prefix="/usuarios",
@@ -35,7 +37,7 @@ async def read_users_me(current_user: Usuario = Depends(get_current_user)):
 async def list_users(
     nome: Optional[str] = Query(None, description="Filtrar por nome (busca parcial)"),
     service: UsuarioService = Depends(get_usuario_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     """
     Lista todos os usuários ativos do sistema.
@@ -54,7 +56,7 @@ async def list_users(
 async def create_user(
     user: UsuarioCreate,
     service: UsuarioService = Depends(get_usuario_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     """
     Cria um novo usuário no sistema.
@@ -92,7 +94,7 @@ async def update_user(
     user_id: int,
     user_update: UsuarioUpdate,
     service: UsuarioService = Depends(get_usuario_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     """
     Atualiza os dados de um usuário existente.
@@ -113,7 +115,7 @@ async def update_user(
 async def delete_user(
     user_id: int,
     service: UsuarioService = Depends(get_usuario_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     """
     Realiza soft delete de um usuário (marca como inativo).
@@ -163,7 +165,7 @@ async def reset_password(
     user_id: int,
     reset_data: UsuarioResetPassword,
     service: UsuarioService = Depends(get_usuario_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     """
     Permite que um administrador resete a senha de qualquer usuário.

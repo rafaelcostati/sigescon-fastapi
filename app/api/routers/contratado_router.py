@@ -9,6 +9,7 @@ from app.services.contratado_service import ContratadoService
 from app.repositories.contratado_repo import ContratadoRepository
 from app.api.dependencies import get_current_user, get_current_admin_user
 from app.schemas.usuario_schema import Usuario
+from app.api.permissions import admin_required
 
 router = APIRouter(
     prefix="/contratados",
@@ -23,7 +24,7 @@ def get_contratado_service(conn: asyncpg.Connection = Depends(get_connection)):
 async def create_contratado(
     contratado: ContratadoCreate,
     service: ContratadoService = Depends(get_contratado_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     return await service.create(contratado)
 
@@ -69,7 +70,7 @@ async def update_contratado(
     contratado_id: int,
     contratado: ContratadoUpdate,
     service: ContratadoService = Depends(get_contratado_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     updated_contratado = await service.update(contratado_id, contratado)
     if not updated_contratado:
@@ -83,7 +84,7 @@ async def update_contratado(
 async def delete_contratado(
     contratado_id: int,
     service: ContratadoService = Depends(get_contratado_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     deleted = await service.delete(contratado_id)
     if not deleted:

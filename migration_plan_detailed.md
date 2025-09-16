@@ -17,7 +17,7 @@
 ### 2.1 Criar Decoradores de Permissão
 ```python
 # app/api/permissions.py
-- admin_required()
+- admin_required
 - fiscal_required()
 - gestor_required()
 - owner_or_admin() # Para recursos próprios

@@ -1,6 +1,5 @@
 # app/api/permissions.py
-from functools import wraps
-from typing import List, Optional
+from typing import List
 from fastapi import HTTPException, status, Depends
 import asyncpg
 
@@ -39,8 +38,9 @@ class PermissionChecker:
         # Gestor/Fiscal podem acessar seus contratos
         return await self.is_contract_stakeholder(user, contrato_id)
 
-# Dependências de permissão
-async def require_admin(
+# === DEPENDÊNCIAS DE PERMISSÃO ===
+
+async def admin_required(
     current_user: Usuario = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_connection)
 ) -> Usuario:
@@ -79,18 +79,3 @@ async def require_contract_access(
             detail="Você não tem permissão para acessar este contrato"
         )
     return current_user
-
-# Decoradores para facilitar o uso
-def admin_required():
-    """Decorador que requer permissão de administrador"""
-    return Depends(require_admin)
-
-def admin_or_manager_required():
-    """Decorador que requer permissão de administrador ou gestor"""
-    return Depends(require_admin_or_manager)
-
-def contract_access_required(contrato_id_param: str = "contrato_id"):
-    """Decorador que requer acesso ao contrato específico"""
-    def decorator(contrato_id: int, current_user: Usuario = Depends(get_current_user)):
-        return require_contract_access(contrato_id, current_user)
-    return decorator

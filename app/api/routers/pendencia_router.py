@@ -6,6 +6,8 @@ from typing import List
 from app.core.database import get_connection
 from app.schemas.usuario_schema import Usuario
 from app.api.dependencies import get_current_user, get_current_admin_user
+from app.api.permissions import admin_required, require_contract_access
+
 
 # Repositórios e Serviços
 from app.repositories.pendencia_repo import PendenciaRepository
@@ -37,7 +39,7 @@ async def create_pendencia(
     contrato_id: int,
     pendencia: PendenciaCreate,
     service: PendenciaService = Depends(get_pendencia_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     """Cria uma nova pendência para um contrato. Requer permissão de administrador."""
     return await service.create_pendencia(contrato_id, pendencia)
@@ -47,7 +49,7 @@ async def create_pendencia(
 async def list_pendencias(
     contrato_id: int,
     service: PendenciaService = Depends(get_pendencia_service),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(require_contract_access)
 ):
     """Lista todas as pendências de um contrato específico."""
     return await service.get_pendencias_by_contrato_id(contrato_id)

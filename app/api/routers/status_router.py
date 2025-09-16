@@ -9,6 +9,7 @@ from app.services.status_service import StatusService
 from app.repositories.status_repo import StatusRepository
 from app.api.dependencies import get_current_user, get_current_admin_user
 from app.schemas.usuario_schema import Usuario
+from app.api.permissions import admin_required
 
 router = APIRouter(
     prefix="/status",
@@ -23,7 +24,7 @@ def get_status_service(conn: asyncpg.Connection = Depends(get_connection)):
 async def create_status(
     status_data: StatusCreate,
     service: StatusService = Depends(get_status_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     try:
         return await service.create(status_data)
@@ -45,7 +46,7 @@ async def update_status(
     status_id: int,
     status_data: StatusUpdate,
     service: StatusService = Depends(get_status_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     updated = await service.update(status_id, status_data)
     if not updated:
@@ -59,7 +60,7 @@ async def update_status(
 async def delete_status(
     status_id: int,
     service: StatusService = Depends(get_status_service),
-    admin_user: Usuario = Depends(get_current_admin_user)
+    admin_user: Usuario = Depends(admin_required)
 ):
     await service.delete(status_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
