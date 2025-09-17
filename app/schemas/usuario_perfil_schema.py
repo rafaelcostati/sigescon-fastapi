@@ -19,7 +19,7 @@ class UsuarioPerfilRevokeRequest(BaseModel):
 
 class UsuarioPerfil(UsuarioPerfilBase):
     id: int
-    ativo: bool = True  # Campo com valor padrão
+    ativo: bool = Field(default=True, description="Status ativo do perfil")  
     perfil_nome: str
     data_concessao: datetime
     observacoes: Optional[str] = None

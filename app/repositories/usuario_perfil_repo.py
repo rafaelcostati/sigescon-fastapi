@@ -1,4 +1,4 @@
-# app/repositories/usuario_perfil_repo.py
+# app/repositories/usuario_perfil_repo.py - VERSÃO CORRIGIDA
 import asyncpg
 from typing import List, Dict, Optional
 
@@ -7,17 +7,26 @@ class UsuarioPerfilRepository:
         self.conn = conn
 
     async def get_user_profiles(self, usuario_id: int) -> List[Dict]:
-        """Busca todos os perfis ativos de um usuário"""
+        """Busca todos os perfis ativos de um usuário - CORRIGIDO"""
         query = """
             SELECT up.id, up.usuario_id, up.perfil_id, p.nome as perfil_nome,
-                   up.data_concessao, up.observacoes
+                   up.data_concessao, up.observacoes, up.ativo
             FROM usuario_perfil up
             JOIN perfil p ON up.perfil_id = p.id
             WHERE up.usuario_id = $1 AND up.ativo = TRUE AND p.ativo = TRUE
             ORDER BY p.nome
         """
         records = await self.conn.fetch(query, usuario_id)
-        return [dict(r) for r in records]
+        
+        # ✅ CORRIGIDO: Garante que o campo 'ativo' sempre seja incluído
+        result = []
+        for record in records:
+            record_dict = dict(record)
+            if 'ativo' not in record_dict:
+                record_dict['ativo'] = True  # Valor padrão
+            result.append(record_dict)
+            
+        return result
 
     async def has_profile(self, usuario_id: int, perfil_nome: str) -> bool:
         """Verifica se o usuário tem um perfil específico"""
@@ -45,17 +54,27 @@ class UsuarioPerfilRepository:
 
     async def add_profile_to_user(self, usuario_id: int, perfil_id: int, 
                                  concedido_por: int, observacoes: Optional[str] = None) -> Dict:
-        """Adiciona um perfil a um usuário"""
+        """Adiciona um perfil a um usuário - CORRIGIDO"""
         query = """
-            INSERT INTO usuario_perfil (usuario_id, perfil_id, concedido_por_usuario_id, observacoes)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO usuario_perfil (usuario_id, perfil_id, concedido_por_usuario_id, observacoes, ativo)
+            VALUES ($1, $2, $3, $4, TRUE)
             ON CONFLICT (usuario_id, perfil_id) 
             DO UPDATE SET ativo = TRUE, data_concessao = NOW(), 
                          concedido_por_usuario_id = $3, observacoes = $4
-            RETURNING *
+            RETURNING id, usuario_id, perfil_id, ativo, data_concessao, observacoes
         """
         record = await self.conn.fetchrow(query, usuario_id, perfil_id, concedido_por, observacoes)
-        return dict(record)
+        
+        # ✅ CORRIGIDO: Busca informações completas incluindo nome do perfil
+        complete_query = """
+            SELECT up.id, up.usuario_id, up.perfil_id, p.nome as perfil_nome,
+                   up.data_concessao, up.observacoes, up.ativo
+            FROM usuario_perfil up
+            JOIN perfil p ON up.perfil_id = p.id
+            WHERE up.id = $1
+        """
+        complete_record = await self.conn.fetchrow(complete_query, record['id'])
+        return dict(complete_record)
 
     async def remove_profile_from_user(self, usuario_id: int, perfil_id: int) -> bool:
         """Remove um perfil de um usuário (soft delete)"""
