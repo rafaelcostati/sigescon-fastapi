@@ -17,8 +17,6 @@ class Pendencia(PendenciaBase):
     contrato_id: int
     created_at: datetime
     updated_at: datetime
-    
-    # Campos de JOINs para exibição
     status_nome: Optional[str] = None
     criado_por_nome: Optional[str] = None
     

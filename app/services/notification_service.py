@@ -30,7 +30,7 @@ class NotificationContext:
     recipient_id: int
     recipient_email: str
     recipient_name: str
-    data: Dict  # Dados específicos para o template
+    data: Dict  
     priority: str = "normal"  # normal, high, urgent
 
 class NotificationTemplates:

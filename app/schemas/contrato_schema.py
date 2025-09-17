@@ -38,11 +38,11 @@ class Contrato(ContratoBase):
     
     model_config = ConfigDict(from_attributes=True)
 
-# Schema para a criação de um novo contrato (o que a API recebe)
+# Schema para a criação de um novo contrato 
 class ContratoCreate(ContratoBase):
     pass
 
-# Schema para atualização (campos opcionais)
+# Schema para atualização 
 class ContratoUpdate(BaseModel):
     nr_contrato: Optional[str] = Field(None, max_length=50)
     objeto: Optional[str] = None
@@ -62,7 +62,7 @@ class ContratoUpdate(BaseModel):
     doe: Optional[str] = Field(None, max_length=50)
     data_doe: Optional[date] = None
 
-# Schema para a resposta da listagem (versão simplificada)
+# Schema para a resposta da listagem 
 class ContratoList(BaseModel):
     id: int
     nr_contrato: str

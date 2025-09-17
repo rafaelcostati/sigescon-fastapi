@@ -10,12 +10,12 @@ class ContratadoBase(BaseModel):
     cpf: Optional[str] = None
     telefone: Optional[str] = None
 
-# Schema para criação (o que a API recebe no POST)
+# Schema para criação
 class ContratadoCreate(ContratadoBase):
     pass
 
 # ---SCHEMA ---
-# Schema para atualização (o que a API recebe no PATCH)
+
 class ContratadoUpdate(BaseModel):
     nome: Optional[str] = None
     email: Optional[EmailStr] = None
@@ -23,7 +23,7 @@ class ContratadoUpdate(BaseModel):
     cpf: Optional[str] = None   
     telefone: Optional[str] = None
 
-# Schema para resposta (o que a API envia de volta)
+# Schema para resposta 
 class Contratado(ContratadoBase):
     id: int
     ativo: bool

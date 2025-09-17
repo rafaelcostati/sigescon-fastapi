@@ -131,7 +131,7 @@ class ContratoService:
         contrato_final = await self.contrato_repo.find_contrato_by_id(contrato_id)
         contrato_response = Contrato.model_validate(contrato_final)
 
-        # === NOVO: Enviar emails de notificação ===
+        # Enviar emails de notificação 
         try:
             await self._send_contract_assignment_email(
                 contrato_data=contrato_final,
@@ -184,7 +184,7 @@ class ContratoService:
         if not updated_contrato_data:
             return None
 
-        # === NOVO: Verificar se fiscal ou gestor mudaram e enviar notificações ===
+        # Verificar se fiscal ou gestor mudaram e enviar notificações ===
         try:
             novo_fiscal_id = getattr(contrato_update, 'fiscal_id', fiscal_atual_id)
             novo_gestor_id = getattr(contrato_update, 'gestor_id', gestor_atual_id)
