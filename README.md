@@ -75,7 +75,7 @@ Sistema robusto de gestão de contratos desenvolvido com **FastAPI**, oferecendo
 
 ### Core Features
 - 🔐 **Autenticação JWT** - Sistema seguro de autenticação com tokens e migração automática de senhas
-- 👥 **Sistema de Perfis** - Três níveis de acesso (Administrador, Gestor, Fiscal) com permissões granulares
+- 👥 **Sistema de Perfis Múltiplos** - Permite que um único usuário possua vários perfis (ex: Gestor e Fiscal) com alternância de contexto e permissões dinâmicas.
 - 📄 **Gestão de Contratos** - CRUD completo com validações avançadas e soft delete
 - 📎 **Upload de Arquivos** - Suporte para múltiplos formatos com validação e organização automática
 - 📊 **Relatórios Fiscais** - Fluxo completo de submissão, análise e aprovação/rejeição
@@ -93,7 +93,7 @@ Sistema robusto de gestão de contratos desenvolvido com **FastAPI**, oferecendo
 #### 👤 **Usuários**
 - Criação e gestão de usuários com validações completas
 - Alteração e reset de senha (própria e administrativa)
-- Perfis com diferentes permissões e controle de acesso
+- Atribuição de múltiplos perfis com histórico completo de concessões e revogações.
 - Listagem paginada com filtros avançados
 - Migração automática de senhas do sistema legado
 
@@ -248,6 +248,7 @@ EMAIL_FISCAL=fiscal.teste@example.com
 ```
 
 ### 2. Execute o seeder para dados iniciais
+O seeder cria a base para o sistema de perfis, status e modalidades.
 ```bash
 # Criar dados essenciais (perfis, status, etc.)
 python -c "
@@ -331,7 +332,11 @@ Com o servidor rodando, acesse:
 ### Endpoints Principais
 
 #### Autenticação
-- `POST /auth/login` - Login e obtenção de token JWT
+- `POST /auth/login` - Realiza o login e retorna o token de acesso, incluindo o `contexto_sessao` com os perfis do usuário.
+- `POST /auth/alternar-perfil` - Permite que o usuário alterne seu perfil de sessão atual.
+- `GET /auth/contexto` - Retorna o contexto de sessão atual do usuário, incluindo perfil e permissões.
+- `GET /auth/dashboard` - Retorna dados contextuais para o dashboard do usuário.
+- `GET /auth/permissoes` - Retorna as permissões do usuário para o contexto de sessão atual.
 
 #### Usuários
 - `GET /api/v1/usuarios` - Listar usuários paginado com filtros (Admin)
@@ -342,6 +347,9 @@ Com o servidor rodando, acesse:
 - `GET /api/v1/usuarios/me` - Dados do usuário logado
 - `PATCH /api/v1/usuarios/{id}/alterar-senha` - Alterar própria senha
 - `PATCH /api/v1/usuarios/{id}/resetar-senha` - Reset de senha (Admin)
+- `GET /api/v1/usuarios/{usuario_id}/perfis` - Lista os perfis associados a um usuário.
+- `POST /api/v1/usuarios/{usuario_id}/perfis/conceder` - Concede um ou mais perfis a um usuário.
+- `POST /api/v1/usuarios/{usuario_id}/perfis/revogar` - Revoga um ou mais perfis de um usuário.
 
 #### Contratos
 - `GET /api/v1/contratos` - Listar contratos com filtros avançados e paginação
@@ -446,11 +454,15 @@ graph LR
 
 ### Níveis de Acesso
 
-| Perfil        | Permissões                                           |
+O sistema utiliza um modelo de perfis flexível, onde um usuário pode ter múltiplos papéis. As permissões são contextuais, baseadas no perfil que está ativo na sessão do usuário.
+
+| Perfil        | Permissões Principais (quando ativo)                 |
 |---------------|------------------------------------------------------|
-| Administrador | Acesso total ao sistema, aprovação de relatórios    |
-| Gestor        | Visualização de contratos sob sua gestão             |
-| Fiscal        | Submissão de relatórios e visualização de pendências |
+| **Administrador** | Acesso total ao sistema, incluindo criação de usuários, gestão de perfis e aprovação de relatórios. |
+| **Gestor** | Visualização e gestão de contratos sob sua responsabilidade, análise de relatórios da sua equipe. |
+| **Fiscal** | Submissão de relatórios para seus contratos designados e visualização de pendências. |
+
+Um usuário com os perfis de **Gestor** e **Fiscal** pode, por exemplo, alternar seu contexto na aplicação para executar tarefas específicas de cada função sem a necessidade de fazer logout.
 
 ## 💻 Desenvolvimento
 
