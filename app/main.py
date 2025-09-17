@@ -17,7 +17,7 @@ from app.api.routers import (
     status_pendencia_router, contrato_router, pendencia_router, relatorio_router, 
     arquivo_router  
 )
-
+from app.api.routers import usuario_perfil_router
 # Imports dos sistemas avançados
 from app.core.database import get_db_pool, close_db_pool
 from app.middleware.audit import AuditMiddleware
@@ -157,6 +157,7 @@ app.add_exception_handler(Exception, generic_exception_handler)
 
 # Routers de autenticação (sem prefixo)
 app.include_router(auth_router.router)
+app.include_router(usuario_perfil_router.router)
 
 # Routers principais com prefixo /api/v1
 API_PREFIX = "/api/v1"
@@ -167,6 +168,7 @@ app.include_router(contrato_router.router, prefix=API_PREFIX)
 app.include_router(pendencia_router.router, prefix=API_PREFIX)
 app.include_router(relatorio_router.router, prefix=API_PREFIX)
 app.include_router(arquivo_router.router, prefix=API_PREFIX)
+
 
 # Routers de tabelas auxiliares
 app.include_router(perfil_router.router, prefix=API_PREFIX)
