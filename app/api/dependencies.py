@@ -48,11 +48,10 @@ async def get_current_admin_user(
     conn: asyncpg.Connection = Depends(get_connection)
 ) -> Usuario:
     """
-    ✅ ATUALIZADO: Verifica se o usuário tem perfil de Administrador no sistema de perfis múltiplos
+    Verifica se o usuário tem perfil de Administrador no sistema de perfis múltiplos
     """
     usuario_perfil_repo = UsuarioPerfilRepository(conn)
     
-    # Verifica se o usuário tem perfil de Administrador
     is_admin = await usuario_perfil_repo.has_profile(current_user.id, "Administrador")
     
     if not is_admin:

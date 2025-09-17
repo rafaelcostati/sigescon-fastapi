@@ -1,4 +1,4 @@
-# app/repositories/usuario_perfil_repo.py - VERSÃO CORRIGIDA
+# app/repositories/usuario_perfil_repo.py 
 import asyncpg
 from typing import List, Dict, Optional
 

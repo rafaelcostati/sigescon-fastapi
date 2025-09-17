@@ -97,7 +97,6 @@ async def create_contrato(
     return await service.create_contrato(contrato_create, documento_contrato)
 
 
-# (O resto dos endpoints permanecem os mesmos)
 @router.get("/", response_model=ContratoPaginated)
 async def list_contratos(
     page: int = Query(1, ge=1, description="Número da página"),

@@ -1,4 +1,4 @@
-# app/repositories/session_context_repo.py - VERSÃO COMPLETA E FUNCIONAL
+# app/repositories/session_context_repo.py 
 import asyncpg
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
@@ -54,7 +54,7 @@ class SessionContextRepository:
                                    perfil_ativo_id: int, perfis_disponiveis: List[Dict],
                                    ip_address: Optional[str] = None, 
                                    user_agent: Optional[str] = None) -> Dict:
-        """Cria um contexto de sessão (versão simplificada)"""
+        """Cria um contexto de sessão """
         return {
             'id': 1,
             'usuario_id': usuario_id,

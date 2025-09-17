@@ -8,9 +8,13 @@ import asyncio
 import sys
 import os
 from datetime import datetime
+import dotenv
 
 # Adiciona o diretório raiz ao path
+dotenv.load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 import asyncpg
 from app.core.config import settings

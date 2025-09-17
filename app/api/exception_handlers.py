@@ -165,7 +165,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
                 "traceback": str(exc) if logger.level <= logging.DEBUG else None
             },
             "path": request.url.path,
-            "support_contact": "COLOCAR UM EMAIL"
+            "support_contact": "sememailnomomento@email.com"
         }
     )
 

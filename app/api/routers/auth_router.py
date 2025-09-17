@@ -1,4 +1,4 @@
-# app/api/routers/auth_router.py - VERSÃO COMPLETA E CORRIGIDA
+# app/api/routers/auth_router.py 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
@@ -49,7 +49,7 @@ def get_user_id_from_token(token: str) -> int:
     except:
         return None
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=LoginResponse, summary="Login do usuário com seleção de perfil")
 async def login_for_access_token(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -123,7 +123,7 @@ async def login_for_access_token(
         mensagem=mensagem
     )
 
-@router.post("/login-com-perfil", response_model=LoginResponse)
+@router.post("/login-com-perfil", response_model=LoginResponse, summary="Login com perfil específico")
 async def login_with_specific_profile(
     request: Request,
     login_data: LoginComPerfilRequest,
@@ -152,7 +152,7 @@ async def login_with_specific_profile(
         conn=conn
     )
 
-@router.post("/alternar-perfil", response_model=ContextoSessao)
+@router.post("/alternar-perfil", response_model=ContextoSessao, summary="Alternar perfil ativo na sessão")
 async def switch_profile(
     request: Request,
     switch_data: AlternarPerfilRequest,
@@ -202,7 +202,7 @@ async def switch_profile(
             detail=f"Erro ao alternar perfil: {str(e)}"
         )
 
-@router.get("/contexto", response_model=ContextoSessao)
+@router.get("/contexto", response_model=ContextoSessao, summary="Contexto atual da sessão do usuário")
 async def get_current_context(
     service: SessionContextService = Depends(get_session_context_service),
     current_user: Usuario = Depends(get_current_user)
@@ -227,7 +227,7 @@ async def get_current_context(
             detail=f"Erro ao buscar contexto: {str(e)}"
         )
 
-@router.get("/dashboard", response_model=DashboardData)
+@router.get("/dashboard", response_model=DashboardData, summary="Dados do dashboard baseados no perfil ativo")
 async def get_dashboard_data(
     service: SessionContextService = Depends(get_session_context_service),
     current_user: Usuario = Depends(get_current_user)
@@ -244,7 +244,7 @@ async def get_dashboard_data(
             detail=f"Erro ao buscar dados do dashboard: {str(e)}"
         )
 
-@router.get("/permissoes", response_model=PermissaoContextual)
+@router.get("/permissoes", response_model=PermissaoContextual, summary="Permissões contextuais baseadas no perfil ativo")
 async def get_contextual_permissions(
     service: SessionContextService = Depends(get_session_context_service),
     current_user: Usuario = Depends(get_current_user)
@@ -266,13 +266,13 @@ async def logout(
     service: SessionContextService = Depends(get_session_context_service),
     current_user: Usuario = Depends(get_current_user)
 ):
-    """✅ SIMPLIFICADO: Realiza logout (mock)"""
+    
     return {
         "message": "Logout realizado com sucesso",
         "sessoes_encerradas": 1
     }
 
-# ✅ MANTIDO: Endpoint de login original para compatibilidade
+
 @router.post("/login-legacy", response_model=Token)
 async def login_legacy(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -304,7 +304,6 @@ async def login_legacy(
     access_token = create_access_token(data={"sub": str(user['id'])})
 
     return {"access_token": access_token, "token_type": "bearer"}
-# ✅ CORREÇÕES ADICIONADAS PARA OS ENDPOINTS
 
 @router.get("/contexto", response_model=ContextoSessao)
 async def get_current_context_fixed(

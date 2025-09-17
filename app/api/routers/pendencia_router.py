@@ -18,7 +18,6 @@ from app.services.pendencia_service import PendenciaService
 from app.schemas.pendencia_schema import Pendencia, PendenciaCreate
 
 router = APIRouter(
-    # O prefixo aninha estas rotas sob um contrato específico
     prefix="/contratos/{contrato_id}/pendencias",
     tags=["Pendências"]
 )

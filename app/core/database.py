@@ -20,7 +20,7 @@ async def get_db_pool():
             pool = await asyncpg.create_pool(
                 dsn=settings.DATABASE_URL,
                 min_size=1,
-                max_size=10,  # Reduzido para testes
+                max_size=10,  
                 command_timeout=60
             )
             logger.info("Pool de conexões do banco criado com sucesso")
