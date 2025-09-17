@@ -443,13 +443,13 @@ sigescon-fastapi/
 
 ```mermaid
 graph LR
-    A[Admin cria Pendência] --&gt; B[Fiscal recebe notificação]
-    B --&gt; C[Fiscal submete Relatório]
-    C --&gt; D[Admin analisa]
-    D --&gt; E{Aprovado?}
-    E --&gt;|Sim| F[Pendência Concluída]
-    E --&gt;|Não| G[Fiscal recebe feedback]
-    G --&gt; C
+    A[Admin cria Pendência] --> B[Fiscal recebe notificação]
+    B --> C[Fiscal submete Relatório]
+    C --> D[Admin analisa]
+    D --> E{Aprovado?}
+    E -->|Sim| F[Pendência Concluída]
+    E -->|Não| G[Fiscal recebe feedback]
+    G --> C
 ```
 
 ### Níveis de Acesso
