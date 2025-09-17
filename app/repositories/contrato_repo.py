@@ -33,7 +33,7 @@ class ContratoRepository:
                 gestor.nome AS gestor_nome,
                 fiscal.nome AS fiscal_nome,
                 fiscal_sub.nome AS fiscal_substituto_nome,
-                doc.nome_arquivo AS documento_nome_arquivo -- Campo adicionado
+                doc.nome_arquivo AS documento_nome_arquivo 
             FROM contrato c
             LEFT JOIN contratado ct ON c.contratado_id = ct.id
             LEFT JOIN modalidade m ON c.modalidade_id = m.id
@@ -41,7 +41,7 @@ class ContratoRepository:
             LEFT JOIN usuario gestor ON c.gestor_id = gestor.id
             LEFT JOIN usuario fiscal ON c.fiscal_id = fiscal.id
             LEFT JOIN usuario fiscal_sub ON c.fiscal_substituto_id = fiscal_sub.id
-            LEFT JOIN arquivo doc ON c.documento = doc.id -- JOIN adicionado
+            LEFT JOIN arquivo doc ON c.documento = doc.id 
             WHERE c.id = $1 AND c.ativo = TRUE
         """
         contrato = await self.conn.fetchrow(query, contrato_id)

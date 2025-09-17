@@ -26,7 +26,6 @@ router = APIRouter(
     tags=["Autenticação"]
 )
 
-# ✅ CORRIGIDO: Dependência simplificada para o serviço de contexto
 def get_session_context_service(conn: asyncpg.Connection = Depends(get_connection)) -> SessionContextService:
     return SessionContextService(
         session_repo=SessionContextRepository(conn),
@@ -58,7 +57,7 @@ async def login_for_access_token(
     service: SessionContextService = Depends(get_session_context_service),
     conn: asyncpg.Connection = Depends(get_connection)
 ):
-    """✅ CORRIGIDO: Login com seleção automática ou manual de perfil inicial"""
+    
     user_repo = UsuarioRepository(conn)
     user = await user_repo.get_user_by_email(form_data.username)
 
@@ -86,7 +85,7 @@ async def login_for_access_token(
     # Obter informações do cliente
     ip_address, user_agent = get_client_info(request)
 
-    # ✅ CORRIGIDO: Cria contexto de sessão
+
     try:
         contexto = await service.create_session_context(
             usuario_id=user['id'],
@@ -160,7 +159,7 @@ async def switch_profile(
     service: SessionContextService = Depends(get_session_context_service),
     current_user: Usuario = Depends(get_current_user)
 ):
-    """✅ CORRIGIDO: Alterna o perfil ativo na sessão atual"""
+    """ Alterna o perfil ativo na sessão atual"""
     try:
         # Busca contexto atual do usuário
         current_context = await service.get_session_context_by_user(current_user.id)
@@ -208,7 +207,7 @@ async def get_current_context(
     service: SessionContextService = Depends(get_session_context_service),
     current_user: Usuario = Depends(get_current_user)
 ):
-    """✅ CORRIGIDO: Retorna o contexto atual da sessão do usuário"""
+    """Retorna o contexto atual da sessão do usuário"""
     try:
         context = await service.get_session_context_by_user(current_user.id)
         
@@ -233,7 +232,7 @@ async def get_dashboard_data(
     service: SessionContextService = Depends(get_session_context_service),
     current_user: Usuario = Depends(get_current_user)
 ):
-    """✅ CORRIGIDO: Retorna dados do dashboard baseados no perfil ativo do usuário"""
+    """Retorna dados do dashboard baseados no perfil ativo do usuário"""
     try:
         return await service.get_dashboard_data(current_user.id)
         
@@ -250,7 +249,7 @@ async def get_contextual_permissions(
     service: SessionContextService = Depends(get_session_context_service),
     current_user: Usuario = Depends(get_current_user)
 ):
-    """✅ CORRIGIDO: Retorna permissões específicas baseadas no perfil ativo"""
+    """Retorna permissões específicas baseadas no perfil ativo"""
     try:
         return await service.get_contextual_permissions(current_user.id)
         

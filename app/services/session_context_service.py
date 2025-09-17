@@ -437,7 +437,7 @@ class SessionContextService:
             return None
 
     async def get_dashboard_data(self, usuario_id: int) -> DashboardData:
-        """✅ CORRIGIDO: Retorna dados do dashboard baseados no usuário"""
+        """ Retorna dados do dashboard baseados no usuário"""
         try:
             # Busca perfis do usuário para determinar o perfil ativo
             perfis = await self.usuario_perfil_repo.get_user_profiles(usuario_id)

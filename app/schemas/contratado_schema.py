@@ -14,13 +14,13 @@ class ContratadoBase(BaseModel):
 class ContratadoCreate(ContratadoBase):
     pass
 
-# ---SCHEMA CORRIGIDO---
+# ---SCHEMA ---
 # Schema para atualização (o que a API recebe no PATCH)
 class ContratadoUpdate(BaseModel):
     nome: Optional[str] = None
     email: Optional[EmailStr] = None
-    cnpj: Optional[str] = None  # <-- CAMPO ADICIONADO
-    cpf: Optional[str] = None   # <-- CAMPO ADICIONADO
+    cnpj: Optional[str] = None  
+    cpf: Optional[str] = None   
     telefone: Optional[str] = None
 
 # Schema para resposta (o que a API envia de volta)

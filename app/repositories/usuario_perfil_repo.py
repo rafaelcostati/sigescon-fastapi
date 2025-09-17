@@ -7,7 +7,7 @@ class UsuarioPerfilRepository:
         self.conn = conn
 
     async def get_user_profiles(self, usuario_id: int) -> List[Dict]:
-        """Busca todos os perfis ativos de um usuário - CORRIGIDO"""
+        """Busca todos os perfis ativos de um usuário """
         query = """
             SELECT up.id, up.usuario_id, up.perfil_id, p.nome as perfil_nome,
                    up.data_concessao, up.observacoes, up.ativo
@@ -18,7 +18,7 @@ class UsuarioPerfilRepository:
         """
         records = await self.conn.fetch(query, usuario_id)
         
-        # ✅ CORRIGIDO: Garante que o campo 'ativo' sempre seja incluído
+        
         result = []
         for record in records:
             record_dict = dict(record)
@@ -54,7 +54,7 @@ class UsuarioPerfilRepository:
 
     async def add_profile_to_user(self, usuario_id: int, perfil_id: int, 
                                  concedido_por: int, observacoes: Optional[str] = None) -> Dict:
-        """Adiciona um perfil a um usuário - CORRIGIDO"""
+        """Adiciona um perfil a um usuário """
         query = """
             INSERT INTO usuario_perfil (usuario_id, perfil_id, concedido_por_usuario_id, observacoes, ativo)
             VALUES ($1, $2, $3, $4, TRUE)
@@ -65,7 +65,7 @@ class UsuarioPerfilRepository:
         """
         record = await self.conn.fetchrow(query, usuario_id, perfil_id, concedido_por, observacoes)
         
-        # ✅ CORRIGIDO: Busca informações completas incluindo nome do perfil
+        # Busca informações completas incluindo nome do perfil
         complete_query = """
             SELECT up.id, up.usuario_id, up.perfil_id, p.nome as perfil_nome,
                    up.data_concessao, up.observacoes, up.ativo

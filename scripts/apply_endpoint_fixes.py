@@ -33,7 +33,7 @@ class SessionContextRepository:
         self.conn = conn
 
     async def get_user_available_profiles(self, usuario_id: int) -> List[Dict]:
-        """✅ CORRIGIDO: Busca todos os perfis disponíveis para o usuário"""
+        """ Busca todos os perfis disponíveis para o usuário"""
         query = """
             SELECT p.id, p.nome, 
                    CASE 
@@ -127,7 +127,7 @@ def update_session_context_service():
             return None
 
     async def get_dashboard_data_by_user(self, usuario_id: int) -> DashboardData:
-        """✅ CORRIGIDO: Retorna dados do dashboard baseados no usuário"""
+        """ Retorna dados do dashboard baseados no usuário"""
         try:
             # Busca perfis do usuário para determinar o perfil ativo
             perfis = await self.usuario_perfil_repo.get_user_profiles(usuario_id)
@@ -206,7 +206,7 @@ def update_session_context_service():
             )
 
     async def get_contextual_permissions_by_user(self, usuario_id: int) -> PermissaoContextual:
-        """✅ CORRIGIDO: Retorna permissões baseadas no usuário"""
+        """ Retorna permissões baseadas no usuário"""
         try:
             # Busca perfis do usuário
             perfis = await self.usuario_perfil_repo.get_user_profiles(usuario_id)
