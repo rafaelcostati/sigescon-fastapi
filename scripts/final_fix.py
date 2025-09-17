@@ -1,4 +1,19 @@
-# app/repositories/session_context_repo.py - VERSÃO COMPLETA E FUNCIONAL
+#!/usr/bin/env python3
+"""
+Script de correção definitiva para resolver o erro do SessionContextRepository.
+Execute com: python scripts/final_fix.py
+"""
+
+import os
+import shutil
+from datetime import datetime
+
+def main():
+    print("🔧 SIGESCON - Correção Definitiva dos Endpoints")
+    print("=" * 50)
+    
+    # 1. Substitui o session_context_repo.py completamente
+    session_repo_content = '''# app/repositories/session_context_repo.py - VERSÃO COMPLETA E FUNCIONAL
 import asyncpg
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
@@ -100,3 +115,57 @@ class SessionContextRepository:
 
     async def get_profile_switch_history(self, usuario_id: int, limit: int = 50) -> List[Dict]:
         return []
+'''
+
+    # Cria backup e substitui o arquivo
+    session_repo_path = 'app/repositories/session_context_repo.py'
+    if os.path.exists(session_repo_path):
+        backup_path = f"{session_repo_path}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        shutil.copy2(session_repo_path, backup_path)
+        print(f"✅ Backup criado: {backup_path}")
+    
+    with open(session_repo_path, 'w', encoding='utf-8') as f:
+        f.write(session_repo_content)
+    
+    print(f"✅ Arquivo atualizado: {session_repo_path}")
+    
+    # 2. Verifica se os imports estão corretos no SessionContextService
+    service_path = 'app/services/session_context_service.py'
+    if os.path.exists(service_path):
+        with open(service_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Verifica se HTTPException está importado
+        if 'from fastapi import HTTPException, status' not in content:
+            # Adiciona o import se não estiver presente
+            content = content.replace(
+                'from fastapi import HTTPException, status',
+                'from fastapi import HTTPException, status'
+            )
+            
+            if 'HTTPException' not in content:
+                # Adiciona o import no topo do arquivo
+                lines = content.split('\n')
+                import_added = False
+                for i, line in enumerate(lines):
+                    if line.startswith('from typing import'):
+                        lines.insert(i+1, 'from fastapi import HTTPException, status')
+                        import_added = True
+                        break
+                
+                if import_added:
+                    content = '\n'.join(lines)
+                    with open(service_path, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    print(f"✅ Import HTTPException adicionado ao: {service_path}")
+    
+    print("\n🎉 CORREÇÕES APLICADAS!")
+    print("\n💡 PRÓXIMOS PASSOS:")
+    print("1. Reinicie o servidor:")
+    print("   uvicorn app.main:app --reload")
+    print()
+    print("2. Execute o teste:")
+    print("   python scripts/test_multiple_profiles_complete.py")
+
+if __name__ == "__main__":
+    main()

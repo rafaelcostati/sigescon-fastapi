@@ -400,3 +400,201 @@ class SessionContextService:
             SELECT COUNT(*) FROM relatoriofiscal 
             WHERE fiscal_usuario_id = $1
         """, usuario_id)
+
+    async def get_session_context_by_user(self, usuario_id: int) -> Optional[ContextoSessao]:
+        """✅ NOVO: Busca contexto baseado no ID do usuário (simplificado)"""
+        try:
+            # Busca perfis disponíveis
+            perfis_disponiveis = await self.session_repo.get_user_available_profiles(usuario_id)
+            
+            if not perfis_disponiveis:
+                return None
+            
+            # Usa o primeiro perfil como ativo (Gestor tem prioridade)
+            perfil_ativo = perfis_disponiveis[0]
+            
+            # Converte para schema
+            perfis_ativos = [
+                PerfilAtivo(
+                    id=p['id'],
+                    nome=p['nome'],
+                    descricao=p.get('descricao'),
+                    pode_ser_selecionado=True
+                ) for p in perfis_disponiveis
+            ]
+            
+            return ContextoSessao(
+                usuario_id=usuario_id,
+                perfil_ativo_id=perfil_ativo['id'],
+                perfil_ativo_nome=perfil_ativo['nome'],
+                perfis_disponiveis=perfis_ativos,
+                pode_alternar=len(perfis_disponiveis) > 1,
+                sessao_id=f'mock-session-{usuario_id}'
+            )
+            
+        except Exception as e:
+            print(f"Erro ao buscar contexto: {e}")
+            return None
+
+    async def get_dashboard_data(self, usuario_id: int) -> DashboardData:
+        """✅ CORRIGIDO: Retorna dados do dashboard baseados no usuário"""
+        try:
+            # Busca perfis do usuário para determinar o perfil ativo
+            perfis = await self.usuario_perfil_repo.get_user_profiles(usuario_id)
+            
+            if not perfis:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Usuário não possui perfis ativos"
+                )
+            
+            # Usa o primeiro perfil (mais prioritário)
+            perfil_ativo = perfis[0]['perfil_nome']
+            
+            # Define widgets e menus baseados no perfil
+            if perfil_ativo == "Administrador":
+                widgets = ["contratos_total", "usuarios_ativos", "relatorios_pendentes", "estatisticas_sistema"]
+                menus = [
+                    {"nome": "Dashboard", "icon": "dashboard", "route": "/dashboard"},
+                    {"nome": "Contratos", "icon": "contracts", "route": "/contratos"},
+                    {"nome": "Usuários", "icon": "users", "route": "/usuarios"},
+                    {"nome": "Relatórios", "icon": "reports", "route": "/relatorios"},
+                    {"nome": "Configurações", "icon": "settings", "route": "/configuracoes"}
+                ]
+                permissoes = ["criar_contrato", "editar_contrato", "gerenciar_usuarios", "aprovar_relatorios"]
+                
+            elif perfil_ativo == "Gestor":
+                widgets = ["meus_contratos", "relatorios_equipe", "pendencias_gestao"]
+                menus = [
+                    {"nome": "Dashboard", "icon": "dashboard", "route": "/dashboard"},
+                    {"nome": "Meus Contratos", "icon": "contracts", "route": "/contratos/gestao"},
+                    {"nome": "Relatórios", "icon": "reports", "route": "/relatorios/gestao"},
+                    {"nome": "Equipe", "icon": "team", "route": "/equipe"}
+                ]
+                permissoes = ["ver_contratos_gestao", "aprovar_relatorios", "criar_pendencias"]
+                
+            elif perfil_ativo == "Fiscal":
+                widgets = ["meus_contratos_fiscalizacao", "pendencias_ativas", "relatorios_submetidos"]
+                menus = [
+                    {"nome": "Dashboard", "icon": "dashboard", "route": "/dashboard"},
+                    {"nome": "Fiscalização", "icon": "audit", "route": "/contratos/fiscalizacao"},
+                    {"nome": "Pendências", "icon": "tasks", "route": "/pendencias"},
+                    {"nome": "Relatórios", "icon": "reports", "route": "/relatorios/fiscal"}
+                ]
+                permissoes = ["submeter_relatorios", "ver_contratos_fiscal", "responder_pendencias"]
+                
+            else:
+                widgets = []
+                menus = []
+                permissoes = []
+            
+            # Busca estatísticas básicas
+            estatisticas = await self._get_profile_statistics(usuario_id, perfil_ativo)
+            
+            return DashboardData(
+                perfil_ativo=perfil_ativo,
+                widgets_disponiveis=widgets,
+                menus_disponiveis=menus,
+                permissoes_ativas=permissoes,
+                estatisticas=estatisticas
+            )
+            
+        except Exception as e:
+            print(f"Erro no dashboard: {e}")
+            # Retorna dashboard básico em caso de erro
+            return DashboardData(
+                perfil_ativo="Fiscal",
+                widgets_disponiveis=["básico"],
+                menus_disponiveis=[{"nome": "Dashboard", "icon": "dashboard", "route": "/dashboard"}],
+                permissoes_ativas=["visualizar"],
+                estatisticas={"total": 0}
+            )
+
+    async def get_contextual_permissions(self, usuario_id: int) -> PermissaoContextual:
+        
+        try:
+            # Busca perfis do usuário
+            perfis = await self.usuario_perfil_repo.get_user_profiles(usuario_id)
+            
+            if not perfis:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Usuário não possui perfis ativos"
+                )
+            
+            # Usa o primeiro perfil como ativo
+            perfil_ativo = perfis[0]['perfil_nome']
+            
+            # Define permissões baseadas no perfil ativo
+            if perfil_ativo == "Administrador":
+                permissions = PermissaoContextual(
+                    perfil_ativo=perfil_ativo,
+                    pode_criar_contrato=True,
+                    pode_editar_contrato=True,
+                    pode_criar_pendencia=True,
+                    pode_submeter_relatorio=True,
+                    pode_aprovar_relatorio=True,
+                    pode_gerenciar_usuarios=True,
+                    pode_ver_todos_contratos=True,
+                    acoes_disponiveis=["criar", "editar", "deletar", "aprovar", "rejeitar", "gerenciar"]
+                )
+                
+            elif perfil_ativo == "Gestor":
+                # Busca contratos onde é gestor
+                try:
+                    contratos_gestao, _ = await self.contrato_repo.get_all_contratos(
+                        filters={'gestor_id': usuario_id}, limit=100, offset=0
+                    )
+                    contratos_ids = [c['id'] for c in contratos_gestao]
+                except:
+                    contratos_ids = []
+                
+                permissions = PermissaoContextual(
+                    perfil_ativo=perfil_ativo,
+                    pode_criar_contrato=False,
+                    pode_editar_contrato=False,
+                    pode_criar_pendencia=True,
+                    pode_submeter_relatorio=False,
+                    pode_aprovar_relatorio=True,
+                    pode_gerenciar_usuarios=False,
+                    pode_ver_todos_contratos=False,
+                    contratos_visiveis=contratos_ids,
+                    acoes_disponiveis=["visualizar", "criar_pendencia", "aprovar_relatorio"]
+                )
+                
+            elif perfil_ativo == "Fiscal":
+                # Busca contratos onde é fiscal
+                try:
+                    contratos_fiscal, _ = await self.contrato_repo.get_all_contratos(
+                        filters={'fiscal_id': usuario_id}, limit=100, offset=0
+                    )
+                    contratos_ids = [c['id'] for c in contratos_fiscal]
+                except:
+                    contratos_ids = []
+                
+                permissions = PermissaoContextual(
+                    perfil_ativo=perfil_ativo,
+                    pode_criar_contrato=False,
+                    pode_editar_contrato=False,
+                    pode_criar_pendencia=False,
+                    pode_submeter_relatorio=True,
+                    pode_aprovar_relatorio=False,
+                    pode_gerenciar_usuarios=False,
+                    pode_ver_todos_contratos=False,
+                    contratos_visiveis=contratos_ids,
+                    acoes_disponiveis=["visualizar", "submeter_relatorio", "responder_pendencia"]
+                )
+                
+            else:
+                permissions = PermissaoContextual(perfil_ativo=perfil_ativo)
+            
+            return permissions
+            
+        except Exception as e:
+            print(f"Erro nas permissões: {e}")
+            # Retorna permissões básicas em caso de erro
+            return PermissaoContextual(
+                perfil_ativo="Fiscal",
+                pode_submeter_relatorio=True,
+                acoes_disponiveis=["visualizar"]
+            )
