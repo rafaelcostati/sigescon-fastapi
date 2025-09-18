@@ -1,7 +1,8 @@
 # app/services/contrato_service.py
 import math
 from typing import Optional, Dict
-from fastapi import HTTPException, logger, status, UploadFile
+from fastapi import HTTPException, status, UploadFile
+import logging
 
 # Repositórios
 from app.repositories.contrato_repo import ContratoRepository
@@ -21,6 +22,7 @@ from app.schemas.contrato_schema import (
     ContratoPaginated, ContratoList
 )
 
+logger = logging.getLogger(__name__)
 class ContratoService:
     def __init__(self,
                  contrato_repo: ContratoRepository,
