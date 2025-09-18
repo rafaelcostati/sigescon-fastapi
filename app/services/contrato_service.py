@@ -177,25 +177,15 @@ class ContratoService:
     ) -> Optional[Contrato]:
         """
         Atualiza um contrato existente, incluindo upload de arquivo opcional.
-        
-        Args:
-            contrato_id: ID do contrato a atualizar
-            contrato_update: Dados para atualização
-            documento_contrato: Arquivo opcional para upload
-            
-        Returns:
-            Contrato atualizado ou None se não encontrado
         """
         
         try:
             # Verifica se o contrato existe
-            existing_contrato = await self.contrato_repo.get_by_id(contrato_id)
+            existing_contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
             if not existing_contrato:
                 return None
             
             # Processa arquivo se fornecido
-            update_data = contrato_update.model_dump(exclude_none=True)
-            
             if documento_contrato and documento_contrato.filename:
                 # Salva o novo arquivo
                 original_filename, file_path, file_size = await self.file_service.save_upload_file(
@@ -210,23 +200,25 @@ class ContratoService:
                         if os.path.exists(existing_contrato['documento_caminho']):
                             os.remove(existing_contrato['documento_caminho'])
                     except Exception as e:
-                        # Log do erro mas não interrompe o processo
-                        logger.warning(f"Erro ao remover arquivo antigo: {e}")
+                        logging.warning(f"Erro ao remover arquivo antigo: {e}")
                 
-                # Atualiza dados do arquivo no contrato
-                update_data.update({
+                # Adiciona campos do arquivo ao update
+                contrato_data = contrato_update.model_dump(exclude_none=True)
+                contrato_data.update({
                     'documento_nome_arquivo': original_filename,
                     'documento_caminho': file_path,
                     'documento_tamanho': file_size
                 })
+                # Recria o ContratoUpdate com os dados do arquivo
+                contrato_update = ContratoUpdate(**contrato_data)
             
-            # Executa a atualização no banco
-            updated_contrato = await self.contrato_repo.update(contrato_id, update_data)
+            # Executa a atualização no banco (método correto)
+            updated_contrato = await self.contrato_repo.update_contrato(contrato_id, contrato_update)
             
             return updated_contrato
             
         except Exception as e:
-            logger.error(f"Erro ao atualizar contrato {contrato_id}: {e}")
+            logging.error(f"Erro ao atualizar contrato {contrato_id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Erro interno ao atualizar contrato: {str(e)}"
