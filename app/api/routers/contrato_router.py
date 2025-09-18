@@ -138,10 +138,85 @@ async def get_contrato_by_id(
     return contrato
 
 @router.patch("/{contrato_id}", response_model=Contrato)
-async def update_contrato(contrato_id: int, contrato_update: ContratoUpdate, service: ContratoService = Depends(get_contrato_service), admin_user: Usuario = Depends(admin_required)):
-    updated_contrato = await service.update_contrato(contrato_id, contrato_update)
+async def update_contrato(
+    contrato_id: int,
+    # Campos opcionais do formulário - apenas os campos que podem ser atualizados
+    objeto: Optional[str] = Form(None),
+    data_inicio: Optional[date] = Form(None),
+    data_fim: Optional[date] = Form(None),
+    contratado_id: Optional[int] = Form(None),
+    modalidade_id: Optional[int] = Form(None),
+    status_id: Optional[int] = Form(None),
+    gestor_id: Optional[int] = Form(None),
+    fiscal_id: Optional[int] = Form(None),
+    valor_anual: Optional[float] = Form(None),
+    valor_global: Optional[float] = Form(None),
+    base_legal: Optional[str] = Form(None),
+    termos_contratuais: Optional[str] = Form(None),
+    fiscal_substituto_id: Optional[int] = Form(None),
+    pae: Optional[str] = Form(None),
+    doe: Optional[str] = Form(None),
+    data_doe: Optional[date] = Form(None),
+    # Arquivo opcional para upload
+    documento_contrato: Optional[UploadFile] = File(None),
+    service: ContratoService = Depends(get_contrato_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Atualiza um contrato existente. Aceita dados de formulário e um ficheiro opcional.
+    Requer permissão de administrador.
+    
+    - **contrato_id**: ID do contrato a ser atualizado
+    - **documento_contrato**: Arquivo opcional para substituir o documento existente
+    - **outros campos**: Campos opcionais do contrato para atualização
+    
+    Todos os campos são opcionais - apenas os fornecidos serão atualizados.
+    """
+    
+    # Constrói objeto ContratoUpdate apenas com campos fornecidos
+    update_data = {}
+    
+    # Lista todos os campos que podem ser atualizados
+    form_fields = {
+        'objeto': objeto,
+        'data_inicio': data_inicio,
+        'data_fim': data_fim,
+        'contratado_id': contratado_id,
+        'modalidade_id': modalidade_id,
+        'status_id': status_id,
+        'gestor_id': gestor_id,
+        'fiscal_id': fiscal_id,
+        'valor_anual': valor_anual,
+        'valor_global': valor_global,
+        'base_legal': base_legal,
+        'termos_contratuais': termos_contratuais,
+        'fiscal_substituto_id': fiscal_substituto_id,
+        'pae': pae,
+        'doe': doe,
+        'data_doe': data_doe
+    }
+    
+    # Inclui apenas campos não None no update
+    for field, value in form_fields.items():
+        if value is not None:
+            update_data[field] = value
+    
+    # Cria o schema de update
+    contrato_update = ContratoUpdate(**update_data)
+    
+    # Chama o service passando o arquivo se fornecido
+    updated_contrato = await service.update_contrato(
+        contrato_id=contrato_id, 
+        contrato_update=contrato_update, 
+        documento_contrato=documento_contrato
+    )
+    
     if not updated_contrato:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado para atualização")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Contrato não encontrado para atualização"
+        )
+    
     return updated_contrato
 
 @router.delete("/{contrato_id}", status_code=status.HTTP_204_NO_CONTENT)

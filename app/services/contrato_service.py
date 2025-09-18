@@ -1,7 +1,7 @@
 # app/services/contrato_service.py
 import math
 from typing import Optional, Dict
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, logger, status, UploadFile
 
 # Repositórios
 from app.repositories.contrato_repo import ContratoRepository
@@ -167,42 +167,68 @@ class ContratoService:
             per_page=per_page
         )
 
-    async def update_contrato(self, contrato_id: int, contrato_update: ContratoUpdate) -> Optional[Contrato]:
-        """Atualiza um contrato e envia notificações se fiscal/gestor mudaram"""
-        contrato_atual = await self.contrato_repo.find_contrato_by_id(contrato_id)
-        if not contrato_atual:
-            return None
+    async def update_contrato(
+        self, 
+        contrato_id: int, 
+        contrato_update: ContratoUpdate, 
+        documento_contrato: Optional[UploadFile] = None
+    ) -> Optional[Contrato]:
+        """
+        Atualiza um contrato existente, incluindo upload de arquivo opcional.
         
-        await self._validate_foreign_keys(contrato_update)
-        
-        # Salva IDs atuais para comparação
-        fiscal_atual_id = contrato_atual.get('fiscal_id')
-        gestor_atual_id = contrato_atual.get('gestor_id')
-        
-        # Atualiza o contrato
-        updated_contrato_data = await self.contrato_repo.update_contrato(contrato_id, contrato_update)
-        if not updated_contrato_data:
-            return None
-
-        # Verificar se fiscal ou gestor mudaram e enviar notificações ===
-        try:
-            novo_fiscal_id = getattr(contrato_update, 'fiscal_id', fiscal_atual_id)
-            novo_gestor_id = getattr(contrato_update, 'gestor_id', gestor_atual_id)
+        Args:
+            contrato_id: ID do contrato a atualizar
+            contrato_update: Dados para atualização
+            documento_contrato: Arquivo opcional para upload
             
-            # Envia notificação apenas se fiscal ou gestor mudaram
-            if (novo_fiscal_id != fiscal_atual_id) or (novo_gestor_id != gestor_atual_id):
-                await self._send_contract_assignment_email(
-                    contrato_data=updated_contrato_data,
-                    fiscal_id=novo_fiscal_id,
-                    gestor_id=novo_gestor_id,
-                    is_update=True,
-                    old_fiscal_id=fiscal_atual_id if novo_fiscal_id != fiscal_atual_id else None
+        Returns:
+            Contrato atualizado ou None se não encontrado
+        """
+        
+        try:
+            # Verifica se o contrato existe
+            existing_contrato = await self.contrato_repo.get_by_id(contrato_id)
+            if not existing_contrato:
+                return None
+            
+            # Processa arquivo se fornecido
+            update_data = contrato_update.model_dump(exclude_none=True)
+            
+            if documento_contrato and documento_contrato.filename:
+                # Salva o novo arquivo
+                original_filename, file_path, file_size = await self.file_service.save_upload_file(
+                    contrato_id=contrato_id,
+                    file=documento_contrato
                 )
+                
+                # Remove arquivo antigo se existir
+                if existing_contrato.get('documento_caminho'):
+                    try:
+                        import os
+                        if os.path.exists(existing_contrato['documento_caminho']):
+                            os.remove(existing_contrato['documento_caminho'])
+                    except Exception as e:
+                        # Log do erro mas não interrompe o processo
+                        logger.warning(f"Erro ao remover arquivo antigo: {e}")
+                
+                # Atualiza dados do arquivo no contrato
+                update_data.update({
+                    'documento_nome_arquivo': original_filename,
+                    'documento_caminho': file_path,
+                    'documento_tamanho': file_size
+                })
+            
+            # Executa a atualização no banco
+            updated_contrato = await self.contrato_repo.update(contrato_id, update_data)
+            
+            return updated_contrato
+            
         except Exception as e:
-            # Log do erro, mas não falha a atualização do contrato
-            print(f"Erro ao enviar emails de notificação para atualização do contrato {contrato_id}: {e}")
-
-        return Contrato.model_validate(updated_contrato_data)
+            logger.error(f"Erro ao atualizar contrato {contrato_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erro interno ao atualizar contrato: {str(e)}"
+            )
 
     async def delete_contrato(self, contrato_id: int) -> bool:
         if not await self.contrato_repo.find_contrato_by_id(contrato_id):
