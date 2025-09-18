@@ -1,5 +1,6 @@
 # app/api/exception_handlers.py
 import logging
+import base64
 from typing import Any, Dict
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
@@ -14,6 +15,29 @@ from app.core.exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+
+def safe_serialize_request_body(body: Any) -> Any:
+    """
+    Serializa o corpo da requisição de forma segura para JSON.
+    Converte bytes para uma representação segura.
+    """
+    if body is None:
+        return None
+    
+    if isinstance(body, bytes):
+        # Para arquivos de upload, não incluir o conteúdo completo do arquivo
+        # Apenas informações básicas sobre o tamanho
+        return {
+            "type": "binary_data",
+            "size_bytes": len(body),
+            "preview": f"Binary data ({len(body)} bytes)"
+        }
+    
+    if isinstance(body, (str, int, float, bool, list, dict)):
+        return body
+    
+    # Para outros tipos, converter para string
+    return str(body)
 
 async def sigescon_exception_handler(request: Request, exc: SigesconException) -> JSONResponse:
     """Handler para exceções customizadas do SIGESCON"""
@@ -83,12 +107,15 @@ async def database_exception_handler(request: Request, exc: asyncpg.PostgresErro
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Handler para erros de validação do Pydantic"""
     
+    # Serializa o corpo da requisição de forma segura
+    safe_body = safe_serialize_request_body(exc.body)
+    
     logger.warning(
         f"Validation error: {exc.errors()}",
         extra={
             "path": request.url.path,
             "method": request.method,
-            "body": exc.body
+            "body_info": safe_body
         }
     )
     
@@ -96,11 +123,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     formatted_errors = []
     for error in exc.errors():
         field_path = " -> ".join(str(loc) for loc in error["loc"])
+        
+        # Sanitiza o input para evitar problemas de serialização
+        error_input = error.get("input")
+        if isinstance(error_input, bytes):
+            error_input = f"<binary data: {len(error_input)} bytes>"
+        elif error_input is not None and not isinstance(error_input, (str, int, float, bool, list, dict)):
+            error_input = str(error_input)
+        
         formatted_errors.append({
             "field": field_path,
             "message": error["msg"],
             "type": error["type"],
-            "input": error.get("input")
+            "input": error_input
         })
     
     return JSONResponse(
@@ -111,7 +146,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "message": "Dados inválidos fornecidos",
             "details": {
                 "validation_errors": formatted_errors,
-                "total_errors": len(formatted_errors)
+                "total_errors": len(formatted_errors),
+                "body_info": safe_body
             },
             "path": request.url.path
         }
@@ -168,131 +204,3 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
             "support_contact": "sememailnomomento@email.com"
         }
     )
-
-# app/core/validators.py
-import re
-from typing import Any, Dict, List, Optional
-from datetime import date, datetime, timedelta
-from app.core.exceptions import ValidationException
-
-class SigesconValidators:
-    """Validadores customizados para o sistema SIGESCON"""
-    
-    @staticmethod
-    def validate_cpf(cpf: str) -> bool:
-        """Valida CPF brasileiro"""
-        cpf = re.sub(r'\D', '', cpf)  # Remove caracteres não numéricos
-        
-        if len(cpf) != 11:
-            return False
-        
-        # Verifica se todos os dígitos são iguais (exceto 00000000000 que usamos para o admin)
-        if cpf == '00000000000' or len(set(cpf)) == 1:
-            return cpf == '00000000000'  # Permite apenas o CPF do admin
-        
-        # Validação dos dígitos verificadores
-        for i in range(9, 11):
-            soma = sum(int(cpf[j]) * (i + 1 - j) for j in range(i))
-            digito = (soma * 10) % 11
-            if digito == 10:
-                digito = 0
-            if int(cpf[i]) != digito:
-                return False
-        
-        return True
-    
-    @staticmethod
-    def validate_cnpj(cnpj: str) -> bool:
-        """Valida CNPJ brasileiro"""
-        cnpj = re.sub(r'\D', '', cnpj)
-        
-        if len(cnpj) != 14:
-            return False
-        
-        # Verifica se todos os dígitos são iguais
-        if len(set(cnpj)) == 1:
-            return False
-        
-        # Cálculo do primeiro dígito verificador
-        soma = sum(int(cnpj[i]) * (5 - i if i < 4 else 13 - i) for i in range(12))
-        digito1 = 11 - (soma % 11)
-        if digito1 >= 10:
-            digito1 = 0
-        
-        # Cálculo do segundo dígito verificador
-        soma = sum(int(cnpj[i]) * (6 - i if i < 5 else 14 - i) for i in range(13))
-        digito2 = 11 - (soma % 11)
-        if digito2 >= 10:
-            digito2 = 0
-        
-        return int(cnpj[12]) == digito1 and int(cnpj[13]) == digito2
-    
-    @staticmethod
-    def validate_contract_dates(data_inicio: date, data_fim: date) -> None:
-        """Valida datas de contrato"""
-        hoje = date.today()
-        
-        if data_inicio >= data_fim:
-            raise ValidationException(
-                "Data de início deve ser anterior à data de fim",
-                {"data_inicio": data_inicio, "data_fim": data_fim}
-            )
-        
-        # Permite contratos retroativos, mas alerta para contratos muito antigos
-        if (hoje - data_inicio).days > 365 * 5:  # 5 anos
-            raise ValidationException(
-                "Data de início não pode ser superior a 5 anos no passado",
-                {"data_inicio": data_inicio, "limite": hoje - timedelta(days=365*5)}
-            )
-        
-        # Permite contratos com prazo muito longo, mas alerta
-        if (data_fim - data_inicio).days > 365 * 10:  # 10 anos
-            raise ValidationException(
-                "Contrato não pode ter prazo superior a 10 anos",
-                {"duracao_anos": (data_fim - data_inicio).days / 365}
-            )
-    
-    @staticmethod
-    def validate_file_upload(filename: str, content_type: str, size_bytes: int) -> None:
-        """Valida arquivo de upload"""
-        # Extensões permitidas
-        allowed_extensions = {'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.odt', '.ods'}
-        
-        file_ext = '.' + filename.split('.')[-1].lower()
-        if file_ext not in allowed_extensions:
-            raise ValidationException(
-                f"Tipo de arquivo não permitido: {file_ext}",
-                {
-                    "filename": filename,
-                    "allowed_extensions": list(allowed_extensions)
-                }
-            )
-        
-        # Tamanho máximo: 50MB
-        max_size = 50 * 1024 * 1024  # 50MB em bytes
-        if size_bytes > max_size:
-            raise ValidationException(
-                f"Arquivo muito grande: {size_bytes / (1024*1024):.1f}MB",
-                {
-                    "size_mb": size_bytes / (1024*1024),
-                    "max_size_mb": max_size / (1024*1024)
-                }
-            )
-        
-        # Verifica nome do arquivo
-        if len(filename) > 255:
-            raise ValidationException(
-                "Nome do arquivo muito longo (máximo 255 caracteres)",
-                {"filename_length": len(filename)}
-            )
-        
-        # Caracteres perigosos no nome do arquivo
-        dangerous_chars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*']
-        if any(char in filename for char in dangerous_chars):
-            raise ValidationException(
-                "Nome do arquivo contém caracteres não permitidos",
-                {
-                    "filename": filename,
-                    "forbidden_chars": dangerous_chars
-                }
-            )
