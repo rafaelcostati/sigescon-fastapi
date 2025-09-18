@@ -112,3 +112,11 @@ class ContratoRepository:
         query = "UPDATE contrato SET ativo = FALSE, updated_at = NOW() WHERE id = $1 AND ativo = TRUE"
         status = await self.conn.execute(query, contrato_id)
         return status.endswith('1')
+    
+    async def get_by_id(self, contrato_id: int) -> Optional[Dict]:
+        """Alias para find_contrato_by_id para manter consistência com outros repositories"""
+        return await self.find_contrato_by_id(contrato_id)
+    
+    async def get_contrato_by_id(self, contrato_id: int) -> Optional[Dict]:
+        """Alias adicional para compatibilidade"""
+        return await self.find_contrato_by_id(contrato_id)
