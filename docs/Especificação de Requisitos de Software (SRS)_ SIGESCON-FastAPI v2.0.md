@@ -86,6 +86,13 @@ Um mesmo usuário pode acumular múltiplos perfis (ex: ser Gestor e Fiscal).
 * **RF02.6:** Administradores podem conceder e revogar múltiplos perfis para um usuário.  
 * **RF02.7:** Um usuário não pode ficar sem nenhum perfil ativo. A revogação do último perfil deve ser bloqueada.
 
+* **RF02.8:** O sistema deve disponibilizar endpoint para listar todos os perfis ativos de um usuário: `GET /api/v1/usuarios/{usuario_id}/perfis`.  
+* **RF02.9:** O sistema deve disponibilizar endpoint para retornar informações completas do usuário incluindo arrays de perfis: `GET /api/v1/usuarios/{usuario_id}/perfis/completo`.  
+* **RF02.10:** O sistema deve disponibilizar endpoint para validar capacidades de um usuário com base em seus perfis: `GET /api/v1/usuarios/{usuario_id}/perfis/validacao`.  
+* **RF02.11:** O sistema deve disponibilizar endpoint para concessão de múltiplos perfis: `POST /api/v1/usuarios/{usuario_id}/perfis/conceder`.  
+* **RF02.12:** O sistema deve disponibilizar endpoint para revogação de múltiplos perfis: `POST /api/v1/usuarios/{usuario_id}/perfis/revogar`, impedindo que o usuário fique sem perfis ativos.  
+* **RF02.13:** A criação de usuários via `POST /usuarios/` deve ignorar o campo legado `perfil_id` (criando usuários sem perfil). A concessão de perfis deve ocorrer posteriormente via endpoints de múltiplos perfis ou pelo atalho `POST /usuarios/com-perfis`.
+
 ##### **RF03: Gerenciamento de Contratos**
 
 * **RF03.1:** Apenas Administradores podem criar, atualizar e desativar (soft delete) contratos.  

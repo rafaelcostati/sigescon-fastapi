@@ -85,6 +85,13 @@ A arquitetura de dados é centrada no PostgreSQL e gerida pela camada de Reposit
 * **Gestão de Conexões:** Um pool de conexões (`asyncpg.pool`) é utilizado para gerir as conexões com a base de dados de forma eficiente, sendo inicializado no startup da aplicação e encerrado no shutdown.  
 * **Estratégia de Persistência:** A estratégia de **Soft Delete** (utilizando a coluna `ativo`) é implementada em todas as entidades principais para garantir a rastreabilidade e a preservação do histórico de dados.
 
+##### Diretrizes Específicas: Perfis Múltiplos e Conexões
+
+- O sistema de perfis utiliza a relação `usuario_perfil` (N:N) para permitir múltiplos perfis por usuário, coexistindo com o campo legado `usuario.perfil_id` apenas para compatibilidade.  
+- Endpoints que retornam informações completas de perfis devem consultar `usuario_perfil` e `perfil` (e.g., `GET /api/v1/usuarios/{id}/perfis`, `GET /api/v1/usuarios/{id}/perfis/completo`).  
+- A função `get_connection()` expõe uma conexão via gerador assíncrono e deve ser consumida através de injeção de dependência (Depends) em serviços/repositórios.  
+- Evitar obter conexões diretamente em routers com `await get_connection().__anext__()` para não provocar fechamento prematuro da conexão em meio à operação. Utilize sempre os Services (que já recebem os Repos com conexão válida) para validações de permissão e regras de negócio.
+
 ---
 
 ### **3\. Padrões e Decisões Arquiteturais**
@@ -93,6 +100,14 @@ A arquitetura de dados é centrada no PostgreSQL e gerida pela camada de Reposit
 * **Injeção de Dependências (DI):** O FastAPI gere nativamente a DI, o que simplifica a criação e a injeção de dependências como conexões de banco de dados e instâncias de serviços nos endpoints. Isso promove o baixo acoplamento e facilita os testes.  
 * **Data Transfer Object (DTO) com Pydantic:** Os schemas Pydantic atuam como DTOs, definindo contratos de dados claros entre o cliente e a API, e entre as camadas internas. A validação automática na camada de API previne a propagação de dados inválidos para a lógica de negócio.  
 * **Programação Assíncrona (Async/Await):** A escolha do FastAPI e `asyncpg` foi deliberada para construir um sistema totalmente assíncrono. Esta abordagem permite que a aplicação lide com um grande número de operações de I/O (como requisições HTTP e queries ao banco) de forma concorrente e eficiente, sem bloquear o loop de eventos principal.
+
+**Decisão: Gestão de Perfis Múltiplos**  
+- Adoção do padrão "Criação sem perfil + concessão posterior" para resolver conflito entre o perfil legado único e o novo modelo de múltiplos perfis.  
+- `POST /usuarios/` cria usuário com `perfil_id = NULL`. Perfis são concedidos via `POST /api/v1/usuarios/{id}/perfis/conceder` ou pelo atalho `POST /usuarios/com-perfis`.  
+- Rotas de consulta de perfis utilizam exclusivamente a tabela `usuario_perfil`.
+
+**Decisão: Boas práticas de conexão**  
+- Routers não devem gerenciar conexões diretamente. A verificação de permissões (e.g., perfil Administrador) deve ser realizada por Services que já dispõem dos Repos com conexão injetada.
 
 ---
 

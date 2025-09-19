@@ -109,6 +109,20 @@ Definidos em `app/schemas/`, os schemas garantem:
   * O `SessionContextService` gerencia o estado da sessão do usuário, incluindo o perfil ativo.  
   * O endpoint `/auth/alternar-perfil` permite ao usuário trocar seu contexto de permissões dinamicamente.
 
+**Detalhamento de Endpoints (Múltiplos Perfis):**
+
+- `GET /api/v1/usuarios/{usuario_id}/perfis` → Lista os perfis ativos do usuário (nome, ids, data de concessão, observações).  
+- `GET /api/v1/usuarios/{usuario_id}/perfis/completo` → Retorna dados do usuário com `perfis`, `perfil_ids` e `perfis_texto`.  
+- `GET /api/v1/usuarios/{usuario_id}/perfis/validacao` → Retorna capacidades derivadas (pode_ser_fiscal, pode_ser_gestor, pode_ser_admin).  
+- `POST /api/v1/usuarios/{usuario_id}/perfis/conceder` → Concede múltiplos perfis a um usuário.  
+- `POST /api/v1/usuarios/{usuario_id}/perfis/revogar` → Revoga múltiplos perfis (impede que o usuário fique sem perfis).  
+- `POST /usuarios/com-perfis` → Cria usuário e concede perfis na mesma operação (atalho).
+
+**Compatibilidade Legada:**
+
+- A rota `GET /usuarios/{id}` mantém exposição do campo `perfil_id`/`perfil_nome` para compatibilidade com o legado (perfil único), mas não reflete o conjunto completo de perfis. Para a listagem completa, usar os endpoints de múltiplos perfis acima.  
+- Na criação (`POST /usuarios/`), o campo `perfil_id` é ignorado e o usuário é criado sem perfil; a concessão deve ocorrer via `/api/v1/usuarios/{id}/perfis/conceder`.
+
 #### **5.2. Sistema de Pendências e Relatórios Fiscais**
 
 O sistema implementa um workflow completo para gestão de relatórios fiscais:

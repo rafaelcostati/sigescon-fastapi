@@ -37,19 +37,19 @@ username=admin@sigescon.com\&password=Admin@123
 
 {
 
-  "access\_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
 
-  "token\_type": "bearer",
+  "token_type": "bearer",
 
-  "contexto\_sessao": {
+  "contexto_sessao": {
 
-    "usuario\_id": 1,
+    "usuario_id": 1,
 
-    "perfil\_ativo\_id": 1,
+    "perfil_ativo_id": 1,
 
-    "perfil\_ativo\_nome": "Administrador",
+    "perfil_ativo_nome": "Administrador",
 
-    "perfis\_disponiveis": \[
+    "perfis_disponiveis": \[
 
       {
 
@@ -57,7 +57,7 @@ username=admin@sigescon.com\&password=Admin@123
 
         "nome": "Administrador",
 
-        "pode\_ser\_selecionado": true,
+        "pode_ser_selecionado": true,
 
         "descricao": "Acesso total ao sistema"
 
@@ -65,17 +65,19 @@ username=admin@sigescon.com\&password=Admin@123
 
     \],
 
-    "pode\_alternar": false,
+    "pode_alternar": false,
 
-    "sessao\_id": "mock-session-1"
+    "sessao_id": "mock-session-1"
 
   },
 
-  "requer\_selecao\_perfil": false,
+  "requer_selecao_perfil": false,
 
   "mensagem": null
 
 }
+
+Nota: O objeto retornado em `/usuarios/me` reflete o perfil legado (`perfil_id`/`perfil_nome`) para compatibilidade. Para listar TODOS os perfis de um usuário no sistema de múltiplos perfis, utilize os endpoints da seção "Gestão de Perfis de Usuário" abaixo.
 
 **Guarde o valor de `access_token`.** Você precisará dele para todas as chamadas futuras.
 
@@ -101,17 +103,17 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
   "matricula": null,
 
-  "perfil\_id": 1,
+  "perfil_id": 1,
 
   "id": 1,
 
   "ativo": true,
 
-  "created\_at": "2025-09-18T15:30:00.000Z",
+  "created_at": "2025-09-18T15:30:00.000Z",
 
-  "updated\_at": "2025-09-18T15:30:00.000Z",
+  "updated_at": "2025-09-18T15:30:00.000Z",
 
-  "perfil\_nome": "Administrador"
+  "perfil_nome": "Administrador"
 
 }
 
@@ -121,7 +123,7 @@ Finalmente, vamos fazer uma chamada para listar um recurso principal do sistema,
 
 **Requisição:**
 
-GET /api/v1/contratados/?page=1\&per\_page=5
+GET /api/v1/contratados/?page=1\&per_page=5
 
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
@@ -151,19 +153,19 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
   \],
 
-  "total\_items": 1,
+  "total_items": 1,
 
-  "total\_pages": 1,
+  "total_pages": 1,
 
-  "current\_page": 1,
+  "current_page": 1,
 
-  "per\_page": 5
+  "per_page": 5
 
 }
 
-Parabéns\! Você autenticou-se e consumiu com sucesso um endpoint da API SIGESCON.
+Parabéns! Você autenticou-se e consumiu com sucesso um endpoint da API SIGESCON.
 
-### **3\. Autenticação e Gestão de Perfis**
+### **3. Autenticação e Gestão de Perfis**
 
 O sistema de autenticação é flexível para lidar com usuários que possuem múltiplos papéis.
 
@@ -171,7 +173,7 @@ O sistema de autenticação é flexível para lidar com usuários que possuem m�
 
 1. O usuário envia as credenciais para `/auth/login`.  
 2. A API retorna o `access_token` e o `contexto_sessao`.  
-3. O `contexto_sessao` informa o perfil que está **ativo por defeito** (o de maior prioridade: Administrador \> Gestor \> Fiscal) e a lista de todos os `perfis_disponiveis`.  
+3. O `contexto_sessao` informa o perfil que está **ativo por defeito** (o de maior prioridade: Administrador > Gestor > Fiscal) e a lista de todos os `perfis_disponiveis`.  
 4. O cliente (frontend) deve usar o `perfil_ativo_nome` para ajustar a sua interface e as opções disponíveis.
 
 #### **Alternando o Perfil Ativo**
@@ -182,13 +184,13 @@ Se o campo `pode_alternar` no contexto for `true`, o usuário pode mudar o seu p
 
 POST /auth/alternar-perfil
 
-Authorization: Bearer \<seu\_token\>
+Authorization: Bearer <seu_token>
 
 Content-Type: application/json
 
 {
 
-  "novo\_perfil\_id": 3,
+  "novo_perfil_id": 3,
 
   "justificativa": "Mudando para o modo de fiscalização"
 
@@ -198,7 +200,7 @@ Content-Type: application/json
 
 **Resposta de Sucesso (200 OK):** A API retornará um novo objeto `contexto_sessao` atualizado, que o cliente deve usar para atualizar o estado da aplicação.
 
-### **4\. Receitas de Workflows (Exemplos Práticos)**
+### **4. Receitas de Workflows (Exemplos Práticos)**
 
 #### **Receita 1: Fluxo Completo de Fiscalização de Relatório**
 
@@ -235,7 +237,7 @@ Este é o fluxo de negócio mais importante do sistema.
    * `PATCH /api/v1/contratos/{contrato_id}/relatorios/{relatorio_id}/analise`.  
    * No corpo, envie o `status_id` correspondente a "Aprovado" e o `aprovador_usuario_id`.
 
-### **5\. Paginação e Filtros**
+### **5. Paginação e Filtros**
 
 Endpoints que retornam listas de recursos (como `/contratos`, `/contratados`, `/usuarios`) são paginados.
 
@@ -250,19 +252,19 @@ Endpoints que retornam listas de recursos (como `/contratos`, `/contratados`, `/
 
   "data": \[ ... lista de itens ... \],
 
-  "total\_items": 150,
+  "total_items": 150,
 
-  "total\_pages": 15,
+  "total_pages": 15,
 
-  "current\_page": 1,
+  "current_page": 1,
 
-  "per\_page": 10
+  "per_page": 10
 
 }
 
 Muitos endpoints também aceitam query parameters adicionais para **filtragem**. Consulte a documentação do Swagger (`/docs`) para ver os filtros disponíveis em cada rota.
 
-### **6\. Novos Endpoints Implementados**
+### **6. Novos Endpoints Implementados**
 
 #### **6.1. Gerenciamento de Arquivos de Contrato**
 
@@ -322,7 +324,74 @@ GET /api/v1/arquivos/relatorios/contrato/{contrato_id}
 - **Status:** Sempre "Pendente de Análise" após reenvio
 - **Notificação:** Admin recebe email sobre novo envio
 
-### **7\. Tratamento de Erros**
+#### **6.5. Gestão de Perfis de Usuário (Múltiplos Perfis)**
+
+O SIGESCON suporta múltiplos perfis por usuário através da relação `usuario_perfil`. Utilize estes endpoints para listar, conceder e revogar perfis:
+
+- `GET /api/v1/usuarios/{usuario_id}/perfis`
+  - Lista todos os perfis ativos do usuário.
+  - Permissões: o próprio usuário ou Administrador.
+  - Exemplo de resposta:
+  ```json
+  [
+    {
+      "id": 10,
+      "usuario_id": 5,
+      "perfil_id": 2,
+      "perfil_nome": "Gestor",
+      "data_concessao": "2025-09-19T12:34:56Z",
+      "observacoes": null,
+      "ativo": true
+    },
+    {
+      "id": 11,
+      "usuario_id": 5,
+      "perfil_id": 3,
+      "perfil_nome": "Fiscal",
+      "data_concessao": "2025-09-19T12:40:00Z",
+      "observacoes": "concessão em lote",
+      "ativo": true
+    }
+  ]
+  ```
+
+- `GET /api/v1/usuarios/{usuario_id}/perfis/completo`
+  - Retorna dados do usuário com arrays `perfis` (nomes), `perfil_ids` e `perfis_texto`.
+  - Permissões: o próprio usuário ou Administrador.
+  - Exemplo de resposta:
+  ```json
+  {
+    "id": 5,
+    "nome": "João Silva",
+    "email": "joao@example.com",
+    "matricula": "12345",
+    "ativo": true,
+    "perfis": ["Fiscal", "Gestor"],
+    "perfil_ids": [3, 2],
+    "perfis_texto": "Fiscal, Gestor"
+  }
+  ```
+
+- `GET /api/v1/usuarios/{usuario_id}/perfis/validacao`
+  - Retorna capacidades derivadas dos perfis do usuário (p.ex., se pode ser fiscal, gestor, admin).
+  - Permissões: o próprio usuário ou Administrador.
+
+- `POST /api/v1/usuarios/{usuario_id}/perfis/conceder`
+  - Concede múltiplos perfis a um usuário.
+  - Permissões: Administrador.
+  - Corpo (JSON): `{ "perfil_ids": [1, 2, 3], "observacoes": "opcional" }`
+
+- `POST /api/v1/usuarios/{usuario_id}/perfis/revogar`
+  - Revoga múltiplos perfis do usuário (não permite deixar o usuário sem perfis ativos).
+  - Permissões: Administrador.
+  - Corpo (JSON): `{ "perfil_ids": [2], "motivo": "opcional" }`
+
+Observações importantes:
+- A rota `GET /usuarios/{id}` (sem prefixo `/api/v1`) expõe o campo legado `perfil_id` apenas para compatibilidade.
+- Para listar todos os perfis de um usuário, utilize os endpoints acima.
+- Na criação de usuário (`POST /usuarios/`), o campo `perfil_id` é sempre ignorado (criação sem perfil). Conceda perfis via `POST /api/v1/usuarios/{id}/perfis/conceder` ou use o atalho `POST /usuarios/com-perfis`.
+
+### **7. Tratamento de Erros**
 
 A API usa códigos de status HTTP padrão e retorna um corpo de resposta JSON para fornecer detalhes sobre o erro.
 
