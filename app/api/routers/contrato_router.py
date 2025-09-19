@@ -147,6 +147,7 @@ async def get_contrato_by_id(
 async def update_contrato(
     contrato_id: int,
     # Campos opcionais do formulário - apenas os campos que podem ser atualizados
+    nr_contrato: Optional[str] = Form(None),
     objeto: Optional[str] = Form(None),
     data_inicio: Optional[date] = Form(None),
     data_fim: Optional[date] = Form(None),
@@ -173,6 +174,7 @@ async def update_contrato(
     Requer permissão de administrador.
 
     - **contrato_id**: ID do contrato a ser atualizado
+    - **nr_contrato**: Número do contrato (pode ser alterado)
     - **documento_contrato**: Arquivos opcionais para adicionar ao contrato
     - **outros campos**: Campos opcionais do contrato para atualização
 
@@ -182,6 +184,7 @@ async def update_contrato(
     - 250MB total
 
     Todos os campos são opcionais - apenas os fornecidos serão atualizados.
+    **ATENÇÃO**: Alterar o número do contrato pode impactar relatórios e histórico.
     """
     
     # Constrói objeto ContratoUpdate apenas com campos fornecidos
@@ -189,6 +192,7 @@ async def update_contrato(
     
     # Lista todos os campos que podem ser atualizados
     form_fields = {
+        'nr_contrato': nr_contrato,
         'objeto': objeto,
         'data_inicio': data_inicio,
         'data_fim': data_fim,
