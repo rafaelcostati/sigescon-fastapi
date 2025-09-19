@@ -68,27 +68,44 @@ async def db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
     finally:
         await conn.close()
         
+# Fixtures de autenticação
+@pytest_asyncio.fixture(scope="function")
+async def admin_credentials():
+    """Credenciais do administrador"""
+    return {"username": os.getenv("ADMIN_EMAIL"), "password": os.getenv("ADMIN_PASSWORD")}
+
+@pytest_asyncio.fixture(scope="function")
+async def admin_token(async_client: AsyncClient, admin_credentials) -> str:
+    """Token de autenticação do administrador"""
+    response = await async_client.post("/auth/login", data=admin_credentials)
+    return response.json()["access_token"]
+
+@pytest_asyncio.fixture(scope="function")
+async def admin_headers(admin_token: str):
+    """Headers com token de administrador"""
+    return {"Authorization": f"Bearer {admin_token}"}
+
 @pytest.fixture
 async def outro_fiscal_user_id(get_db_connection):
     """Cria um segundo usuário fiscal para testes de transferência"""
     conn = await get_db_connection()
-    
+
     # Busca o perfil Fiscal
     perfil_fiscal = await conn.fetchrow("SELECT id FROM perfil WHERE nome = 'Fiscal'")
-    
+
     # Hash da senha
     from app.core.security import get_password_hash
     senha_hash = get_password_hash("senha123")
-    
+
     # Cria o segundo fiscal
     fiscal_id = await conn.fetchval(
-        """INSERT INTO usuario (nome, email, cpf, senha, perfil_id) 
+        """INSERT INTO usuario (nome, email, cpf, senha, perfil_id)
            VALUES ($1, $2, $3, $4, $5) RETURNING id""",
-        "Carlos Fiscal Substituto", "carlos.fiscal@test.com", "98765432100", 
+        "Carlos Fiscal Substituto", "carlos.fiscal@test.com", "98765432100",
         senha_hash, perfil_fiscal['id']
     )
-    
+
     yield fiscal_id
-    
+
     # Cleanup
     await conn.execute("UPDATE usuario SET ativo = FALSE WHERE id = $1", fiscal_id)

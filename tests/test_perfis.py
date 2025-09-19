@@ -9,25 +9,9 @@ import uuid
 # Carrega as variáveis de ambiente para os testes
 load_dotenv()
 
-@pytest.fixture(scope="module")
-def admin_credentials() -> Dict:
-    """Credenciais do admin do .env"""
-    return {
-        "username": os.getenv("ADMIN_EMAIL"),
-        "password": os.getenv("ADMIN_PASSWORD")
-    }
+# Fixtures movidas para conftest.py
 
-@pytest.fixture
-async def admin_token(async_client: AsyncClient, admin_credentials: Dict) -> str:
-    """Obtém um token de admin válido"""
-    response = await async_client.post("/auth/login", data=admin_credentials)
-    assert response.status_code == 200
-    return response.json()["access_token"]
-
-@pytest.fixture
-async def admin_headers(admin_token: str) -> Dict:
-    """Headers com autenticação de admin"""
-    return {"Authorization": f"Bearer {admin_token}"}
+# admin_headers também está no conftest.py
 
 
 @pytest.mark.asyncio

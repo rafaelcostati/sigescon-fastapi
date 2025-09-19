@@ -9,18 +9,9 @@ import random
 
 load_dotenv()
 
-@pytest.fixture(scope="module")
-def admin_credentials() -> Dict:
-    return {"username": os.getenv("ADMIN_EMAIL"), "password": os.getenv("ADMIN_PASSWORD")}
+# Fixtures movidas para conftest.py
 
-@pytest.fixture
-async def admin_token(async_client: AsyncClient, admin_credentials: Dict) -> str:
-    response = await async_client.post("/auth/login", data=admin_credentials)
-    return response.json()["access_token"]
-
-@pytest.fixture
-async def admin_headers(admin_token: str) -> Dict:
-    return {"Authorization": f"Bearer {admin_token}"}
+# admin_headers também está no conftest.py
 
 @pytest.mark.asyncio
 async def test_crud_modalidades_workflow(async_client: AsyncClient, admin_headers: Dict):

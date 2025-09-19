@@ -58,11 +58,18 @@ echo "------------------------"
 
 # Array de módulos de teste
 declare -a test_modules=(
-    "tests/test_auth_e_usuarios.py::TestUsuariosCRUD"
-    "tests/test_auth_e_usuarios.py::TestPasswordManagement"
-    "tests/test_auth_e_usuarios.py::TestPermissions"
+    "tests/test_auth_e_usuarios.py"
     "tests/test_contratados.py"
     "tests/test_usuarios_complete.py"
+    "tests/test_contratos.py"
+    "tests/test_modalidades.py"
+    "tests/test_perfis.py"
+    "tests/test_status.py"
+    "tests/test_pendencias.py"
+    "tests/test_relatorios.py"
+    "tests/test_email_service.py"
+    "tests/test_workflow_relatorios.py"
+    "tests/test_arquivos_contrato.py"
 )
 
 # Contadores
@@ -70,17 +77,39 @@ total_tests=0
 passed_tests=0
 failed_tests=0
 
+# Arrays para armazenar resultados
+declare -a passed_modules=()
+declare -a failed_modules=()
+declare -a error_details=()
+
 # Executar cada módulo de teste
 for test_module in "${test_modules[@]}"; do
     echo ""
     echo "📋 Testando: $test_module"
     echo "---"
-    
-    if pytest "$test_module" -v --tb=short; then
+
+    # Capturar output do pytest para análise de erros
+    test_output=$(pytest "$test_module" -v --tb=short 2>&1)
+    test_exit_code=$?
+
+    if [ $test_exit_code -eq 0 ]; then
         echo -e "${GREEN}✓ Passou${NC}"
+        passed_modules+=("$test_module")
         ((passed_tests++))
     else
         echo -e "${RED}✗ Falhou${NC}"
+        failed_modules+=("$test_module")
+
+        # Extrair informações de erro mais específicas
+        error_info=$(echo "$test_output" | grep -E "FAILED.*::" | head -2)
+        if [ -z "$error_info" ]; then
+            # Se não encontrou FAILED, procura por outras mensagens de erro
+            error_info=$(echo "$test_output" | grep -E "(ERROR:|AssertionError|TypeError|ValueError)" | head -2)
+        fi
+        if [ -z "$error_info" ]; then
+            error_info="Verifique logs - teste pode ter passado com warnings"
+        fi
+        error_details+=("$test_module: $error_info")
         ((failed_tests++))
     fi
     ((total_tests++))
@@ -136,12 +165,37 @@ echo -e "Passou: ${GREEN}$passed_tests${NC}"
 echo -e "Falhou: ${RED}$failed_tests${NC}"
 echo ""
 
+# Mostrar módulos que passaram
+if [ ${#passed_modules[@]} -gt 0 ]; then
+    echo -e "${GREEN}✅ MÓDULOS QUE PASSARAM:${NC}"
+    for module in "${passed_modules[@]}"; do
+        echo -e "  ${GREEN}✓${NC} $module"
+    done
+    echo ""
+fi
+
+# Mostrar detalhes dos erros
+if [ ${#failed_modules[@]} -gt 0 ]; then
+    echo -e "${RED}❌ MÓDULOS COM FALHAS:${NC}"
+    for i in "${!failed_modules[@]}"; do
+        echo -e "  ${RED}✗${NC} ${failed_modules[$i]}"
+    done
+    echo ""
+
+    echo -e "${YELLOW}🔍 DETALHES DOS ERROS:${NC}"
+    echo "----------------------------------------"
+    for detail in "${error_details[@]}"; do
+        echo -e "${RED}➤${NC} $detail"
+        echo ""
+    done
+fi
+
 if [ $failed_tests -eq 0 ]; then
     echo -e "${GREEN}🎉 Todos os testes passaram!${NC}"
     echo "A migração está progredindo corretamente."
 else
     echo -e "${RED}⚠️  Alguns testes falharam.${NC}"
-    echo "Por favor, verifique os erros acima."
+    echo "Verifique os detalhes dos erros acima para debug."
 fi
 
 echo ""
