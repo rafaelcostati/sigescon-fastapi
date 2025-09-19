@@ -161,3 +161,26 @@ class FileService:
                 saved_file['warnings'] = error_details
 
         return saved_files
+
+    async def delete_file(self, file_path: str) -> bool:
+        """
+        Remove um arquivo físico do sistema de arquivos.
+
+        Args:
+            file_path: Caminho completo para o arquivo
+
+        Returns:
+            bool: True se removido com sucesso, False caso contrário
+        """
+        try:
+            import os
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                return True
+            else:
+                # Arquivo já não existe, considera como "removido"
+                return True
+        except Exception as e:
+            # Log do erro mas não falha a operação
+            print(f"Erro ao remover arquivo físico {file_path}: {e}")
+            return False
