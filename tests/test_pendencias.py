@@ -1,5 +1,6 @@
-# tests/test_pendencias.py 
+# tests/test_pendencias.py
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from typing import Dict, Any
 import os
@@ -10,27 +11,16 @@ from datetime import date
 
 load_dotenv()
 
-# --- Fixtures de Autenticação e Pré-requisitos ---
+# --- Fixtures movidas para conftest.py ---
 
-@pytest.fixture
-def admin_credentials() -> Dict:
-    return {"username": os.getenv("ADMIN_EMAIL"), "password": os.getenv("ADMIN_PASSWORD")}
-
-@pytest.fixture
+@pytest_asyncio.fixture
 async def admin_user_id(async_client: AsyncClient, admin_headers: Dict) -> int:
     """Obtém o ID do usuário admin logado."""
-    response = await async_client.get("/api/v1/usuarios/me", headers=admin_headers)  
+    response = await async_client.get("/api/v1/usuarios/me", headers=admin_headers)
     assert response.status_code == 200
     return response.json()["id"]
 
-@pytest.fixture
-async def admin_headers(async_client: AsyncClient, admin_credentials: Dict) -> Dict:
-    response = await async_client.post("/auth/login", data=admin_credentials)
-    assert response.status_code == 200
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
-
-@pytest.fixture
+@pytest_asyncio.fixture
 async def setup_contract(async_client: AsyncClient, admin_headers: Dict, admin_user_id: int) -> Dict[str, Any]:
     """Cria um contrato completo e retorna seus dados e IDs."""
     

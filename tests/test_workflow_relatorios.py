@@ -1,5 +1,6 @@
 # tests/test_workflow_relatorios.py
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from typing import Dict, Any
 import os
@@ -10,18 +11,9 @@ from datetime import date
 
 load_dotenv()
 
-# --- Fixtures ---
+# --- Fixtures movidas para conftest.py ---
 
-@pytest.fixture
-async def admin_headers(async_client: AsyncClient) -> Dict:
-    response = await async_client.post("/auth/login", data={
-        "username": os.getenv("ADMIN_EMAIL"),
-        "password": os.getenv("ADMIN_PASSWORD")
-    })
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
-
-@pytest.fixture
+@pytest_asyncio.fixture
 async def setup_complete_workflow(async_client: AsyncClient, admin_headers: Dict) -> Dict[str, Any]:
     """Cria um ambiente completo para testar o workflow de relatórios."""
 

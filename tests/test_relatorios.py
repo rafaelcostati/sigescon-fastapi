@@ -1,5 +1,6 @@
 # tests/test_relatorios.py
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from typing import Dict, Any
 import os
@@ -10,23 +11,14 @@ from datetime import date
 
 load_dotenv()
 
-# --- Fixtures de Autenticação e Pré-requisitos ---
+# --- Fixtures movidas para conftest.py ---
 
-@pytest.fixture
-async def admin_headers(async_client: AsyncClient) -> Dict:
-    response = await async_client.post("/auth/login", data={
-        "username": os.getenv("ADMIN_EMAIL"),
-        "password": os.getenv("ADMIN_PASSWORD")
-    })
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
-
-@pytest.fixture
+@pytest_asyncio.fixture
 async def admin_user(async_client: AsyncClient, admin_headers: Dict) -> Dict:
     response = await async_client.get("/api/v1/usuarios/me", headers=admin_headers)
     return response.json()
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def setup_for_reports(async_client: AsyncClient, admin_headers: Dict, admin_user: Dict) -> Dict:
     """Cria um fiscal, um contrato e uma pendência para os testes de relatório."""
     
