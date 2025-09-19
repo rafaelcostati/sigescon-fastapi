@@ -177,9 +177,9 @@ async def update_contrato(
     - **outros campos**: Campos opcionais do contrato para atualização
 
     Limites de upload:
-    - Máximo 5 arquivos por upload
-    - 10MB por arquivo individual
-    - 50MB total
+    - Máximo 10 arquivos por upload
+    - 100MB por arquivo individual
+    - 250MB total
 
     Todos os campos são opcionais - apenas os fornecidos serão atualizados.
     """

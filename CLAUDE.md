@@ -98,6 +98,9 @@ backend-contratos-FASTAPI/
 │   ├── test_contratados.py          # Testes de contratados
 │   └── fixtures/                    # Arquivos de teste
 │
+├── test_enviomultiplo.py            # Teste de upload múltiplo de arquivos
+├── test_arquivos_contrato.py        # Teste de gerenciamento de arquivos
+│
 ├── uploads/                         # Arquivos enviados
 ├── logs/                            # Logs da aplicação
 ├── scripts/                         # Scripts auxiliares
@@ -218,7 +221,8 @@ chmod +x run_tests.sh
 - **Alteração de Senhas** - Própria e administrativa
 
 ### Gestão de Contratos
-- **Upload de Arquivos** - Documentos contratuais
+- **Upload Múltiplo** - Documentos contratuais com validação completa
+- **Gerenciamento de Arquivos** - Listar, baixar e excluir arquivos por contrato
 - **Associações** - Gestores, fiscais, substitutos
 - **Filtros Avançados** - Por data, status, responsáveis
 - **Soft Delete** - Preservação de histórico
@@ -278,6 +282,13 @@ POST   /api/v1/contratos              # Criar contrato + upload
 GET    /api/v1/contratos/{id}         # Detalhes do contrato
 PATCH  /api/v1/contratos/{id}         # Atualizar contrato
 DELETE /api/v1/contratos/{id}         # Deletar contrato
+```
+
+### Gerenciamento de Arquivos de Contrato
+```
+GET    /api/v1/contratos/{id}/arquivos                    # Listar arquivos do contrato
+GET    /api/v1/contratos/{id}/arquivos/{arquivo_id}/download # Download de arquivo específico
+DELETE /api/v1/contratos/{id}/arquivos/{arquivo_id}       # Excluir arquivo (Admin)
 ```
 
 ### Relatórios e Pendências
@@ -369,6 +380,54 @@ pytest --cov=app tests/
 @gestor_required         # Gestores e superiores
 @owner_or_admin          # Próprio usuário ou admin
 ```
+
+---
+
+## 📁 Gerenciamento de Arquivos de Contrato
+
+### Funcionalidades Implementadas
+- **Listagem de Arquivos** - Visualizar todos os arquivos associados a um contrato
+- **Download Seguro** - Download individual de arquivos com verificação de permissões
+- **Exclusão Controlada** - Remoção de arquivos (apenas administradores)
+- **Upload Múltiplo** - Adicionar vários arquivos simultaneamente
+
+### Endpoints Disponíveis
+```bash
+GET    /api/v1/contratos/{id}/arquivos                    # Lista arquivos do contrato
+GET    /api/v1/contratos/{id}/arquivos/{arquivo_id}/download # Download de arquivo
+DELETE /api/v1/contratos/{id}/arquivos/{arquivo_id}       # Remove arquivo
+```
+
+### Características Técnicas
+- **Validação de Permissões** - Usuários só acessam arquivos de contratos autorizados
+- **Verificação de Integridade** - Validação de existência física dos arquivos
+- **Cleanup Automático** - Remoção tanto do banco quanto do sistema de arquivos
+- **Metadados Completos** - Nome, tipo, tamanho e data de criação
+- **Ordenação** - Arquivos listados por data de criação (mais recentes primeiro)
+
+### Estrutura de Resposta
+```json
+{
+  "arquivos": [
+    {
+      "id": 69,
+      "nome_arquivo": "contrato_principal.pdf",
+      "tipo_arquivo": "application/pdf",
+      "tamanho_bytes": 1987,
+      "contrato_id": 101,
+      "created_at": "2025-09-19T10:08:13"
+    }
+  ],
+  "total_arquivos": 7,
+  "contrato_id": 101
+}
+```
+
+### Segurança e Controle
+- **Autenticação Obrigatória** - Todas as operações requerem login
+- **Controle de Acesso** - Verificação de permissões por contrato
+- **Exclusão Restrita** - Apenas administradores podem remover arquivos
+- **Download Rastreável** - Logs de auditoria para downloads
 
 ---
 
@@ -539,12 +598,13 @@ SELECT numero, objeto, data_assinatura FROM contratos WHERE data_exclusao IS NUL
 - [x] **Múltiplos Perfis** - Concessão/revogação dinâmica
 - [x] **Contratados** - CRUD com validações
 - [x] **Tabelas Auxiliares** - Perfis, Status, Modalidades
-- [x] **Contratos** - Gestão completa com upload
+- [x] **Contratos** - Gestão completa com upload múltiplo
+- [x] **Gerenciamento de Arquivos** - Listar, baixar e excluir arquivos de contratos
 - [x] **Relatórios e Pendências** - Workflow implementado
 - [x] **Sistema de Emails** - SMTP assíncrono
 - [x] **Scheduler** - Notificações automáticas
 - [x] **Middleware** - Auditoria e logging
-- [x] **Testes** - Cobertura abrangente
+- [x] **Testes** - Cobertura abrangente incluindo upload múltiplo
 - [x] **Documentação** - Swagger protegido
 
 ### 🚀 Em Produção

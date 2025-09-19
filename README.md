@@ -99,7 +99,8 @@ Sistema robusto de gestão de contratos desenvolvido com **FastAPI**, oferecendo
 
 #### 📋 **Contratos**
 - Cadastro completo com múltiplos campos e validações
-- Upload e gestão de documentos contratuais
+- **Upload múltiplo** de documentos contratuais (até 10 arquivos, 250MB total)
+- **Gerenciamento de arquivos** - listar, baixar e excluir arquivos por contrato
 - Associação com gestores, fiscais e substitutos
 - Filtros avançados por data, status, responsáveis
 - Controle de prazos e notificações de vencimento
@@ -353,10 +354,15 @@ Com o servidor rodando, acesse:
 
 #### Contratos
 - `GET /api/v1/contratos` - Listar contratos com filtros avançados e paginação
-- `POST /api/v1/contratos` - Criar contrato com upload opcional (Admin)
+- `POST /api/v1/contratos` - Criar contrato com upload múltiplo (Admin)
 - `GET /api/v1/contratos/{id}` - Detalhes completos do contrato
-- `PATCH /api/v1/contratos/{id}` - Atualizar contrato (Admin)
+- `PATCH /api/v1/contratos/{id}` - Atualizar contrato com arquivos adicionais (Admin)
 - `DELETE /api/v1/contratos/{id}` - Deletar contrato (Admin)
+
+#### Gerenciamento de Arquivos
+- `GET /api/v1/contratos/{id}/arquivos` - Listar arquivos do contrato
+- `GET /api/v1/contratos/{id}/arquivos/{arquivo_id}/download` - Download de arquivo
+- `DELETE /api/v1/contratos/{id}/arquivos/{arquivo_id}` - Excluir arquivo (Admin)
 
 #### Relatórios
 - `GET /api/v1/contratos/{id}/relatorios` - Listar relatórios do contrato
