@@ -86,9 +86,19 @@ async def test_non_admin_cannot_write(async_client: AsyncClient, admin_headers: 
         "perfil_id": 3
     }
 
-    #  para criar usuário
+    # Criar usuário
     create_user_response = await async_client.post("/api/v1/usuarios/", json=fiscal_data, headers=admin_headers)
     assert create_user_response.status_code == 201, f"Falha ao criar usuário fiscal de teste: {create_user_response.text}"
+    fiscal_id = create_user_response.json()["id"]
+
+    # Conceder perfil fiscal via sistema de múltiplos perfis
+    perfil_data = {"perfil_ids": [3]}  # Fiscal
+    perfil_response = await async_client.post(
+        f"/api/v1/usuarios/{fiscal_id}/perfis/conceder",
+        json=perfil_data,
+        headers=admin_headers
+    )
+    assert perfil_response.status_code == 200
 
     # Login como fiscal
     login_resp = await async_client.post("/auth/login", data={"username": fiscal_data["email"], "password": fiscal_data["senha"]})

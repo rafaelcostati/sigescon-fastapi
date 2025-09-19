@@ -23,7 +23,7 @@ async def admin_headers(admin_token: str) -> Dict:
 @pytest.mark.asyncio
 async def test_get_all_status_relatorio(async_client: AsyncClient, admin_headers: Dict):
     """Testa se a lista de status de relatório é retornada corretamente."""
-    response = await async_client.get("/statusrelatorio/", headers=admin_headers)
+    response = await async_client.get("/api/v1/statusrelatorio/", headers=admin_headers)
     assert response.status_code == 200
     
     data = response.json()
@@ -38,11 +38,11 @@ async def test_get_all_status_relatorio(async_client: AsyncClient, admin_headers
 async def test_get_status_relatorio_by_id(async_client: AsyncClient, admin_headers: Dict):
     """Testa a busca de um status de relatório específico."""
     # Primeiro, pega todos para descobrir um ID válido
-    response_all = await async_client.get("/statusrelatorio/", headers=admin_headers)
+    response_all = await async_client.get("/api/v1/statusrelatorio/", headers=admin_headers)
     item_to_find = response_all.json()[0]
     item_id = item_to_find['id']
     item_name = item_to_find['nome']
     
-    response_one = await async_client.get(f"/statusrelatorio/{item_id}", headers=admin_headers)
+    response_one = await async_client.get(f"/api/v1/statusrelatorio/{item_id}", headers=admin_headers)
     assert response_one.status_code == 200
     assert response_one.json()['nome'] == item_name

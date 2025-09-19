@@ -66,6 +66,9 @@ class UsuarioRepository:
 
     async def create_user(self, user: UsuarioCreate, hashed_password: str) -> Dict:
         """Cria um novo usuário"""
+        # Se perfil_id não foi fornecido, define como NULL (None)
+        perfil_id = user.perfil_id if user.perfil_id else None
+
         query = """
             INSERT INTO usuario (nome, email, cpf, matricula, senha, perfil_id)
             VALUES ($1, $2, $3, $4, $5, $6)
@@ -74,7 +77,7 @@ class UsuarioRepository:
         new_user = await self.conn.fetchrow(
             query,
             user.nome, user.email, user.cpf,
-            user.matricula, hashed_password, user.perfil_id
+            user.matricula, hashed_password, perfil_id
         )
         return dict(new_user)
 

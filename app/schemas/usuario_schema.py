@@ -9,7 +9,7 @@ class UsuarioBase(BaseModel):
     email: EmailStr = Field(..., description="Email único do usuário")
     cpf: str = Field(..., min_length=11, max_length=11, description="CPF sem formatação")
     matricula: Optional[str] = Field(None, max_length=20, description="Matrícula do usuário")
-    perfil_id: int = Field(..., gt=0, description="ID do perfil do usuário")
+    perfil_id: Optional[int] = Field(None, gt=0, description="ID do perfil do usuário (legado)")
 
     @field_validator('cpf')
     @classmethod

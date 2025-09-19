@@ -145,7 +145,16 @@ async def test_non_admin_user_blocked(async_client: AsyncClient, admin_headers: 
     create_user_response = await async_client.post("/api/v1/usuarios/", json=fiscal_data, headers=admin_headers)
     assert create_user_response.status_code == 201
     fiscal_id = create_user_response.json()["id"]
-    
+
+    # Conceder perfil fiscal via sistema de múltiplos perfis
+    perfil_data = {"perfil_ids": [3]}  # Fiscal
+    perfil_response = await async_client.post(
+        f"/api/v1/usuarios/{fiscal_id}/perfis/conceder",
+        json=perfil_data,
+        headers=admin_headers
+    )
+    assert perfil_response.status_code == 200
+
     # Login como fiscal
     login_response = await async_client.post("/auth/login", data={"username": fiscal_data["email"], "password": fiscal_data["senha"]})
     assert login_response.status_code == 200

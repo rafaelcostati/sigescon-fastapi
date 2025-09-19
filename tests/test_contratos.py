@@ -29,15 +29,29 @@ async def contract_prerequisites(async_client: AsyncClient, admin_headers: Dict)
     """Cria um gestor, fiscal, contratado, modalidade e status para usar nos testes de contrato."""
     
     async def create_user(perfil_id: int, role: str):
+        # Cria usuário com perfil Fiscal como padrão (necessário devido à constraint NOT NULL)
         user_data = {
             "nome": f"{role} Teste Contrato {uuid.uuid4().hex[:6]}",
             "email": f"{role.lower()}.contrato.{uuid.uuid4().hex[:6]}@teste.com",
             "cpf": ''.join([str(random.randint(0, 9)) for _ in range(11)]),
-            "senha": "password123", "perfil_id": perfil_id
+            "senha": "password123",
+            "perfil_id": 3  # Fiscal como padrão temporário
         }
         response = await async_client.post("/api/v1/usuarios/", json=user_data, headers=admin_headers)
         assert response.status_code == 201
-        return response.json()
+        user = response.json()
+
+        # Se o perfil desejado não for Fiscal (3), concede o perfil correto
+        if perfil_id != 3:
+            perfil_data = {"perfil_ids": [perfil_id]}
+            perfil_response = await async_client.post(
+                f"/api/v1/usuarios/{user['id']}/perfis/conceder",
+                json=perfil_data,
+                headers=admin_headers
+            )
+            assert perfil_response.status_code == 200
+
+        return user
 
     async def create_contratado():
         contratado_data = {
@@ -118,7 +132,7 @@ async def test_crud_contrato_workflow_with_file(async_client: AsyncClient, admin
 
     # --- 4. UPDATE ---
     update_data = {"objeto": "Este é um objeto de contrato atualizado após o upload."}
-    update_response = await async_client.patch(f"/api/v1/contratos/{contrato_id}", json=update_data, headers=admin_headers)
+    update_response = await async_client.patch(f"/api/v1/contratos/{contrato_id}", data=update_data, headers=admin_headers)
     assert update_response.status_code == 200
     assert update_response.json()["objeto"] == update_data["objeto"]
 
@@ -153,12 +167,22 @@ async def test_contract_permissions(async_client: AsyncClient, admin_headers: Di
         "email": f"outro.fiscal.{uuid.uuid4().hex[:6]}@teste.com",
         "cpf": ''.join([str(random.randint(0, 9)) for _ in range(11)]),
         "senha": "password123",
-        "perfil_id": 3  # Fiscal
+        "perfil_id": 3  # Fiscal como padrão temporário
     }
-    
+
     other_fiscal_resp = await async_client.post("/api/v1/usuarios/", json=other_fiscal_data, headers=admin_headers)
     assert other_fiscal_resp.status_code == 201
-    other_fiscal_id = other_fiscal_resp.json()["id"]
+    other_fiscal = other_fiscal_resp.json()
+    other_fiscal_id = other_fiscal["id"]
+
+    # Conceder perfil fiscal via sistema de múltiplos perfis
+    perfil_data = {"perfil_ids": [3]}  # Fiscal
+    perfil_response = await async_client.post(
+        f"/api/v1/usuarios/{other_fiscal_id}/perfis/conceder",
+        json=perfil_data,
+        headers=admin_headers
+    )
+    assert perfil_response.status_code == 200
     
     # 3. Login como o fiscal que NÃO tem acesso ao contrato
     login_resp = await async_client.post("/auth/login", data={"username": other_fiscal_data["email"], "password": other_fiscal_data["senha"]})

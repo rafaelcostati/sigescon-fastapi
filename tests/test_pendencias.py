@@ -41,8 +41,17 @@ async def setup_contract(async_client: AsyncClient, admin_headers: Dict, admin_u
         "cpf": ''.join([str(random.randint(0, 9)) for _ in range(11)]),
         "senha": "password123", "perfil_id": 3
     }
-    fiscal_resp = await async_client.post("/api/v1/usuarios/", json=fiscal_data, headers=admin_headers)  
+    fiscal_resp = await async_client.post("/api/v1/usuarios/", json=fiscal_data, headers=admin_headers)
     fiscal = fiscal_resp.json()
+
+    # Conceder perfil fiscal via sistema de múltiplos perfis
+    perfil_data = {"perfil_ids": [3]}  # Fiscal
+    perfil_response = await async_client.post(
+        f"/api/v1/usuarios/{fiscal['id']}/perfis/conceder",
+        json=perfil_data,
+        headers=admin_headers
+    )
+    assert perfil_response.status_code == 200
 
     # Cria um contratado
     contratado_data = {

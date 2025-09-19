@@ -30,6 +30,28 @@ async def admin_headers(admin_token: str) -> Dict:
     """Headers com autenticação de admin"""
     return {"Authorization": f"Bearer {admin_token}"}
 
+async def create_user_with_profile(async_client: AsyncClient, user_data: Dict, admin_headers: Dict) -> Dict:
+    """
+    Helper function to create a user and properly grant them a profile in usuario_perfil table.
+    This is needed because the system now fully uses the multiple profiles system.
+    """
+    # Create user
+    response = await async_client.post("/api/v1/usuarios/", json=user_data, headers=admin_headers)
+    assert response.status_code == 201
+    user = response.json()
+
+    # Grant the profile via the multiple profiles system
+    perfil_id = user_data.get("perfil_id", 3)  # Default to Fiscal if not specified
+    perfil_data = {"perfil_ids": [perfil_id]}
+    perfil_response = await async_client.post(
+        f"/api/v1/usuarios/{user['id']}/perfis/conceder",
+        json=perfil_data,
+        headers=admin_headers
+    )
+    assert perfil_response.status_code == 200
+
+    return user
+
 @pytest_asyncio.fixture
 def unique_user_data() -> Dict:
     """Gera dados únicos para criar um usuário"""
@@ -94,14 +116,17 @@ class TestUsuariosCRUD:
     async def test_list_users(self, async_client: AsyncClient, admin_headers: Dict):
         """Testa listagem de usuários"""
         print("\n--- Testando LIST de Usuários ---")
-        
+
         response = await async_client.get("/api/v1/usuarios/", headers=admin_headers)
-        
+
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) > 0
-        print(f"✓ {len(data)} usuários listados")
+        assert isinstance(data, dict)  # API agora retorna objeto paginado
+        assert "data" in data
+        assert "total_items" in data
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) > 0
+        print(f"✓ {len(data['data'])} usuários listados, total: {data['total_items']}")
         
         # Testa filtro por nome
         response = await async_client.get(
@@ -110,8 +135,13 @@ class TestUsuariosCRUD:
         )
         assert response.status_code == 200
         filtered_data = response.json()
-        assert all("Teste" in u["nome"] or "teste" in u["nome"].lower() for u in filtered_data)
-        print(f"✓ Filtro por nome funcionando")
+        assert isinstance(filtered_data, dict)  # API retorna objeto paginado
+        assert "data" in filtered_data
+        if filtered_data["total_items"] > 0:  # Se encontrou resultados
+            assert all("Teste" in u["nome"] or "teste" in u["nome"].lower() for u in filtered_data["data"])
+            print(f"✓ Filtro funcionou, {len(filtered_data['data'])} usuários encontrados")
+        else:
+            print("✓ Filtro funcionou, nenhum usuário com 'Teste' no nome encontrado")
     
     @pytest.mark.asyncio
     async def test_update_user(self, async_client: AsyncClient, admin_headers: Dict):
@@ -173,15 +203,10 @@ class TestPasswordManagement:
     async def test_user_change_own_password(self, async_client: AsyncClient, admin_headers: Dict, unique_user_data: Dict):
         """Testa alteração de senha pelo próprio usuário"""
         print("\n--- Testando Alteração de Senha ---")
-        
-        # Cria um usuário novo para este teste
-        response = await async_client.post(
-            "/api/v1/usuarios/",
-            json=unique_user_data,
-            headers=admin_headers
-        )
-        assert response.status_code == 201
-        user_id = response.json()["id"]
+
+        # Cria um usuário novo para este teste com perfil ativo
+        user = await create_user_with_profile(async_client, unique_user_data, admin_headers)
+        user_id = user["id"]
         
         # Faz login com o usuário criado
         login_data = {
@@ -224,15 +249,10 @@ class TestPasswordManagement:
     async def test_admin_reset_password(self, async_client: AsyncClient, admin_headers: Dict, unique_user_data: Dict):
         """Testa reset de senha por admin"""
         print("\n--- Testando Reset de Senha por Admin ---")
-        
-        # Cria um usuário para o teste
-        response = await async_client.post(
-            "/api/v1/usuarios/",
-            json=unique_user_data,
-            headers=admin_headers
-        )
-        assert response.status_code == 201
-        user_id = response.json()["id"]
+
+        # Cria um usuário para o teste com perfil ativo
+        user = await create_user_with_profile(async_client, unique_user_data, admin_headers)
+        user_id = user["id"]
         
         # Admin reseta a senha
         reset_data = {"nova_senha": "senha_resetada_123"}
@@ -266,17 +286,12 @@ class TestPermissions:
     async def test_non_admin_cannot_create_user(self, async_client: AsyncClient, unique_user_data: Dict, admin_headers: Dict):
         """Testa que usuário comum não pode criar outros usuários"""
         print("\n--- Testando Restrições de Permissão ---")
-        
-        # Cria um usuário fiscal
+
+        # Cria um usuário fiscal com perfil ativo
         fiscal_data = unique_user_data.copy()
         fiscal_data["perfil_id"] = 3  # Fiscal
-        response = await async_client.post(
-            "/api/v1/usuarios/",
-            json=fiscal_data,
-            headers=admin_headers
-        )
-        assert response.status_code == 201
-        fiscal_id = response.json()["id"]
+        fiscal_user = await create_user_with_profile(async_client, fiscal_data, admin_headers)
+        fiscal_id = fiscal_user["id"]
         
         # Faz login como fiscal
         login_data = {
@@ -308,7 +323,7 @@ class TestPermissions:
         """Testa que usuário não pode alterar senha de outros"""
         print("\n--- Testando Proteção de Senha ---")
         
-        # Cria dois usuários
+        # Cria dois usuários com perfis ativos
         user1_data = {
             "nome": "User 1",
             "email": f"user1_{uuid.uuid4().hex[:8]}@test.com",
@@ -323,14 +338,12 @@ class TestPermissions:
             "senha": "senha2",
             "perfil_id": 3
         }
-        
-        # Cria ambos
-        response1 = await async_client.post("/api/v1/usuarios/", json=user1_data, headers=admin_headers)
-        response2 = await async_client.post("/api/v1/usuarios/", json=user2_data, headers=admin_headers)
-        assert response1.status_code == 201
-        assert response2.status_code == 201
-        user1_id = response1.json()["id"]
-        user2_id = response2.json()["id"]
+
+        # Cria ambos com perfis ativos
+        user1 = await create_user_with_profile(async_client, user1_data, admin_headers)
+        user2 = await create_user_with_profile(async_client, user2_data, admin_headers)
+        user1_id = user1["id"]
+        user2_id = user2["id"]
         
         # Login como user1
         login_data = {"username": user1_data["email"], "password": user1_data["senha"]}

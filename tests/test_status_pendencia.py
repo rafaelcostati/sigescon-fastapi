@@ -23,7 +23,7 @@ async def admin_headers(admin_token: str) -> Dict:
 @pytest.mark.asyncio
 async def test_get_all_status_pendencia(async_client: AsyncClient, admin_headers: Dict):
     """Testa se a lista de status de pendência é retornada corretamente."""
-    response = await async_client.get("/statuspendencia/", headers=admin_headers)
+    response = await async_client.get("/api/v1/statuspendencia/", headers=admin_headers)
     assert response.status_code == 200
     
     data = response.json()
@@ -37,10 +37,10 @@ async def test_get_all_status_pendencia(async_client: AsyncClient, admin_headers
 @pytest.mark.asyncio
 async def test_get_status_pendencia_by_id(async_client: AsyncClient, admin_headers: Dict):
     """Testa a busca de um status de pendência específico."""
-    response_all = await async_client.get("/statuspendencia/", headers=admin_headers)
+    response_all = await async_client.get("/api/v1/statuspendencia/", headers=admin_headers)
     item_to_find = next(item for item in response_all.json() if item['nome'] == 'Pendente')
     item_id = item_to_find['id']
     
-    response_one = await async_client.get(f"/statuspendencia/{item_id}", headers=admin_headers)
+    response_one = await async_client.get(f"/api/v1/statuspendencia/{item_id}", headers=admin_headers)
     assert response_one.status_code == 200
     assert response_one.json()['nome'] == 'Pendente'
