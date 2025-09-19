@@ -363,15 +363,16 @@ Com o servidor rodando, acesse:
 - `GET /api/v1/contratos/{id}/arquivos` - Listar arquivos do contrato
 - `GET /api/v1/contratos/{id}/arquivos/{arquivo_id}/download` - Download de arquivo
 - `DELETE /api/v1/contratos/{id}/arquivos/{arquivo_id}` - Excluir arquivo (Admin)
+- `GET /api/v1/arquivos/relatorios/contrato/{id}` - **NOVO** - Listar arquivos de relatórios separadamente
 
-#### Relatórios
+#### Relatórios e Pendências
 - `GET /api/v1/contratos/{id}/relatorios` - Listar relatórios do contrato
-- `POST /api/v1/contratos/{id}/relatorios` - Submeter relatório com arquivo (Fiscal)
-- `PATCH /api/v1/contratos/{id}/relatorios/{id}/analise` - Analisar relatório (Admin)
-
-#### Pendências
+- `POST /api/v1/contratos/{id}/relatorios` - Submeter relatório com arquivo (Fiscal/Admin)
+- `PATCH /api/v1/contratos/{id}/relatorios/{id}/analise` - **ATUALIZADO** - Analisar relatório (aprovar/rejeitar)
 - `GET /api/v1/contratos/{id}/pendencias` - Listar pendências do contrato
 - `POST /api/v1/contratos/{id}/pendencias` - Criar pendência (Admin)
+- `PATCH /api/v1/contratos/{id}/pendencias/{id}/cancelar` - **NOVO** - Cancelar pendência (Admin)
+- `GET /api/v1/contratos/{id}/pendencias/contador` - **NOVO** - Contador por status para dashboard
 
 #### Arquivos
 - `GET /api/v1/arquivos/{id}/download` - Download de arquivos com controle de acesso
@@ -449,14 +450,45 @@ sigescon-fastapi/
 
 ```mermaid
 graph LR
-    A[Admin cria Pendência] --> B[Fiscal recebe notificação]
-    B --> C[Fiscal submete Relatório]
-    C --> D[Admin analisa]
-    D --> E{Aprovado?}
-    E -->|Sim| F[Pendência Concluída]
-    E -->|Não| G[Fiscal recebe feedback]
-    G --> C
+    A[Admin cria Pendência] --> B[Fiscal recebe email]
+    B --> C{Fiscal responde}
+    C -->|Envia Relatório + PDF| D[Status: Pendente de Análise]
+    C -->|Não responde| E[Lembrete automático]
+    E --> C
+    A --> F[Admin pode cancelar]
+    F --> G[Fiscal recebe email de cancelamento]
+    D --> H[Admin analisa relatório]
+    H --> I{Decisão}
+    I -->|Aprova| J[Status: Aprovado<br/>Pendência: Concluída]
+    I -->|Rejeita| K[Status: Rejeitado<br/>Volta para Pendente]
+    K --> L[Fiscal recebe feedback]
+    L --> M[Fiscal reenvia<br/>Substitui arquivo anterior]
+    M --> D
+    J --> N[Fiscal recebe confirmação]
 ```
+
+### 🆕 Principais Melhorias no Fluxo de Pendências
+
+#### **Cancelamento de Pendências**
+- Administradores podem cancelar pendências via `PATCH /contratos/{id}/pendencias/{id}/cancelar`
+- Fiscal recebe notificação automática por email
+- Status muda para "Cancelada" e não requer mais ação do fiscal
+
+#### **Upload e Gestão de Relatórios com Arquivos**
+- Fiscais podem enviar PDFs, DOCs, XLS ou qualquer arquivo como resposta
+- **Reenvio inteligente**: Novo arquivo substitui automaticamente o anterior
+- **Visualização separada**: Arquivos de relatórios ficam separados dos arquivos contratuais
+- Endpoint dedicado: `GET /arquivos/relatorios/contrato/{id}`
+
+#### **Análise Aprimorada pelo Administrador**
+- **Aprovar**: Relatório aceito, pendência finalizada
+- **Rejeitar**: Com observações, fiscal pode corrigir e reenviar
+- Notificações automáticas por email em todas as decisões
+
+#### **Dashboard com Contadores**
+- Endpoint `GET /pendencias/contador` retorna estatísticas em tempo real
+- Permite exibir badges no frontend: "Pendências(3)" se houver ações necessárias
+- Contadores separados: pendentes, em análise, concluídas, canceladas
 
 ### Níveis de Acesso
 
@@ -615,6 +647,19 @@ Para suporte técnico:
 - 📧 Email: suporte.sigescon@gmail.com
 - 🐛 Issues: [GitHub Issues](https://github.com/rafaelcostati/sigescon-fastapi/issues)
 - 📖 Documentação: Acesse `/docs` com o servidor rodando
+
+## 📚 Documentação Adicional
+
+### Documentação Completa
+- **`CLAUDE.md`** - Documentação técnica detalhada da API, arquitetura e funcionalidades
+- **`FLUXO_USUARIOS_MULTIPLOS_PERFIS.md`** - Guia completo para implementação do frontend React TypeScript
+
+### Funcionalidades Documentadas
+- ✅ **Sistema de Pendências e Relatórios** - Fluxo completo com upload de arquivos
+- ✅ **Múltiplos Perfis por Usuário** - Alternância de contexto sem logout
+- ✅ **Sistema de Notificações** - Templates de email para todas as ações
+- ✅ **Gerenciamento de Arquivos** - Separação entre arquivos contratuais e de relatórios
+- ✅ **Dashboard Inteligente** - Contadores em tempo real por status
 
 ## 🔗 Links Úteis
 

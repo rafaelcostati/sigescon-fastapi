@@ -293,21 +293,24 @@ DELETE /api/v1/contratos/{id}/arquivos/{arquivo_id}       # Excluir arquivo (Adm
 
 ### Relatórios e Pendências
 ```
-GET    /api/v1/contratos/{id}/relatorios     # Listar relatórios
-POST   /api/v1/contratos/{id}/relatorios     # Submeter relatório
-PATCH  /api/v1/contratos/{id}/relatorios/{id}/analise  # Analisar
+GET    /api/v1/contratos/{id}/relatorios                    # Listar relatórios
+POST   /api/v1/contratos/{id}/relatorios                    # Submeter relatório (com arquivo)
+PATCH  /api/v1/contratos/{id}/relatorios/{id}/analise       # Analisar relatório (aprovar/rejeitar)
 
-GET    /api/v1/contratos/{id}/pendencias     # Listar pendências
-POST   /api/v1/contratos/{id}/pendencias     # Criar pendência
+GET    /api/v1/contratos/{id}/pendencias                    # Listar pendências
+POST   /api/v1/contratos/{id}/pendencias                    # Criar pendência
+PATCH  /api/v1/contratos/{id}/pendencias/{id}/cancelar      # Cancelar pendência (Admin)
+GET    /api/v1/contratos/{id}/pendencias/contador           # Contador por status (dashboard)
 ```
 
 ### Arquivos e Tabelas Auxiliares
 ```
-GET    /api/v1/arquivos/{id}/download        # Download seguro
-GET    /api/v1/contratados                   # Empresas/pessoas
-GET    /api/v1/perfis                        # Tipos de perfil
-GET    /api/v1/modalidades                   # Modalidades de contrato
-GET    /api/v1/status                        # Status possíveis
+GET    /api/v1/arquivos/{id}/download                    # Download seguro
+GET    /api/v1/arquivos/relatorios/contrato/{id}        # Arquivos de relatórios (separados)
+GET    /api/v1/contratados                              # Empresas/pessoas
+GET    /api/v1/perfis                                   # Tipos de perfil
+GET    /api/v1/modalidades                              # Modalidades de contrato
+GET    /api/v1/status                                   # Status possíveis
 ```
 
 ### Monitoramento
@@ -431,6 +434,83 @@ DELETE /api/v1/contratos/{id}/arquivos/{arquivo_id}       # Remove arquivo
 
 ---
 
+## 🔄 Sistema de Pendências e Relatórios Fiscais
+
+### Fluxo Completo Implementado
+
+#### 1. **Criação de Pendências pelo Administrador**
+- Admin cria pendência via `POST /api/v1/contratos/{id}/pendencias`
+- Fiscal recebe email automático com detalhes da tarefa
+- Status inicial: **"Pendente"**
+
+#### 2. **Cancelamento de Pendências**
+- Admin pode cancelar via `PATCH /api/v1/contratos/{id}/pendencias/{id}/cancelar`
+- Status muda para **"Cancelada"**
+- Fiscal recebe email informando que não precisa mais enviar relatório
+
+#### 3. **Envio de Relatórios pelo Fiscal**
+- Fiscal envia relatório com arquivo via `POST /api/v1/contratos/{id}/relatorios`
+- Sistema aceita PDF, DOC, XLS ou qualquer formato
+- **Primeiro envio**: Cria novo relatório
+- **Reenvio**: Substitui arquivo anterior automaticamente
+- Status do relatório: **"Pendente de Análise"**
+- Admin recebe email sobre novo relatório submetido
+
+#### 4. **Análise pelo Administrador**
+- Admin analisa via `PATCH /api/v1/contratos/{id}/relatorios/{id}/analise`
+- **Aprovar**: Status vira "Aprovado", pendência "Concluída"
+- **Rejeitar**: Status vira "Rejeitado com Pendência", volta para "Pendente"
+- Fiscal recebe email com resultado e observações (se houver)
+
+#### 5. **Contador para Dashboard**
+- Endpoint `GET /api/v1/contratos/{id}/pendencias/contador`
+- Retorna: `{"pendentes": 2, "analise_pendente": 1, "concluidas": 5, "canceladas": 0}`
+- Para exibir no frontend: "Pendências(3)" se houver ações necessárias
+
+### Arquivos de Relatórios Separados
+
+#### Visualização Específica para Relatórios
+```bash
+GET /api/v1/arquivos/relatorios/contrato/{id}
+```
+
+**Diferença dos Arquivos Contratuais:**
+- **Arquivos de Contrato**: Documentos oficiais do contrato
+- **Arquivos de Relatórios**: PDFs/documentos enviados pelos fiscais
+
+**Estrutura de Resposta:**
+```json
+{
+  "arquivos_relatorios": [
+    {
+      "id": 45,
+      "nome_arquivo": "relatorio_outubro_2024.pdf",
+      "tipo_arquivo": "application/pdf",
+      "status_relatorio": "Aprovado",
+      "enviado_por": "João Fiscal",
+      "data_envio": "2024-10-15T14:30:00",
+      "mes_competencia": "2024-10-01"
+    }
+  ],
+  "total_arquivos": 3,
+  "contrato_id": 101
+}
+```
+
+### Estados dos Status
+
+**StatusPendencia:**
+1. **"Pendente"** - Aguardando envio de relatório
+2. **"Concluída"** - Relatório aprovado pelo admin
+3. **"Cancelada"** - Cancelada pelo administrador
+
+**StatusRelatorio:**
+1. **"Pendente de Análise"** - Aguardando análise do admin
+2. **"Aprovado"** - Aceito pelo administrador
+3. **"Rejeitado com Pendência"** - Fiscal deve corrigir e reenviar
+
+---
+
 ## 📧 Sistema de Notificações
 
 ### Configuração SMTP
@@ -444,6 +524,7 @@ SENDER_PASSWORD=senha_app
 
 ### Tipos de Notificação
 - **Pendência Criada** - Fiscal recebe nova tarefa
+- **Pendência Cancelada** - Fiscal informado sobre cancelamento
 - **Relatório Submetido** - Admin notificado para análise
 - **Relatório Aprovado** - Fiscal informado da aprovação
 - **Relatório Rejeitado** - Fiscal recebe feedback para correção
