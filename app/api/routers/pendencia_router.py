@@ -60,3 +60,46 @@ async def list_pendencias(
         )
     
     return await service.get_pendencias_by_contrato_id(contrato_id)
+
+@router.patch("/{pendencia_id}/cancelar", response_model=Pendencia)
+async def cancelar_pendencia(
+    contrato_id: int,
+    pendencia_id: int,
+    service: PendenciaService = Depends(get_pendencia_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Cancela uma pendência específica. Requer permissão de administrador.
+
+    - **contrato_id**: ID do contrato
+    - **pendencia_id**: ID da pendência a ser cancelada
+
+    Ao cancelar, o fiscal será notificado por email e não precisará mais
+    enviar relatório para esta pendência.
+    """
+    return await service.cancelar_pendencia(contrato_id, pendencia_id, admin_user.id)
+
+@router.get("/contador", summary="Contador de pendências por status")
+async def contador_pendencias(
+    contrato_id: int,
+    service: PendenciaService = Depends(get_pendencia_service),
+    current_user: Usuario = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_connection)
+):
+    """
+    Retorna contador de pendências por status para o dashboard.
+
+    - **contrato_id**: ID do contrato
+
+    Retorna quantidades separadas por status (pendente, análise, concluída, cancelada)
+    para exibir badges no frontend como "Pendências(2)".
+    """
+    # Verificação de permissão
+    checker = PermissionChecker(conn)
+    if not await checker.can_access_contract(current_user, contrato_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para acessar este contrato"
+        )
+
+    return await service.get_contador_pendencias(contrato_id, current_user)

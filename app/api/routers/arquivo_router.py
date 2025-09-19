@@ -9,6 +9,7 @@ from app.schemas.usuario_schema import Usuario
 from app.api.dependencies import get_current_user
 from app.api.permissions import PermissionChecker
 from app.repositories.arquivo_repo import ArquivoRepository
+from app.repositories.relatorio_repo import RelatorioRepository
 
 router = APIRouter(
     prefix="/arquivos",
@@ -50,5 +51,66 @@ async def download_arquivo(
         path=path_completo,
         filename=nome_original,
         media_type=arquivo.get('tipo_arquivo'),
-        content_disposition_type="attachment" 
+        content_disposition_type="attachment"
     )
+
+
+@router.get("/relatorios/contrato/{contrato_id}")
+async def list_arquivos_relatorios(
+    contrato_id: int,
+    conn: asyncpg.Connection = Depends(get_connection),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Lista todos os arquivos de relatórios de um contrato específico.
+
+    Retorna somente arquivos que foram enviados como relatórios fiscais,
+    separados dos arquivos contratuais.
+    """
+    # Verificação de permissão
+    checker = PermissionChecker(conn)
+    if not await checker.can_access_contract(current_user, contrato_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para acessar este contrato"
+        )
+
+    relatorio_repo = RelatorioRepository(conn)
+    arquivo_repo = ArquivoRepository(conn)
+
+    # Busca todos os relatórios do contrato
+    relatorios = await relatorio_repo.get_relatorios_by_contrato_id(contrato_id)
+
+    # Extrai os IDs dos arquivos dos relatórios
+    arquivo_ids = [r['arquivo_id'] for r in relatorios if r.get('arquivo_id')]
+
+    # Busca os detalhes dos arquivos
+    arquivos_relatorios = []
+    for arquivo_id in arquivo_ids:
+        arquivo = await arquivo_repo.find_arquivo_by_id(arquivo_id)
+        if arquivo:
+            # Encontra o relatório correspondente para dados adicionais
+            relatorio = next((r for r in relatorios if r['arquivo_id'] == arquivo_id), None)
+
+            arquivo_info = {
+                "id": arquivo['id'],
+                "nome_arquivo": arquivo['nome_arquivo'],
+                "tipo_arquivo": arquivo['tipo_arquivo'],
+                "tamanho_bytes": arquivo['tamanho_bytes'],
+                "created_at": arquivo['created_at'],
+                "relatorio_id": relatorio['id'] if relatorio else None,
+                "mes_competencia": relatorio['mes_competencia'] if relatorio else None,
+                "status_relatorio": relatorio['status_relatorio'] if relatorio else None,
+                "enviado_por": relatorio['enviado_por'] if relatorio else None,
+                "data_envio": relatorio['created_at'] if relatorio else None
+            }
+            arquivos_relatorios.append(arquivo_info)
+
+    # Ordena por data de criação (mais recentes primeiro)
+    arquivos_relatorios.sort(key=lambda x: x['created_at'], reverse=True)
+
+    return {
+        "arquivos_relatorios": arquivos_relatorios,
+        "total_arquivos": len(arquivos_relatorios),
+        "contrato_id": contrato_id
+    }

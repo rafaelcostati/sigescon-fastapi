@@ -79,3 +79,50 @@ class RelatorioRepository:
             relatorio_id
         )
         return await self.get_relatorio_by_id(relatorio_id)
+
+    async def get_relatorios_pendentes_analise(self, contrato_id: int) -> List[Dict]:
+        """Busca relatórios com status 'Pendente de Análise' para um contrato"""
+        query = """
+            SELECT
+                rf.*,
+                u.nome as enviado_por,
+                s.nome as status_relatorio,
+                a.nome_arquivo,
+                p.descricao as pendencia_descricao
+            FROM relatoriofiscal rf
+            LEFT JOIN usuario u ON rf.fiscal_usuario_id = u.id
+            LEFT JOIN statusrelatorio s ON rf.status_id = s.id
+            LEFT JOIN arquivo a ON rf.arquivo_id = a.id
+            LEFT JOIN pendenciarelatorio p ON rf.pendencia_id = p.id
+            WHERE rf.contrato_id = $1 AND s.nome = 'Pendente de Análise'
+            ORDER BY rf.created_at DESC
+        """
+        records = await self.conn.fetch(query, contrato_id)
+        return [dict(r) for r in records]
+
+    async def get_relatorios_by_pendencia_id(self, pendencia_id: int) -> List[Dict]:
+        """Busca todos os relatórios associados a uma pendência específica"""
+        query = """
+            SELECT
+                rf.*,
+                u.nome as enviado_por,
+                s.nome as status_relatorio,
+                a.nome_arquivo
+            FROM relatoriofiscal rf
+            LEFT JOIN usuario u ON rf.fiscal_usuario_id = u.id
+            LEFT JOIN statusrelatorio s ON rf.status_id = s.id
+            LEFT JOIN arquivo a ON rf.arquivo_id = a.id
+            WHERE rf.pendencia_id = $1
+            ORDER BY rf.created_at DESC
+        """
+        records = await self.conn.fetch(query, pendencia_id)
+        return [dict(r) for r in records]
+
+    async def update_relatorio_arquivo(self, relatorio_id: int, novo_arquivo_id: int, status_id: int) -> None:
+        """Atualiza o arquivo de um relatório (para casos de reenvio)"""
+        query = """
+            UPDATE relatoriofiscal
+            SET arquivo_id = $1, status_id = $2, created_at = NOW()
+            WHERE id = $3
+        """
+        await self.conn.execute(query, novo_arquivo_id, status_id, relatorio_id)

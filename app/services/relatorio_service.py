@@ -1,4 +1,5 @@
 # app/services/relatorio_service.py
+import os
 from typing import List, Optional
 from fastapi import HTTPException, status, UploadFile
 
@@ -54,13 +55,18 @@ class RelatorioService:
 
         perfil_usuario = await self.perfil_repo.get_perfil_by_id(current_user.perfil_id)
         is_admin = perfil_usuario and perfil_usuario.get("nome") == "Administrador"
-        
+
         if not is_admin and contrato['fiscal_id'] != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado: Você não é o fiscal deste contrato.")
 
-        if not await self.pendencia_repo.get_pendencia_by_id(relatorio_data.pendencia_id):
+        pendencia = await self.pendencia_repo.get_pendencia_by_id(relatorio_data.pendencia_id)
+        if not pendencia:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pendência não encontrada")
 
+        # Verifica se é reenvio - se já existe relatório para esta pendência, substitui o arquivo
+        relatorios_existentes = await self.relatorio_repo.get_relatorios_by_pendencia_id(relatorio_data.pendencia_id)
+
+        # Salva o novo arquivo
         nome_original, path, tamanho = await self.file_service.save_upload_file(contrato_id, file)
 
         arquivo_criado = await self.arquivo_repo.create_arquivo(
@@ -72,29 +78,159 @@ class RelatorioService:
         )
 
         status_relatorio_pendente = next(s for s in await self.status_relatorio_repo.get_all() if s['nome'] == 'Pendente de Análise')
-        status_pendencia_concluida = next(s for s in await self.status_pendencia_repo.get_all() if s['nome'] == 'Concluída')
 
-        novo_relatorio_data = await self.relatorio_repo.create_relatorio(
-            contrato_id=contrato_id,
-            arquivo_id=arquivo_criado['id'],
-            status_id=status_relatorio_pendente['id'],
-            data=relatorio_data.model_dump()
-        )
+        # Se for reenvio, atualiza o relatório existente em vez de criar novo
+        if relatorios_existentes:
+            relatorio_existente = relatorios_existentes[0]  # Pega o mais recente
 
-        await self.pendencia_repo.update_pendencia_status(relatorio_data.pendencia_id, status_pendencia_concluida['id'])
+            # Remove o arquivo antigo fisicamente
+            arquivo_antigo = await self.arquivo_repo.find_arquivo_by_id(relatorio_existente['arquivo_id'])
+            if arquivo_antigo and os.path.exists(arquivo_antigo['path_armazenamento']):
+                try:
+                    os.remove(arquivo_antigo['path_armazenamento'])
+                except Exception as e:
+                    print(f"❌ Erro ao remover arquivo antigo: {e}")
 
-        return Relatorio.model_validate(novo_relatorio_data)
+            # Atualiza o relatório existente
+            await self.relatorio_repo.update_relatorio_arquivo(
+                relatorio_existente['id'],
+                arquivo_criado['id'],
+                status_relatorio_pendente['id']
+            )
+            relatorio_atualizado = await self.relatorio_repo.get_relatorio_by_id(relatorio_existente['id'])
+
+            # Muda status da pendência para 'pendente de análise' (status customizado)
+            await self._update_pendencia_para_analise(relatorio_data.pendencia_id)
+
+            print(f"✅ Relatório reenviado para pendência {relatorio_data.pendencia_id}")
+            return Relatorio.model_validate(relatorio_atualizado)
+        else:
+            # Primeiro envio - cria novo relatório
+            novo_relatorio_data = await self.relatorio_repo.create_relatorio(
+                contrato_id=contrato_id,
+                arquivo_id=arquivo_criado['id'],
+                status_id=status_relatorio_pendente['id'],
+                data=relatorio_data.model_dump()
+            )
+
+            # Muda status da pendência para 'pendente de análise'
+            await self._update_pendencia_para_analise(relatorio_data.pendencia_id)
+
+            # === NOTIFICAÇÃO POR EMAIL PARA ADMINISTRADOR ===
+            await self._notify_admin_new_report(contrato, pendencia, current_user)
+
+            print(f"✅ Primeiro relatório enviado para pendência {relatorio_data.pendencia_id}")
+            return Relatorio.model_validate(novo_relatorio_data)
+
+    async def _update_pendencia_para_analise(self, pendencia_id: int):
+        """Atualiza status da pendência para indicar que tem relatório aguardando análise"""
+        # Neste caso, mantemos como 'Pendente' pois o administrador ainda precisa analisar
+        # O status 'pendente de análise' é específico do relatório, não da pendência
+        pass
+
+    async def _notify_admin_new_report(self, contrato: dict, pendencia: dict, fiscal: Usuario):
+        """Notifica administrador sobre novo relatório submetido"""
+        try:
+            # Busca usuário administrador
+            admin_users = await self.usuario_repo.get_users_by_perfil("Administrador")
+            if admin_users:
+                admin = admin_users[0]  # Pega o primeiro admin encontrado
+
+                from app.services.email_templates import EmailTemplates
+
+                fiscal_data = {
+                    'nome': fiscal.nome,
+                    'email': fiscal.email
+                }
+
+                subject, body = EmailTemplates.report_submitted_notification(
+                    admin_nome=admin['nome'],
+                    contrato_data=contrato,
+                    pendencia_data=pendencia,
+                    fiscal_data=fiscal_data
+                )
+
+                from app.services.email_service import EmailService
+                await EmailService.send_email(admin['email'], subject, body)
+
+                print(f"✅ Email de notificação enviado para admin {admin['email']}")
+        except Exception as e:
+            print(f"❌ Erro ao enviar notificação para admin: {e}")
 
     async def analisar_relatorio(self, relatorio_id: int, analise_data: RelatorioAnalise) -> Relatorio:
-        if not await self.relatorio_repo.get_relatorio_by_id(relatorio_id):
+        relatorio = await self.relatorio_repo.get_relatorio_by_id(relatorio_id)
+        if not relatorio:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relatório não encontrado")
-        
+
         if not await self.usuario_repo.get_user_by_id(analise_data.aprovador_usuario_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário aprovador não encontrado")
-            
-        if not await self.status_relatorio_repo.get_by_id(analise_data.status_id):
-             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status de relatório não encontrado")
 
+        status_relatorio = await self.status_relatorio_repo.get_by_id(analise_data.status_id)
+        if not status_relatorio:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status de relatório não encontrado")
+
+        # Busca dados necessários para notificações
+        contrato = await self.contrato_repo.find_contrato_by_id(relatorio['contrato_id'])
+        pendencia = await self.pendencia_repo.get_pendencia_by_id(relatorio['pendencia_id'])
+        fiscal = await self.usuario_repo.get_user_by_id(relatorio['fiscal_usuario_id'])
+
+        # Atualiza o relatório
         relatorio_atualizado = await self.relatorio_repo.analise_relatorio(relatorio_id, analise_data.model_dump())
-        
+
+        # Processa baseado no status
+        status_nome = status_relatorio['nome']
+
+        if status_nome == 'Aprovado':
+            # Aprova o relatório e conclui a pendência
+            await self._aprovar_relatorio(relatorio, contrato, pendencia, fiscal)
+
+        elif status_nome == 'Rejeitado com Pendência':
+            # Rejeita o relatório e volta pendência para 'Pendente'
+            await self._rejeitar_relatorio(relatorio, contrato, pendencia, fiscal, analise_data.observacoes_aprovador)
+
         return Relatorio.model_validate(relatorio_atualizado)
+
+    async def _aprovar_relatorio(self, relatorio: dict, contrato: dict, pendencia: dict, fiscal: dict):
+        """Processa aprovação do relatório"""
+        try:
+            # Muda status da pendência para 'Concluída'
+            status_concluida = next(s for s in await self.status_pendencia_repo.get_all() if s['nome'] == 'Concluída')
+            await self.pendencia_repo.update_pendencia_status(pendencia['id'], status_concluida['id'])
+
+            # Envia email de aprovação para o fiscal
+            from app.services.email_templates import EmailTemplates
+            subject, body = EmailTemplates.report_approved_notification(
+                fiscal_nome=fiscal['nome'],
+                contrato_data=contrato,
+                pendencia_data=pendencia
+            )
+
+            from app.services.email_service import EmailService
+            await EmailService.send_email(fiscal['email'], subject, body)
+
+            print(f"✅ Relatório aprovado e email enviado para {fiscal['email']}")
+        except Exception as e:
+            print(f"❌ Erro ao processar aprovação: {e}")
+
+    async def _rejeitar_relatorio(self, relatorio: dict, contrato: dict, pendencia: dict, fiscal: dict, observacoes: str = None):
+        """Processa rejeição do relatório"""
+        try:
+            # Volta status da pendência para 'Pendente' para que o fiscal possa reenviar
+            status_pendente = next(s for s in await self.status_pendencia_repo.get_all() if s['nome'] == 'Pendente')
+            await self.pendencia_repo.update_pendencia_status(pendencia['id'], status_pendente['id'])
+
+            # Envia email de rejeição para o fiscal
+            from app.services.email_templates import EmailTemplates
+            subject, body = EmailTemplates.report_rejected_notification(
+                fiscal_nome=fiscal['nome'],
+                contrato_data=contrato,
+                pendencia_data=pendencia,
+                observacoes=observacoes
+            )
+
+            from app.services.email_service import EmailService
+            await EmailService.send_email(fiscal['email'], subject, body)
+
+            print(f"✅ Relatório rejeitado e email enviado para {fiscal['email']}")
+        except Exception as e:
+            print(f"❌ Erro ao processar rejeição: {e}")

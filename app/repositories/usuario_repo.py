@@ -122,3 +122,15 @@ class UsuarioRepository:
             query = "SELECT 1 FROM usuario WHERE email = $1 AND ativo = TRUE"
             exists = await self.conn.fetchval(query, email)
         return bool(exists)
+
+    async def get_users_by_perfil(self, perfil_nome: str) -> List[Dict]:
+        """Busca todos os usuários com um perfil específico"""
+        query = """
+            SELECT u.id, u.nome, u.email, u.cpf, u.matricula, u.perfil_id, u.ativo, u.created_at, u.updated_at, p.nome as perfil_nome
+            FROM usuario u
+            INNER JOIN perfil p ON u.perfil_id = p.id
+            WHERE p.nome = $1 AND u.ativo = TRUE
+            ORDER BY u.nome
+        """
+        records = await self.conn.fetch(query, perfil_nome)
+        return [dict(r) for r in records]

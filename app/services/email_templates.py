@@ -173,3 +173,120 @@ Atenciosamente,
 Sistema SIGESCON - Gestão de Contratos
         """
         return subject, body
+
+    @staticmethod
+    def pending_cancellation_notification(fiscal_nome: str, contrato_data: Dict, pendencia_data: Dict) -> tuple[str, str]:
+        """Template para notificar fiscal sobre cancelamento de pendência"""
+        subject = f"Pendência cancelada: Contrato {contrato_data['nr_contrato']}"
+
+        body = f"""
+Olá, {fiscal_nome},
+
+Uma pendência do contrato foi cancelada pelo administrador.
+
+📋 DETALHES DA PENDÊNCIA CANCELADA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Contrato: {contrato_data['nr_contrato']}
+• Objeto: {contrato_data['objeto']}
+• Descrição: {pendencia_data.get('descricao', 'N/A')}
+• Status: CANCELADA
+
+✅ NENHUMA AÇÃO NECESSÁRIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Você não precisa mais enviar relatório para esta pendência.
+A solicitação foi cancelada pela administração.
+
+Atenciosamente,
+Sistema SIGESCON - Gestão de Contratos
+        """
+        return subject, body
+
+    @staticmethod
+    def report_submitted_notification(admin_nome: str, contrato_data: Dict, pendencia_data: Dict, fiscal_data: Dict) -> tuple[str, str]:
+        """Template para notificar administrador sobre relatório submetido"""
+        subject = f"Relatório submetido: Contrato {contrato_data['nr_contrato']}"
+
+        body = f"""
+Olá, {admin_nome},
+
+Um novo relatório foi submetido e aguarda sua análise.
+
+📋 DETALHES DO RELATÓRIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Contrato: {contrato_data['nr_contrato']}
+• Objeto: {contrato_data['objeto']}
+• Fiscal: {fiscal_data['nome']} ({fiscal_data['email']})
+• Pendência: {pendencia_data.get('descricao', 'N/A')}
+• Status: Pendente de Análise
+
+🔗 AÇÃO NECESSÁRIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Acesse o sistema SIGESCON para analisar o relatório submetido
+e decidir entre aprovar ou rejeitar.
+
+Atenciosamente,
+Sistema SIGESCON - Gestão de Contratos
+        """
+        return subject, body
+
+    @staticmethod
+    def report_approved_notification(fiscal_nome: str, contrato_data: Dict, pendencia_data: Dict) -> tuple[str, str]:
+        """Template para notificar fiscal sobre relatório aprovado"""
+        subject = f"Relatório aprovado: Contrato {contrato_data['nr_contrato']}"
+
+        body = f"""
+Olá, {fiscal_nome},
+
+Seu relatório foi APROVADO pelo administrador.
+
+📋 DETALHES DO RELATÓRIO APROVADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Contrato: {contrato_data['nr_contrato']}
+• Objeto: {contrato_data['objeto']}
+• Pendência: {pendencia_data.get('descricao', 'N/A')}
+• Status: APROVADO ✅
+
+🎉 PARABÉNS!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Seu relatório atendeu aos requisitos e foi aprovado.
+A pendência foi marcada como concluída.
+
+Atenciosamente,
+Sistema SIGESCON - Gestão de Contratos
+        """
+        return subject, body
+
+    @staticmethod
+    def report_rejected_notification(fiscal_nome: str, contrato_data: Dict, pendencia_data: Dict, observacoes: str = None) -> tuple[str, str]:
+        """Template para notificar fiscal sobre relatório rejeitado"""
+        subject = f"Relatório rejeitado: Contrato {contrato_data['nr_contrato']}"
+
+        observacoes_section = ""
+        if observacoes:
+            observacoes_section = f"""
+🔍 OBSERVAÇÕES DO ADMINISTRADOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{observacoes}
+"""
+
+        body = f"""
+Olá, {fiscal_nome},
+
+Seu relatório foi REJEITADO e necessita de correções.
+
+📋 DETALHES DO RELATÓRIO REJEITADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Contrato: {contrato_data['nr_contrato']}
+• Objeto: {contrato_data['objeto']}
+• Pendência: {pendencia_data.get('descricao', 'N/A')}
+• Status: REJEITADO ❌{observacoes_section}
+
+🔄 AÇÃO NECESSÁRIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Por favor, faça as correções necessárias e reenvie o relatório
+através do sistema SIGESCON.
+
+Atenciosamente,
+Sistema SIGESCON - Gestão de Contratos
+        """
+        return subject, body

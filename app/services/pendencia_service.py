@@ -10,6 +10,7 @@ from app.repositories.status_pendencia_repo import StatusPendenciaRepository
 
 # Schemas
 from app.schemas.pendencia_schema import Pendencia, PendenciaCreate
+from app.schemas.usuario_schema import Usuario
 
 # Services
 from app.services.email_service import EmailService
@@ -186,17 +187,96 @@ class PendenciaService:
         
         return pendencias_fiscal
 
-    async def cancel_pendencia(self, pendencia_id: int, usuario_id: int) -> Pendencia:
-        """Cancela uma pendência (muda status para 'Cancelada')"""
+    async def cancelar_pendencia(self, contrato_id: int, pendencia_id: int, admin_usuario_id: int) -> Pendencia:
+        """Cancela uma pendência e notifica o fiscal por email"""
+        # Verifica se o contrato existe
+        contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
+        if not contrato:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
+
+        # Verifica se a pendência existe e pertence ao contrato
+        pendencia = await self.pendencia_repo.get_pendencia_by_id(pendencia_id)
+        if not pendencia or pendencia['contrato_id'] != contrato_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pendência não encontrada para este contrato")
+
         # Busca o status 'Cancelada'
         all_status = await self.status_pendencia_repo.get_all()
         status_cancelada = next((s for s in all_status if s['nome'] == 'Cancelada'), None)
-        
+
         if not status_cancelada:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Status 'Cancelada' não encontrado no sistema"
             )
-        
+
         # Atualiza o status da pendência
-        return await self.update_pendencia_status(pendencia_id, status_cancelada['id'])
+        await self.pendencia_repo.update_pendencia_status(pendencia_id, status_cancelada['id'])
+
+        # === NOTIFICAÇÃO POR EMAIL DE CANCELAMENTO ===
+        try:
+            if contrato.get('fiscal_id'):
+                fiscal = await self.usuario_repo.get_user_by_id(contrato['fiscal_id'])
+                if fiscal:
+                    from app.services.email_templates import EmailTemplates
+
+                    subject, body = EmailTemplates.pending_cancellation_notification(
+                        fiscal_nome=fiscal['nome'],
+                        contrato_data=contrato,
+                        pendencia_data=pendencia
+                    )
+                    await EmailService.send_email(fiscal['email'], subject, body)
+
+                    print(f"✅ Email de cancelamento de pendência enviado para {fiscal['email']}")
+        except Exception as e:
+            # Log do erro, mas não falha o cancelamento da pendência
+            print(f"❌ Erro ao enviar email de cancelamento da pendência {pendencia_id}: {e}")
+
+        # Retorna a pendência atualizada
+        return await self.get_pendencia_by_id(pendencia_id)
+
+    async def get_contador_pendencias(self, contrato_id: int, current_user: Usuario) -> dict:
+        """Retorna contador de pendências por status para o dashboard"""
+        # Verifica se o contrato existe
+        if not await self.contrato_repo.find_contrato_by_id(contrato_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
+
+        # Busca todas as pendências do contrato
+        pendencias = await self.pendencia_repo.get_pendencias_by_contrato_id(contrato_id)
+
+        # Conta por status
+        contador = {
+            "pendentes": 0,                # Pendências aguardando envio de relatório
+            "analise_pendente": 0,         # Relatórios aguardando análise do admin
+            "concluidas": 0,               # Pendências finalizadas (relatório aprovado)
+            "canceladas": 0,               # Pendências canceladas pelo admin
+            "total": len(pendencias)
+        }
+
+        for pendencia in pendencias:
+            status_nome = pendencia.get('status_nome', '').lower()
+
+            if 'pendente' in status_nome:
+                contador["pendentes"] += 1
+            elif 'concluída' in status_nome:
+                contador["concluidas"] += 1
+            elif 'cancelada' in status_nome:
+                contador["canceladas"] += 1
+
+        # Verifica pendências com relatórios pendentes de análise
+        from app.repositories.relatorio_repo import RelatorioRepository
+        relatorio_repo = RelatorioRepository(self.pendencia_repo.connection)
+        relatorios_pendentes = await relatorio_repo.get_relatorios_pendentes_analise(contrato_id)
+        contador["analise_pendente"] = len(relatorios_pendentes)
+
+        # Ajusta contadores - se tem relatório pendente, não deve estar em "pendentes"
+        if relatorios_pendentes:
+            # Para cada relatório pendente de análise, diminui do contador "pendentes"
+            # pois a pendência já tem relatório enviado
+            for relatorio in relatorios_pendentes:
+                pendencia_id = relatorio.get('pendencia_id')
+                # Verifica se esta pendência estava sendo contada como "pendente"
+                pendencia_relacionada = next((p for p in pendencias if p['id'] == pendencia_id), None)
+                if pendencia_relacionada and 'pendente' in pendencia_relacionada.get('status_nome', '').lower():
+                    contador["pendentes"] = max(0, contador["pendentes"] - 1)
+
+        return contador
