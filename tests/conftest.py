@@ -72,12 +72,24 @@ async def db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
 @pytest_asyncio.fixture(scope="function")
 async def admin_credentials():
     """Credenciais do administrador"""
-    return {"username": os.getenv("ADMIN_EMAIL"), "password": os.getenv("ADMIN_PASSWORD")}
+    from dotenv import load_dotenv
+    load_dotenv()  # Garantir que .env é carregado
+    email = os.getenv("ADMIN_EMAIL")
+    password = os.getenv("ADMIN_PASSWORD")
+    if not email or not password:
+        # Fallback para valores padrão se env não estiver carregado
+        email = "admin@sigescon.pge.pa.gov.br"
+        password = "xpto1661WIN"
+    return {"username": email, "password": password}
 
 @pytest_asyncio.fixture(scope="function")
 async def admin_token(async_client: AsyncClient, admin_credentials) -> str:
     """Token de autenticação do administrador"""
     response = await async_client.post("/auth/login", data=admin_credentials)
+    if response.status_code != 200:
+        print(f"Login failed: {response.status_code} - {response.text}")
+        print(f"Credentials used: {admin_credentials}")
+    assert response.status_code == 200, f"Login failed: {response.text}"
     return response.json()["access_token"]
 
 @pytest_asyncio.fixture(scope="function")

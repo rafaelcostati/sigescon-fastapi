@@ -70,6 +70,9 @@ declare -a test_modules=(
     "tests/test_email_service.py"
     "tests/test_workflow_relatorios.py"
     "tests/test_arquivos_contrato.py"
+    "tests/test_security_authorization.py"
+    "tests/test_notification_system.py"
+    "tests/test_data_integrity.py"
 )
 
 # Contadores
