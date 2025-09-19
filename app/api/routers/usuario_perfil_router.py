@@ -45,11 +45,8 @@ async def get_user_profiles(
     """Lista todos os perfis ativos de um usuário específico"""
     # Usuários podem ver seus próprios perfis, admins podem ver de qualquer usuário
     if current_user.id != usuario_id:
-        # Verifica se é admin
-        conn = await get_connection().__anext__()
-        from app.api.permissions import PermissionChecker
-        checker = PermissionChecker(conn)
-        if not await checker.has_profile(current_user, "Administrador"):
+        # Verifica se é admin usando o service que já tem a conexão
+        if not await service.has_profile(current_user.id, "Administrador"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Você só pode visualizar seus próprios perfis"
@@ -66,10 +63,8 @@ async def get_user_complete_info(
     """Busca informações completas do usuário incluindo todos os perfis"""
     # Mesma validação de permissão
     if current_user.id != usuario_id:
-        conn = await get_connection().__anext__()
-        from app.api.permissions import PermissionChecker
-        checker = PermissionChecker(conn)
-        if not await checker.has_profile(current_user, "Administrador"):
+        # Verifica se é admin usando o service que já tem a conexão
+        if not await service.has_profile(current_user.id, "Administrador"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Você só pode visualizar suas próprias informações"
@@ -121,10 +116,8 @@ async def validate_user_permissions(
     """Valida as permissões e capacidades de um usuário"""
     # Permite que usuários vejam suas próprias validações
     if current_user.id != usuario_id:
-        conn = await get_connection().__anext__()
-        from app.api.permissions import PermissionChecker
-        checker = PermissionChecker(conn)
-        if not await checker.has_profile(current_user, "Administrador"):
+        # Verifica se é admin usando o service que já tem a conexão
+        if not await service.has_profile(current_user.id, "Administrador"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Você só pode validar suas próprias permissões"
