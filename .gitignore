@@ -17,3 +17,4 @@ uv.lock
 teste_email.py
 test_enviomultiplo.py 
 test_arquivos_contrato.py
+*.json

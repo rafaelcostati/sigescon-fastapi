@@ -29,6 +29,9 @@ class UsuarioBase(BaseModel):
 
 class UsuarioCreate(UsuarioBase):
     senha: str = Field(..., min_length=6, description="Senha do usuário")
+    
+    # Sobrescreve o perfil_id para ser sempre None na criação
+    perfil_id: Optional[int] = Field(None, description="Perfil legado - não usado na criação")
 
 class UsuarioUpdate(BaseModel):
     nome: Optional[str] = Field(None, min_length=3, max_length=255)

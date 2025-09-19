@@ -65,19 +65,19 @@ class UsuarioRepository:
         return [dict(u) for u in users], total_items or 0
 
     async def create_user(self, user: UsuarioCreate, hashed_password: str) -> Dict:
-        """Cria um novo usuário"""
-        # Se perfil_id não foi fornecido, define como NULL (None)
-        perfil_id = user.perfil_id if user.perfil_id else None
-
+        """Cria um novo usuário sem perfil - perfis devem ser concedidos via sistema de múltiplos perfis"""
+        # Sempre cria usuário sem perfil (perfil_id = NULL)
+        # Os perfis devem ser concedidos posteriormente via /usuarios/{id}/perfis/conceder
+        
         query = """
             INSERT INTO usuario (nome, email, cpf, matricula, senha, perfil_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES ($1, $2, $3, $4, $5, NULL)
             RETURNING id, nome, email, cpf, matricula, perfil_id, ativo, created_at, updated_at
         """
         new_user = await self.conn.fetchrow(
             query,
             user.nome, user.email, user.cpf,
-            user.matricula, hashed_password, perfil_id
+            user.matricula, hashed_password
         )
         return dict(new_user)
 

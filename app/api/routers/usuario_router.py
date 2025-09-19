@@ -6,6 +6,7 @@ from app.schemas.usuario_schema import (
     Usuario, UsuarioCreate, UsuarioUpdate,
     UsuarioChangePassword, UsuarioResetPassword, UsuarioPaginated 
 )
+from app.schemas.usuario_perfil_schema import UsuarioPerfilGrantRequest
 from app.api.dependencies import get_current_user
 from app.services.usuario_service import UsuarioService
 from app.repositories.usuario_repo import UsuarioRepository
@@ -61,16 +62,63 @@ async def create_user(
     admin_user: Usuario = Depends(admin_required)
 ):
     """
-    Cria um novo usuário no sistema.
+    Cria um novo usuário no sistema SEM PERFIL.
     
     **Requer permissão de administrador.**
+    
+    **IMPORTANTE:** O usuário é criado sem perfil. Para conceder perfis, use:
+    `POST /api/v1/usuarios/{user_id}/perfis/conceder`
     
     Validações:
     - Email deve ser único
     - CPF deve ter 11 dígitos
     - Senha deve ter no mínimo 6 caracteres
+    - perfil_id é ignorado (sempre NULL)
     """
     return await service.create_user(user)
+
+@router.post("/com-perfis", response_model=Usuario, status_code=status.HTTP_201_CREATED, summary="Criar usuário e conceder perfis")
+async def create_user_with_profiles(
+    user: UsuarioCreate,
+    perfil_ids: List[int],
+    service: UsuarioService = Depends(get_usuario_service),
+    admin_user: Usuario = Depends(admin_required),
+    conn: asyncpg.Connection = Depends(get_connection)
+):
+    """
+    Cria um novo usuário e concede perfis em uma única operação.
+    
+    **Requer permissão de administrador.**
+    
+    Este endpoint é uma conveniência que combina:
+    1. Criação do usuário (sem perfil)
+    2. Concessão dos perfis especificados
+    
+    Parâmetros:
+    - user: Dados do usuário (perfil_id é ignorado)
+    - perfil_ids: Lista de IDs dos perfis a serem concedidos
+    """
+    # 1. Criar o usuário
+    new_user = await service.create_user(user)
+    
+    # 2. Conceder os perfis
+    if perfil_ids:
+        from app.repositories.usuario_perfil_repo import UsuarioPerfilRepository
+        from app.services.usuario_perfil_service import UsuarioPerfilService
+        from app.repositories.perfil_repo import PerfilRepository
+        
+        usuario_perfil_service = UsuarioPerfilService(
+            usuario_perfil_repo=UsuarioPerfilRepository(conn),
+            usuario_repo=UsuarioRepository(conn),
+            perfil_repo=PerfilRepository(conn)
+        )
+        
+        grant_request = UsuarioPerfilGrantRequest(perfil_ids=perfil_ids)
+        await usuario_perfil_service.grant_profiles_to_user(
+            new_user.id, grant_request, admin_user.id
+        )
+    
+    return new_user
 
 @router.get("/{user_id}", response_model=Usuario, summary="Buscar usuário por ID")
 async def get_user_by_id(
