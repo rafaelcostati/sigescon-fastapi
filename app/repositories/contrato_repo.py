@@ -120,3 +120,49 @@ class ContratoRepository:
     async def get_contrato_by_id(self, contrato_id: int) -> Optional[Dict]:
         """Alias adicional para compatibilidade"""
         return await self.find_contrato_by_id(contrato_id)
+
+    # Métodos para gerenciamento de arquivos do contrato
+    async def get_arquivos_contrato(self, contrato_id: int) -> List[Dict]:
+        """Busca todos os arquivos de um contrato específico"""
+        query = """
+            SELECT
+                id,
+                nome_arquivo,
+                tipo_arquivo,
+                tamanho_bytes,
+                contrato_id,
+                created_at::text as created_at
+            FROM arquivo
+            WHERE contrato_id = $1
+            ORDER BY created_at DESC
+        """
+        rows = await self.conn.fetch(query, contrato_id)
+        return [dict(row) for row in rows]
+
+    async def get_arquivo_by_id(self, arquivo_id: int, contrato_id: int) -> Optional[Dict]:
+        """Busca um arquivo específico de um contrato"""
+        query = """
+            SELECT
+                id,
+                nome_arquivo,
+                path_armazenamento,
+                tipo_arquivo,
+                tamanho_bytes,
+                contrato_id,
+                created_at::text as created_at
+            FROM arquivo
+            WHERE id = $1 AND contrato_id = $2
+        """
+        row = await self.conn.fetchrow(query, arquivo_id, contrato_id)
+        return dict(row) if row else None
+
+    async def delete_arquivo(self, arquivo_id: int, contrato_id: int) -> bool:
+        """Remove um arquivo específico de um contrato"""
+        query = "DELETE FROM arquivo WHERE id = $1 AND contrato_id = $2"
+        status = await self.conn.execute(query, arquivo_id, contrato_id)
+        return status.endswith('1')
+
+    async def count_arquivos_contrato(self, contrato_id: int) -> int:
+        """Conta o número total de arquivos de um contrato"""
+        query = "SELECT COUNT(*) FROM arquivo WHERE contrato_id = $1"
+        return await self.conn.fetchval(query, contrato_id)

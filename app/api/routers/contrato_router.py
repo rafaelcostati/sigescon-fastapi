@@ -1,7 +1,8 @@
 # app/api/routers/contrato_router.py
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, UploadFile, File, Form
-from typing import Optional
+from fastapi.responses import FileResponse
+from typing import List, Optional
 from datetime import date
 
 from app.core.database import get_connection
@@ -23,7 +24,7 @@ from app.services.file_service import FileService
 
 # Schemas
 from app.schemas.contrato_schema import (
-    Contrato, ContratoCreate, ContratoUpdate, ContratoPaginated
+    Contrato, ContratoCreate, ContratoUpdate, ContratoPaginated, ArquivoContrato, ArquivoContratoList
 )
 
 router = APIRouter(
@@ -65,13 +66,18 @@ async def create_contrato(
     pae: Optional[str] = Form(None),
     doe: Optional[str] = Form(None),
     data_doe: Optional[date] = Form(None),
-    documento_contrato: Optional[UploadFile] = File(None),
+    documento_contrato: List[UploadFile] = File(None),
     service: ContratoService = Depends(get_contrato_service),
     admin_user: Usuario = Depends(admin_required)
 ):
     """
-    Cria um novo contrato. Aceita dados de formulário e um ficheiro opcional.
+    Cria um novo contrato. Aceita dados de formulário e múltiplos ficheiros opcionais.
     Requer permissão de administrador.
+
+    Limites de upload:
+    - Máximo 10 arquivos por upload
+    - 100MB por arquivo individual
+    - 250MB total
     """
     # Constrói manualmente o objeto Pydantic a partir dos campos do formulário
     contrato_create = ContratoCreate(
@@ -93,7 +99,7 @@ async def create_contrato(
         doe=doe,
         data_doe=data_doe
     )
-    
+
     return await service.create_contrato(contrato_create, documento_contrato)
 
 
@@ -157,19 +163,24 @@ async def update_contrato(
     pae: Optional[str] = Form(None),
     doe: Optional[str] = Form(None),
     data_doe: Optional[date] = Form(None),
-    # Arquivo opcional para upload
-    documento_contrato: Optional[UploadFile] = File(None),
+    # Arquivos opcionais para upload
+    documento_contrato: List[UploadFile] = File(None),
     service: ContratoService = Depends(get_contrato_service),
     admin_user: Usuario = Depends(admin_required)
 ):
     """
-    Atualiza um contrato existente. Aceita dados de formulário e um ficheiro opcional.
+    Atualiza um contrato existente. Aceita dados de formulário e múltiplos ficheiros opcionais.
     Requer permissão de administrador.
-    
+
     - **contrato_id**: ID do contrato a ser atualizado
-    - **documento_contrato**: Arquivo opcional para substituir o documento existente
+    - **documento_contrato**: Arquivos opcionais para adicionar ao contrato
     - **outros campos**: Campos opcionais do contrato para atualização
-    
+
+    Limites de upload:
+    - Máximo 5 arquivos por upload
+    - 10MB por arquivo individual
+    - 50MB total
+
     Todos os campos são opcionais - apenas os fornecidos serão atualizados.
     """
     
@@ -222,4 +233,74 @@ async def update_contrato(
 @router.delete("/{contrato_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_contrato(contrato_id: int, service: ContratoService = Depends(get_contrato_service), admin_user: Usuario = Depends(admin_required)):
     await service.delete_contrato(contrato_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+# Rotas para gerenciamento de arquivos do contrato
+@router.get("/{contrato_id}/arquivos", response_model=ArquivoContratoList, summary="Listar arquivos do contrato")
+async def listar_arquivos_contrato(
+    contrato_id: int,
+    service: ContratoService = Depends(get_contrato_service),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Lista todos os arquivos de um contrato específico.
+
+    - **contrato_id**: ID do contrato
+
+    Retorna uma lista com todos os arquivos associados ao contrato,
+    incluindo informações como nome, tipo, tamanho e data de criação.
+    """
+    return await service.get_arquivos_contrato(contrato_id)
+
+@router.get("/{contrato_id}/arquivos/{arquivo_id}/download", summary="Download de arquivo do contrato")
+async def download_arquivo_contrato(
+    contrato_id: int,
+    arquivo_id: int,
+    service: ContratoService = Depends(get_contrato_service),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Download de um arquivo específico de um contrato.
+
+    - **contrato_id**: ID do contrato
+    - **arquivo_id**: ID do arquivo a ser baixado
+
+    Retorna o arquivo para download com o nome original e tipo MIME correto.
+    """
+    arquivo = await service.get_arquivo_contrato(contrato_id, arquivo_id)
+
+    # Verificação de existência física do arquivo
+    import os
+    path_completo = arquivo['path_armazenamento']
+    if not os.path.exists(path_completo):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Arquivo físico não encontrado no servidor"
+        )
+
+    nome_original = arquivo['nome_arquivo']
+
+    return FileResponse(
+        path=path_completo,
+        filename=nome_original,
+        media_type='application/octet-stream'
+    )
+
+@router.delete("/{contrato_id}/arquivos/{arquivo_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Excluir arquivo do contrato")
+async def excluir_arquivo_contrato(
+    contrato_id: int,
+    arquivo_id: int,
+    service: ContratoService = Depends(get_contrato_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Remove um arquivo específico de um contrato.
+
+    - **contrato_id**: ID do contrato
+    - **arquivo_id**: ID do arquivo a ser removido
+
+    **Atenção**: Esta operação remove permanentemente o arquivo tanto do banco
+    de dados quanto do sistema de arquivos. Requer permissão de administrador.
+    """
+    await service.delete_arquivo_contrato(contrato_id, arquivo_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

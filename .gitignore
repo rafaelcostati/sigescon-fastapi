@@ -15,3 +15,4 @@ uv.lock
 *.logs
 /logs 
 teste_email.py
+test_enviomultiplo.py 

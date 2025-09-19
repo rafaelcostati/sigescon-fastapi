@@ -1,6 +1,6 @@
 # app/services/contrato_service.py
 import math
-from typing import Optional, Dict
+from typing import List, Optional, Dict
 from fastapi import HTTPException, status, UploadFile
 import logging
 
@@ -107,27 +107,33 @@ class ContratoService:
                 )
                 await EmailService.send_email(old_fiscal['email'], subject, body)
 
-    async def create_contrato(self, contrato_create: ContratoCreate, file: Optional[UploadFile] = None) -> Contrato:
-        """Cria um novo contrato e, opcionalmente, anexa um arquivo"""
+    async def create_contrato(self, contrato_create: ContratoCreate, files: Optional[List[UploadFile]] = None) -> Contrato:
+        """Cria um novo contrato e, opcionalmente, anexa múltiplos arquivos"""
         await self._validate_foreign_keys(contrato_create)
-        
+
         # Cria o contrato primeiro para obter um ID
         new_contrato_data = await self.contrato_repo.create_contrato(contrato_create)
         contrato_id = new_contrato_data['id']
 
-        # Se um arquivo foi enviado, guarda-o e associa-o ao contrato
-        if file:
-            nome_original, path, tamanho = await self.file_service.save_upload_file(contrato_id, file)
-            
-            arquivo_data = await self.arquivo_repo.create_arquivo(
-                nome_arquivo=nome_original,
-                path_armazenamento=path,
-                tipo_arquivo=file.content_type,
-                tamanho_bytes=tamanho,
-                contrato_id=contrato_id
-            )
-            # Vincula o ID do arquivo ao campo 'documento' do contrato
-            await self.arquivo_repo.link_arquivo_to_contrato(arquivo_data['id'], contrato_id)
+        # Se arquivos foram enviados, guarda-os e associa-os ao contrato
+        if files and any(file.filename for file in files if file):
+            # Filtra apenas arquivos válidos
+            valid_files = [file for file in files if file and file.filename and file.filename.strip()]
+
+            if valid_files:
+                saved_files = await self.file_service.save_multiple_upload_files(contrato_id, valid_files)
+
+                # Salva cada arquivo no banco de dados
+                for file_info in saved_files:
+                    arquivo_data = await self.arquivo_repo.create_arquivo(
+                        nome_arquivo=file_info['original_filename'],
+                        path_armazenamento=file_info['file_path'],
+                        tipo_arquivo=file_info['content_type'],
+                        tamanho_bytes=file_info['file_size'],
+                        contrato_id=contrato_id
+                    )
+                    # Vincula o ID do arquivo ao contrato
+                    await self.arquivo_repo.link_arquivo_to_contrato(arquivo_data['id'], contrato_id)
         
         # Retorna o contrato completo, agora com a informação do arquivo, se houver
         contrato_final = await self.contrato_repo.find_contrato_by_id(contrato_id)
@@ -170,51 +176,45 @@ class ContratoService:
         )
 
     async def update_contrato(
-        self, 
-        contrato_id: int, 
-        contrato_update: ContratoUpdate, 
-        documento_contrato: Optional[UploadFile] = None
+        self,
+        contrato_id: int,
+        contrato_update: ContratoUpdate,
+        documento_contrato: Optional[List[UploadFile]] = None
     ) -> Optional[Contrato]:
         """
-        Atualiza um contrato existente, incluindo upload de arquivo opcional.
+        Atualiza um contrato existente, incluindo upload de múltiplos arquivos opcionais.
         """
-        
+
         try:
             # Verifica se o contrato existe
             existing_contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
             if not existing_contrato:
                 return None
-            
-            # Processa arquivo se fornecido
-            if documento_contrato and documento_contrato.filename:
-                # Salva o novo arquivo
-                original_filename, file_path, file_size = await self.file_service.save_upload_file(
-                    contrato_id=contrato_id,
-                    file=documento_contrato
-                )
-                
-                # Remove arquivo antigo se existir
-                if existing_contrato.get('documento_caminho'):
-                    try:
-                        import os
-                        if os.path.exists(existing_contrato['documento_caminho']):
-                            os.remove(existing_contrato['documento_caminho'])
-                    except Exception as e:
-                        logging.warning(f"Erro ao remover arquivo antigo: {e}")
-                
-                # Adiciona campos do arquivo ao update
-                contrato_data = contrato_update.model_dump(exclude_none=True)
-                contrato_data.update({
-                    'documento_nome_arquivo': original_filename,
-                    'documento_caminho': file_path,
-                    'documento_tamanho': file_size
-                })
-                # Recria o ContratoUpdate com os dados do arquivo
-                contrato_update = ContratoUpdate(**contrato_data)
-            
+
+            # Processa arquivos se fornecidos
+            if documento_contrato and any(file.filename for file in documento_contrato if file):
+                # Filtra apenas arquivos válidos
+                valid_files = [file for file in documento_contrato if file and file.filename and file.filename.strip()]
+
+                if valid_files:
+                    # Salva os novos arquivos
+                    saved_files = await self.file_service.save_multiple_upload_files(contrato_id, valid_files)
+
+                    # Salva cada arquivo no banco de dados
+                    for file_info in saved_files:
+                        arquivo_data = await self.arquivo_repo.create_arquivo(
+                            nome_arquivo=file_info['original_filename'],
+                            path_armazenamento=file_info['file_path'],
+                            tipo_arquivo=file_info['content_type'],
+                            tamanho_bytes=file_info['file_size'],
+                            contrato_id=contrato_id
+                        )
+                        # Vincula o ID do arquivo ao contrato
+                        await self.arquivo_repo.link_arquivo_to_contrato(arquivo_data['id'], contrato_id)
+
             # Executa a atualização no banco (método correto)
             updated_contrato = await self.contrato_repo.update_contrato(contrato_id, contrato_update)
-            
+
             return updated_contrato
             
         except Exception as e:
@@ -228,3 +228,77 @@ class ContratoService:
         if not await self.contrato_repo.find_contrato_by_id(contrato_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
         return await self.contrato_repo.delete_contrato(contrato_id)
+
+    # Métodos para gerenciamento de arquivos do contrato
+    async def get_arquivos_contrato(self, contrato_id: int) -> List[Dict]:
+        """Lista todos os arquivos de um contrato específico"""
+        # Verifica se o contrato existe
+        contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
+        if not contrato:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Contrato não encontrado"
+            )
+
+        arquivos = await self.contrato_repo.get_arquivos_contrato(contrato_id)
+        total_arquivos = await self.contrato_repo.count_arquivos_contrato(contrato_id)
+
+        return {
+            "arquivos": arquivos,
+            "total_arquivos": total_arquivos,
+            "contrato_id": contrato_id
+        }
+
+    async def get_arquivo_contrato(self, contrato_id: int, arquivo_id: int) -> Optional[Dict]:
+        """Obtém um arquivo específico de um contrato"""
+        # Verifica se o contrato existe
+        contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
+        if not contrato:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Contrato não encontrado"
+            )
+
+        arquivo = await self.contrato_repo.get_arquivo_by_id(arquivo_id, contrato_id)
+        if not arquivo:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Arquivo não encontrado neste contrato"
+            )
+
+        return arquivo
+
+    async def delete_arquivo_contrato(self, contrato_id: int, arquivo_id: int) -> bool:
+        """Remove um arquivo específico de um contrato"""
+        # Verifica se o contrato existe
+        contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
+        if not contrato:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Contrato não encontrado"
+            )
+
+        # Busca o arquivo para verificar se existe e obter o path
+        arquivo = await self.contrato_repo.get_arquivo_by_id(arquivo_id, contrato_id)
+        if not arquivo:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Arquivo não encontrado neste contrato"
+            )
+
+        try:
+            # Remove o arquivo do banco de dados
+            deleted = await self.contrato_repo.delete_arquivo(arquivo_id, contrato_id)
+
+            if deleted:
+                # Remove o arquivo físico do sistema de arquivos
+                await self.file_service.delete_file(arquivo['path_armazenamento'])
+
+            return deleted
+
+        except Exception as e:
+            logging.error(f"Erro ao deletar arquivo {arquivo_id} do contrato {contrato_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erro interno ao deletar arquivo: {str(e)}"
+            )

@@ -80,3 +80,21 @@ class ContratoPaginated(BaseModel):
     total_pages: int
     current_page: int
     per_page: int
+
+# Schemas para gerenciamento de arquivos do contrato
+class ArquivoContrato(BaseModel):
+    """Schema para representar um arquivo de contrato"""
+    id: int
+    nome_arquivo: str
+    tipo_arquivo: Optional[str] = None
+    tamanho_bytes: Optional[int] = None
+    contrato_id: int
+    created_at: Optional[str] = None  # ISO format datetime string
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ArquivoContratoList(BaseModel):
+    """Schema para listagem de arquivos de um contrato"""
+    arquivos: List[ArquivoContrato]
+    total_arquivos: int
+    contrato_id: int
