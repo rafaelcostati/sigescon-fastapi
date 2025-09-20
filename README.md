@@ -267,6 +267,49 @@ asyncio.run(run_seeder())
 "
 ```
 
+## 🗄️ Reset Completo do Banco (Desenvolvimento)
+
+Para desenvolvimento e testes, você pode resetar completamente o banco e recriar com dados de exemplo:
+
+### Opção 1: Script Interativo (Recomendado)
+```bash
+# Script completo com confirmação e logs detalhados
+python scripts/reset_and_seed_database.py
+```
+
+### Opção 2: Script Shell
+```bash
+# Execução simplificada com verificações automáticas
+./reset_database.sh
+```
+
+### Opção 3: SQL Direto
+```bash
+# Para quem prefere SQL puro
+psql -U postgres -d contratos -f scripts/reset_database.sql
+```
+
+### Opção 4: Reset Rápido (CI/CD)
+```bash
+# Sem confirmação interativa
+python scripts/quick_reset.py
+```
+
+**⚠️ ATENÇÃO:** Estes scripts **APAGAM TODOS OS DADOS**! Use apenas em desenvolvimento.
+
+**📋 Dados criados após reset:**
+- **3 usuários padrão** (admin, gestor, fiscal)
+- **3 contratos de exemplo** com documentos
+- **Tabelas de lookup** populadas
+- **Pendências de teste** para workflow completo
+
+**🔑 Credenciais padrão:**
+- Admin: `admin@sigescon.gov.br` / `admin123`
+- Gestor: `gestor@sigescon.gov.br` / `gestor123`
+- Fiscal: `fiscal@sigescon.gov.br` / `fiscal123`
+
+📖 **Documentação completa:** [docs/DATABASE_RESET.md](docs/DATABASE_RESET.md)
+
 ## 🏃 Execução
 
 ### Modo Desenvolvimento
