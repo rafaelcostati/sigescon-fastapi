@@ -12,7 +12,7 @@ from app.services.usuario_service import UsuarioService
 from app.repositories.usuario_repo import UsuarioRepository
 from app.core.database import get_connection
 import asyncpg
-from app.api.permissions import admin_required, require_admin_or_manager
+from app.api.permissions import admin_required, require_admin_or_manager, require_any_profile
 
 
 router = APIRouter(
@@ -40,14 +40,14 @@ async def list_users(
     per_page: int = Query(10, ge=1, le=100, description="Itens por página"),
     nome: Optional[str] = Query(None, description="Filtrar por nome (busca parcial)"),
     service: UsuarioService = Depends(get_usuario_service),
-    admin_user: Usuario = Depends(admin_required)
+    current_user: Usuario = Depends(require_any_profile)
 ):
     """
     Lista todos os usuários ativos do sistema com paginação.
-    
+
     Permite filtrar por nome (busca parcial).
-    
-    **Requer permissão de administrador.**
+
+    **Requer usuário com perfil ativo (Administrador, Gestor ou Fiscal).**
     """
     filters = {}
     if nome:
@@ -124,12 +124,12 @@ async def create_user_with_profiles(
 async def get_user_by_id(
     user_id: int,
     service: UsuarioService = Depends(get_usuario_service),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(require_any_profile)
 ):
     """
     Busca um usuário específico pelo ID.
-    
-    **Requer autenticação válida.**
+
+    **Requer usuário com perfil ativo (Administrador, Gestor ou Fiscal).**
     """
     user = await service.get_by_id(user_id)
     if not user:

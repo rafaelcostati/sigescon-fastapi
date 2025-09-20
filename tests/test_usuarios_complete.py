@@ -281,7 +281,96 @@ class TestPasswordManagement:
 
 class TestPermissions:
     """Testa permissões e restrições de acesso"""
-    
+
+    @pytest.mark.asyncio
+    async def test_fiscal_can_list_users(self, async_client: AsyncClient, unique_user_data: Dict, admin_headers: Dict):
+        """Testa que fiscal consegue listar usuários"""
+        print("\n--- Testando Acesso de Fiscal à Lista de Usuários ---")
+
+        # Cria um usuário fiscal com perfil ativo
+        fiscal_data = unique_user_data.copy()
+        fiscal_user = await create_user_with_profile(async_client, fiscal_data, admin_headers)
+        fiscal_id = fiscal_user["id"]
+
+        # Concede perfil de Fiscal ao usuário
+        perfil_data = {"perfil_ids": [3]}  # ID 3 = Fiscal
+        response = await async_client.post(
+            f"/api/v1/usuarios/{fiscal_id}/perfis/conceder",
+            json=perfil_data,
+            headers=admin_headers
+        )
+        assert response.status_code == 200
+
+        # Faz login como fiscal
+        login_data = {
+            "username": fiscal_data["email"],
+            "password": fiscal_data["senha"]
+        }
+        response = await async_client.post("/auth/login", data=login_data)
+        assert response.status_code == 200
+        fiscal_token = response.json()["access_token"]
+        fiscal_headers = {"Authorization": f"Bearer {fiscal_token}"}
+
+        # Tenta listar usuários como fiscal - deve conseguir
+        response = await async_client.get("/api/v1/usuarios/", headers=fiscal_headers)
+        assert response.status_code == 200
+        print(f"✓ Fiscal conseguiu listar usuários")
+
+        # Tenta criar usuário como fiscal - deve falhar
+        new_user_data = unique_user_data.copy()
+        new_user_data["email"] = f"teste_fiscal_{uuid.uuid4()}@test.com"
+        response = await async_client.post("/api/v1/usuarios/", json=new_user_data, headers=fiscal_headers)
+        assert response.status_code == 403
+        print(f"✓ Fiscal não conseguiu criar usuário (como esperado)")
+
+        # Limpa o usuário criado
+        await async_client.delete(f"/api/v1/usuarios/{fiscal_id}", headers=admin_headers)
+
+    @pytest.mark.asyncio
+    async def test_gestor_can_list_users(self, async_client: AsyncClient, unique_user_data: Dict, admin_headers: Dict):
+        """Testa que gestor consegue listar usuários"""
+        print("\n--- Testando Acesso de Gestor à Lista de Usuários ---")
+
+        # Cria um usuário gestor com perfil ativo
+        gestor_data = unique_user_data.copy()
+        gestor_data["email"] = f"gestor_{uuid.uuid4()}@test.com"
+        gestor_user = await create_user_with_profile(async_client, gestor_data, admin_headers)
+        gestor_id = gestor_user["id"]
+
+        # Concede perfil de Gestor ao usuário
+        perfil_data = {"perfil_ids": [2]}  # ID 2 = Gestor
+        response = await async_client.post(
+            f"/api/v1/usuarios/{gestor_id}/perfis/conceder",
+            json=perfil_data,
+            headers=admin_headers
+        )
+        assert response.status_code == 200
+
+        # Faz login como gestor
+        login_data = {
+            "username": gestor_data["email"],
+            "password": gestor_data["senha"]
+        }
+        response = await async_client.post("/auth/login", data=login_data)
+        assert response.status_code == 200
+        gestor_token = response.json()["access_token"]
+        gestor_headers = {"Authorization": f"Bearer {gestor_token}"}
+
+        # Tenta listar usuários como gestor - deve conseguir
+        response = await async_client.get("/api/v1/usuarios/", headers=gestor_headers)
+        assert response.status_code == 200
+        print(f"✓ Gestor conseguiu listar usuários")
+
+        # Tenta criar usuário como gestor - deve falhar
+        new_user_data = unique_user_data.copy()
+        new_user_data["email"] = f"teste_gestor_{uuid.uuid4()}@test.com"
+        response = await async_client.post("/api/v1/usuarios/", json=new_user_data, headers=gestor_headers)
+        assert response.status_code == 403
+        print(f"✓ Gestor não conseguiu criar usuário (como esperado)")
+
+        # Limpa o usuário criado
+        await async_client.delete(f"/api/v1/usuarios/{gestor_id}", headers=admin_headers)
+
     @pytest.mark.asyncio
     async def test_non_admin_cannot_create_user(self, async_client: AsyncClient, unique_user_data: Dict, admin_headers: Dict):
         """Testa que usuário comum não pode criar outros usuários"""

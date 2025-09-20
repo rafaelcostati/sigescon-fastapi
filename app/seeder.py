@@ -44,24 +44,63 @@ async def seed_data(conn: asyncpg.Connection):
     admin_email = settings.ADMIN_EMAIL
     if admin_email:
         admin_user = await conn.fetchrow("SELECT id FROM usuario WHERE email = $1", admin_email)
-        
+
         if not admin_user:
             print(f"Criando usuário Administrador ({admin_email})...")
             admin_pass_hash = get_password_hash(settings.ADMIN_PASSWORD)
             perfil_admin_id = await conn.fetchval("SELECT id FROM perfil WHERE nome = 'Administrador'")
-            
+
             if perfil_admin_id:
+                # Cria o usuário sem perfil_id (campo legacy)
+                admin_user_id = await conn.fetchval(
+                    """
+                    INSERT INTO usuario (nome, email, cpf, senha)
+                    VALUES ($1, $2, $3, $4)
+                    RETURNING id
+                    """,
+                    'Administrador do Sistema', admin_email, '00000000000', admin_pass_hash
+                )
+
+                # Associa o perfil através da tabela usuario_perfil
                 await conn.execute(
                     """
-                    INSERT INTO usuario (nome, email, cpf, senha, perfil_id)
-                    VALUES ($1, $2, $3, $4, $5)
+                    INSERT INTO usuario_perfil (usuario_id, perfil_id, concedido_por_usuario_id, ativo)
+                    VALUES ($1, $2, $1, TRUE)
                     """,
-                    'Administrador do Sistema', admin_email, '00000000000', admin_pass_hash, perfil_admin_id
+                    admin_user_id, perfil_admin_id
                 )
+
                 print(f"- Usuário Administrador '{admin_email}' criado com sucesso.")
+                print(f"- Perfil 'Administrador' concedido com sucesso.")
             else:
                 print("ERRO: Perfil 'Administrador' não encontrado. Não foi possível criar o usuário admin.")
         else:
-            print(f"Usuário Administrador ({admin_email}) já existe. Pulando.")
+            # Verifica se o admin já tem o perfil na nova tabela
+            admin_profile = await conn.fetchrow(
+                """
+                SELECT up.id FROM usuario_perfil up
+                JOIN perfil p ON up.perfil_id = p.id
+                WHERE up.usuario_id = $1 AND p.nome = 'Administrador' AND up.ativo = TRUE
+                """,
+                admin_user['id']
+            )
+
+            if not admin_profile:
+                print(f"Concedendo perfil 'Administrador' para usuário existente ({admin_email})...")
+                perfil_admin_id = await conn.fetchval("SELECT id FROM perfil WHERE nome = 'Administrador'")
+
+                if perfil_admin_id:
+                    await conn.execute(
+                        """
+                        INSERT INTO usuario_perfil (usuario_id, perfil_id, concedido_por_usuario_id, ativo)
+                        VALUES ($1, $2, $1, TRUE)
+                        """,
+                        admin_user['id'], perfil_admin_id
+                    )
+                    print(f"- Perfil 'Administrador' concedido com sucesso.")
+                else:
+                    print("ERRO: Perfil 'Administrador' não encontrado.")
+            else:
+                print(f"Usuário Administrador ({admin_email}) já existe e tem perfil ativo. Pulando.")
     
     print("Seed do banco de dados concluído.")
