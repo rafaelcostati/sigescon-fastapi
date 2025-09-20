@@ -220,7 +220,7 @@ class DashboardRepository:
                 query = """
                     SELECT COUNT(*)
                     FROM relatoriofiscal r
-                    JOIN statusrelatorio sr ON r.status_relatorio_id = sr.id
+                    JOIN statusrelatorio sr ON r.status_id = sr.id
                     WHERE sr.nome = 'Pendente de Análise'
                 """
                 result = await self.conn.fetchval(query)
@@ -450,11 +450,11 @@ class DashboardRepository:
 
             query = """
             SELECT
-                COUNT(*) as total_pendencias_vencidas,
-                COUNT(DISTINCT c.id) as contratos_afetados,
-                COALESCE(SUM(CASE WHEN (CURRENT_DATE - p.data_prazo) > 30 THEN 1 ELSE 0 END), 0) as pendencias_criticas,
-                COALESCE(SUM(CASE WHEN (CURRENT_DATE - p.data_prazo) BETWEEN 15 AND 30 THEN 1 ELSE 0 END), 0) as pendencias_altas,
-                COALESCE(SUM(CASE WHEN (CURRENT_DATE - p.data_prazo) BETWEEN 1 AND 14 THEN 1 ELSE 0 END), 0) as pendencias_medias
+                COALESCE(COUNT(*), 0) as total_pendencias_vencidas,
+                COALESCE(COUNT(DISTINCT c.id), 0) as contratos_afetados,
+                COALESCE(COUNT(*) FILTER (WHERE (CURRENT_DATE - p.data_prazo) > 30), 0) as pendencias_criticas,
+                COALESCE(COUNT(*) FILTER (WHERE (CURRENT_DATE - p.data_prazo) BETWEEN 15 AND 30), 0) as pendencias_altas,
+                COALESCE(COUNT(*) FILTER (WHERE (CURRENT_DATE - p.data_prazo) BETWEEN 1 AND 14), 0) as pendencias_medias
             FROM pendenciarelatorio p
             JOIN contrato c ON p.contrato_id = c.id
             JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
@@ -519,7 +519,7 @@ class DashboardRepository:
                     SELECT COUNT(*)
                     FROM relatoriofiscal r
                     JOIN contrato c ON r.contrato_id = c.id
-                    JOIN statusrelatorio sr ON r.status_relatorio_id = sr.id
+                    JOIN statusrelatorio sr ON r.status_id = sr.id
                     WHERE c.gestor_id = $1
                         AND c.ativo = true
                         AND sr.nome = 'Pendente de Análise'

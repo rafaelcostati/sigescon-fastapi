@@ -117,10 +117,10 @@ class DashboardService:
                 contrato_numero=pendencia['contrato_numero'],
                 contrato_objeto=pendencia['contrato_objeto'],
                 pendencia_id=pendencia['pendencia_id'],
-                pendencia_titulo=pendencia['pendencia_titulo'],
+                pendencia_titulo=pendencia['pendencia_descricao'],  # Usando descricao como titulo
                 pendencia_descricao=pendencia['pendencia_descricao'],
-                data_criacao=pendencia['data_criacao'],
-                prazo_entrega=pendencia['prazo_entrega'],
+                data_criacao=pendencia['created_at'],  # Corrigido nome do campo
+                prazo_entrega=pendencia['data_prazo'],  # Corrigido nome do campo
                 dias_restantes=pendencia['dias_restantes'],
                 em_atraso=pendencia['em_atraso']
             )
