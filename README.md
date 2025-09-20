@@ -417,6 +417,10 @@ Com o servidor rodando, acesse:
 - `PATCH /api/v1/contratos/{id}/pendencias/{id}/cancelar` - **NOVO** - Cancelar pendência (Admin)
 - `GET /api/v1/contratos/{id}/pendencias/contador` - **NOVO** - Contador por status para dashboard
 
+#### Dashboard do Fiscal
+- `GET /api/v1/dashboard/fiscal/minhas-pendencias` - **NOVO** - Pendências específicas do fiscal logado
+- `GET /api/v1/dashboard/fiscal/completo` - **NOVO** - Dashboard completo do fiscal
+
 #### Arquivos
 - `GET /api/v1/arquivos/{id}/download` - Download de arquivos com controle de acesso
 
@@ -493,17 +497,17 @@ sigescon-fastapi/
 
 ```mermaid
 graph LR
-    A[Admin cria Pendência] --> B[Fiscal recebe email]
+    A[Admin cria Pendência<br/>Status: Pendente] --> B[Fiscal recebe email]
     B --> C{Fiscal responde}
-    C -->|Envia Relatório + PDF| D[Status: Pendente de Análise]
+    C -->|Envia Relatório + PDF| D[Relatório: Pendente de Análise<br/>Pendência: Aguardando Análise]
     C -->|Não responde| E[Lembrete automático]
     E --> C
     A --> F[Admin pode cancelar]
     F --> G[Fiscal recebe email de cancelamento]
     D --> H[Admin analisa relatório]
     H --> I{Decisão}
-    I -->|Aprova| J[Status: Aprovado<br/>Pendência: Concluída]
-    I -->|Rejeita| K[Status: Rejeitado<br/>Volta para Pendente]
+    I -->|Aprova| J[Relatório: Aprovado<br/>Pendência: Concluída]
+    I -->|Rejeita| K[Relatório: Rejeitado<br/>Pendência: volta para Pendente]
     K --> L[Fiscal recebe feedback]
     L --> M[Fiscal reenvia<br/>Substitui arquivo anterior]
     M --> D
@@ -531,7 +535,11 @@ graph LR
 #### **Dashboard com Contadores**
 - Endpoint `GET /pendencias/contador` retorna estatísticas em tempo real
 - Permite exibir badges no frontend: "Pendências(3)" se houver ações necessárias
-- Contadores separados: pendentes, em análise, concluídas, canceladas
+- **Novos Status de Pendências:**
+  - **Pendente**: Aguardando envio de relatório pelo fiscal
+  - **Aguardando Análise**: Relatório enviado, aguardando análise do administrador
+  - **Concluída**: Relatório aprovado pelo administrador
+  - **Cancelada**: Pendência cancelada pelo administrador
 
 ### Níveis de Acesso
 

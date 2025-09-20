@@ -303,6 +303,12 @@ PATCH  /api/v1/contratos/{id}/pendencias/{id}/cancelar      # Cancelar pendênci
 GET    /api/v1/contratos/{id}/pendencias/contador           # Contador por status (dashboard)
 ```
 
+### Dashboard do Fiscal
+```
+GET    /api/v1/dashboard/fiscal/minhas-pendencias           # Pendências específicas do fiscal logado
+GET    /api/v1/dashboard/fiscal/completo                    # Dashboard completo do fiscal
+```
+
 ### Arquivos e Tabelas Auxiliares
 ```
 GET    /api/v1/arquivos/{id}/download                    # Download seguro
@@ -449,23 +455,27 @@ DELETE /api/v1/contratos/{id}/arquivos/{arquivo_id}       # Remove arquivo
 - Fiscal recebe email informando que não precisa mais enviar relatório
 
 #### 3. **Envio de Relatórios pelo Fiscal**
+- Fiscal consulta pendências via `GET /api/v1/dashboard/fiscal/minhas-pendencias`
 - Fiscal envia relatório com arquivo via `POST /api/v1/contratos/{id}/relatorios`
 - Sistema aceita PDF, DOC, XLS ou qualquer formato
 - **Primeiro envio**: Cria novo relatório
 - **Reenvio**: Substitui arquivo anterior automaticamente
 - Status do relatório: **"Pendente de Análise"**
+- **Status da pendência muda automaticamente**: "Pendente" → **"Aguardando Análise"**
 - Admin recebe email sobre novo relatório submetido
 
 #### 4. **Análise pelo Administrador**
 - Admin analisa via `PATCH /api/v1/contratos/{id}/relatorios/{id}/analise`
-- **Aprovar**: Status vira "Aprovado", pendência "Concluída"
-- **Rejeitar**: Status vira "Rejeitado com Pendência", volta para "Pendente"
+- **Aprovar**: Status do relatório vira "Aprovado", pendência vira "Concluída"
+- **Rejeitar**: Status do relatório vira "Rejeitado com Pendência", pendência volta para "Pendente"
 - Fiscal recebe email com resultado e observações (se houver)
 
 #### 5. **Contador para Dashboard**
 - Endpoint `GET /api/v1/contratos/{id}/pendencias/contador`
-- Retorna: `{"pendentes": 2, "analise_pendente": 1, "concluidas": 5, "canceladas": 0}`
-- Para exibir no frontend: "Pendências(3)" se houver ações necessárias
+- Retorna: `{"pendentes": 2, "aguardando_analise": 1, "concluidas": 5, "canceladas": 0}`
+- Para exibir no frontend:
+  - **Admin**: "Aguardando Análise (1)" - prioridade alta
+  - **Fiscal**: "Pendentes (2)" - relatórios para enviar
 
 ### Arquivos de Relatórios Separados
 
@@ -500,9 +510,10 @@ GET /api/v1/arquivos/relatorios/contrato/{id}
 ### Estados dos Status
 
 **StatusPendencia:**
-1. **"Pendente"** - Aguardando envio de relatório
-2. **"Concluída"** - Relatório aprovado pelo admin
+1. **"Pendente"** - Aguardando envio de relatório pelo fiscal
+2. **"Concluída"** - Relatório aprovado pelo administrador
 3. **"Cancelada"** - Cancelada pelo administrador
+4. **"Aguardando Análise"** - Relatório enviado, aguardando análise do administrador
 
 **StatusRelatorio:**
 1. **"Pendente de Análise"** - Aguardando análise do admin

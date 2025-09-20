@@ -140,12 +140,20 @@ Workflow completo de gestão de relatórios fiscais implementado:
 
 **Fluxo de Relatórios:**
 1. **Submissão:** Fiscal envia relatório com arquivo via `POST /api/v1/contratos/{id}/relatorios`
+   - Status da pendência muda automaticamente para "Aguardando Análise"
 2. **Análise:** Admin analisa via `PATCH /api/v1/contratos/{id}/relatorios/{id}/analise`
 3. **Resultado:** Aprovação (pendência concluída) ou rejeição (volta para pendente)
 
 **Estados Implementados:**
-* **StatusPendencia:** Pendente → Concluída/Cancelada
+* **StatusPendencia:** Pendente → Aguardando Análise → Concluída/Cancelada
 * **StatusRelatorio:** Pendente de Análise → Aprovado/Rejeitado com Pendência
+
+**Transições Automáticas de Status:**
+- **Criação de Pendência:** Status inicial "Pendente"
+- **Envio de Relatório:** Status muda para "Aguardando Análise"
+- **Aprovação do Relatório:** Status muda para "Concluída"
+- **Rejeição do Relatório:** Status volta para "Pendente" (para reenvio)
+- **Cancelamento pelo Admin:** Status muda para "Cancelada"
 
 #### **4.3. Sistema de Notificações por Email**
 

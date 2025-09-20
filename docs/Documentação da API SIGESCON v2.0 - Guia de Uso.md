@@ -219,14 +219,16 @@ Este é o fluxo de negócio mais importante do sistema.
 3. **Criar a Pendência:**  
    * `POST /api/v1/contratos/{contrato_id}/pendencias/` com a descrição da pendência e a data de prazo. Guarde o `id` da pendência.
 
-**Passo 2 (Fiscal): Submeter o relatório.**
+**Passo 2 (Fiscal): Verificar pendências e submeter o relatório.**
 
-1. **Login como Fiscal.**  
-2. **Listar Pendências:**  
-   * `GET /api/v1/contratos/{contrato_id}/pendencias/` para ver as pendências em aberto.  
-3. **Submeter o Relatório:**  
-   * `POST /api/v1/contratos/{contrato_id}/relatorios/` (usando `multipart/form-data`).  
+1. **Login como Fiscal.**
+2. **Listar Suas Pendências:**
+   * `GET /api/v1/contratos/{contrato_id}/pendencias/` para ver as pendências designadas para ele.
+   * O fiscal visualiza quais relatórios precisa enviar.
+3. **Submeter o Relatório:**
+   * `POST /api/v1/contratos/{contrato_id}/relatorios/` (usando `multipart/form-data`).
    * O corpo deve conter `mes_competencia`, `pendencia_id` e um `arquivo`.
+   * **Efeito**: Status da pendência muda automaticamente para "Aguardando Análise".
 
 **Passo 3 (Admin): Analisar e Aprovar o Relatório.**
 
@@ -237,7 +239,32 @@ Este é o fluxo de negócio mais importante do sistema.
    * `PATCH /api/v1/contratos/{contrato_id}/relatorios/{relatorio_id}/analise`.  
    * No corpo, envie o `status_id` correspondente a "Aprovado" e o `aprovador_usuario_id`.
 
-### **5. Paginação e Filtros**
+### **5. Fluxo de Status das Pendências**
+
+O sistema implementa transições automáticas de status para melhor controle do workflow:
+
+#### **Estados Possíveis:**
+1. **"Pendente"** - Pendência criada, aguardando envio de relatório pelo fiscal
+2. **"Aguardando Análise"** - Relatório enviado pelo fiscal, aguardando avaliação do administrador
+3. **"Concluída"** - Relatório aprovado pelo administrador
+4. **"Cancelada"** - Pendência cancelada pelo administrador
+
+#### **Transições Automáticas:**
+- **Criação**: Pendência inicia como "Pendente"
+- **Envio de Relatório**: Status muda automaticamente para "Aguardando Análise"
+- **Aprovação**: Admin aprova → status vira "Concluída"
+- **Rejeição**: Admin rejeita → status volta para "Pendente" (para reenvio)
+- **Cancelamento**: Admin cancela → status vira "Cancelada"
+
+#### **Dashboard Fiscal:**
+Para verificar pendências designadas:
+```
+GET /api/v1/contratos/{contrato_id}/pendencias/
+```
+- Filtra automaticamente pendências do fiscal logado
+- Mostra apenas pendências com status "Pendente" (que precisam de ação)
+
+### **6. Paginação e Filtros**
 
 Endpoints que retornam listas de recursos (como `/contratos`, `/contratados`, `/usuarios`) são paginados.
 
@@ -264,9 +291,9 @@ Endpoints que retornam listas de recursos (como `/contratos`, `/contratados`, `/
 
 Muitos endpoints também aceitam query parameters adicionais para **filtragem**. Consulte a documentação do Swagger (`/docs`) para ver os filtros disponíveis em cada rota.
 
-### **6. Novos Endpoints Implementados**
+### **7. Novos Endpoints Implementados**
 
-#### **6.1. Gerenciamento de Arquivos de Contrato**
+#### **7.1. Gerenciamento de Arquivos de Contrato**
 
 **Listar arquivos de um contrato:**
 ```
@@ -289,7 +316,7 @@ DELETE /api/v1/contratos/{contrato_id}/arquivos/{arquivo_id}
 - **Permissões:** Apenas Administradores
 - **Resposta:** Confirmação de exclusão
 
-#### **6.2. Gestão Avançada de Pendências**
+#### **7.2. Gestão Avançada de Pendências**
 
 **Cancelar pendência:**
 ```
@@ -304,9 +331,14 @@ PATCH /api/v1/contratos/{contrato_id}/pendencias/{pendencia_id}/cancelar
 GET /api/v1/contratos/{contrato_id}/pendencias/contador
 ```
 - **Permissões:** Usuários com acesso ao contrato
-- **Resposta:** `{"pendentes": 2, "analise_pendente": 1, "concluidas": 5, "canceladas": 0}`
+- **Resposta:** `{"pendentes": 2, "aguardando_analise": 1, "concluidas": 5, "canceladas": 0}`
+- **Status das Pendências:**
+  - `pendentes`: Aguardando envio de relatório pelo fiscal (Status: "Pendente")
+  - `aguardando_analise`: Relatório enviado, aguardando análise do administrador (Status: "Aguardando Análise")
+  - `concluidas`: Relatório aprovado pelo administrador (Status: "Concluída")
+  - `canceladas`: Pendência cancelada pelo administrador (Status: "Cancelada")
 
-#### **6.3. Arquivos de Relatórios Fiscais**
+#### **7.3. Arquivos de Relatórios Fiscais**
 
 **Listar arquivos de relatórios por contrato:**
 ```
@@ -316,7 +348,7 @@ GET /api/v1/arquivos/relatorios/contrato/{contrato_id}
 - **Resposta:** Lista específica de arquivos de relatórios fiscais
 - **Metadados:** Status do relatório, responsável pelo envio, competência
 
-#### **6.4. Funcionalidades de Reenvio**
+#### **7.4. Funcionalidades de Reenvio**
 
 **Comportamento de Reenvio de Relatórios:**
 - **Primeiro envio:** Cria novo relatório na base de dados
@@ -324,7 +356,7 @@ GET /api/v1/arquivos/relatorios/contrato/{contrato_id}
 - **Status:** Sempre "Pendente de Análise" após reenvio
 - **Notificação:** Admin recebe email sobre novo envio
 
-#### **6.5. Gestão de Perfis de Usuário (Múltiplos Perfis)**
+#### **7.5. Gestão de Perfis de Usuário (Múltiplos Perfis)**
 
 O SIGESCON suporta múltiplos perfis por usuário através da relação `usuario_perfil`. Utilize estes endpoints para listar, conceder e revogar perfis:
 
@@ -391,7 +423,7 @@ Observações importantes:
 - Para listar todos os perfis de um usuário, utilize os endpoints acima.
 - Na criação de usuário (`POST /usuarios/`), o campo `perfil_id` é sempre ignorado (criação sem perfil). Conceda perfis via `POST /api/v1/usuarios/{id}/perfis/conceder` ou use o atalho `POST /usuarios/com-perfis`.
 
-### **7. Tratamento de Erros**
+### **8. Tratamento de Erros**
 
 A API usa códigos de status HTTP padrão e retorna um corpo de resposta JSON para fornecer detalhes sobre o erro.
 
