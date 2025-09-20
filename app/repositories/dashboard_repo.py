@@ -160,9 +160,9 @@ class DashboardRepository:
                 p.data_prazo,
                 CASE
                     WHEN p.data_prazo IS NOT NULL AND p.data_prazo < CURRENT_DATE
-                    THEN EXTRACT(DAY FROM CURRENT_DATE - p.data_prazo)::int
+                    THEN (CURRENT_DATE - p.data_prazo)::int
                     WHEN p.data_prazo IS NOT NULL
-                    THEN EXTRACT(DAY FROM p.data_prazo - CURRENT_DATE)::int
+                    THEN (p.data_prazo - CURRENT_DATE)::int
                     ELSE NULL
                 END as dias_restantes,
                 CASE
@@ -233,7 +233,7 @@ class DashboardRepository:
                     FROM contrato c
                     JOIN pendenciarelatorio p ON p.contrato_id = c.id
                     JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
-                    WHERE c.data_exclusao IS NULL AND sp.nome = 'Pendente'
+                    WHERE c.ativo = true AND sp.nome = 'Pendente'
                 """
                 result = await self.conn.fetchval(query)
                 contadores['contratos_com_pendencias'] = result or 0
@@ -301,7 +301,7 @@ class DashboardRepository:
                     FROM pendenciarelatorio p
                     JOIN contrato c ON p.contrato_id = c.id
                     JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
-                    WHERE c.fiscal_id = $1 AND c.data_exclusao IS NULL AND sp.nome = 'Pendente'
+                    WHERE c.fiscal_id = $1 AND c.ativo = true AND sp.nome = 'Pendente'
                 """
                 result = await self.conn.fetchval(query, fiscal_id)
                 contadores['minhas_pendencias'] = result or 0
@@ -314,7 +314,7 @@ class DashboardRepository:
                     JOIN contrato c ON p.contrato_id = c.id
                     JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
                     WHERE c.fiscal_id = $1
-                        AND c.data_exclusao IS NULL
+                        AND c.ativo = true
                         AND sp.nome = 'Pendente'
                         AND p.data_prazo IS NOT NULL
                         AND p.data_prazo < CURRENT_DATE
@@ -329,7 +329,7 @@ class DashboardRepository:
                     FROM relatoriofiscal r
                     JOIN contrato c ON r.contrato_id = c.id
                     WHERE r.fiscal_usuario_id = $1
-                        AND c.data_exclusao IS NULL
+                        AND c.ativo = true
                         AND EXTRACT(MONTH FROM r.data_submissao) = EXTRACT(MONTH FROM CURRENT_DATE)
                         AND EXTRACT(YEAR FROM r.data_submissao) = EXTRACT(YEAR FROM CURRENT_DATE)
                 """
@@ -508,7 +508,7 @@ class DashboardRepository:
                 query = """
                     SELECT COUNT(*)
                     FROM contrato c
-                    WHERE c.gestor_id = $1 AND c.data_exclusao IS NULL
+                    WHERE c.gestor_id = $1 AND c.ativo = true
                 """
                 result = await self.conn.fetchval(query, gestor_id)
                 contadores['contratos_sob_gestao'] = result or 0
@@ -521,7 +521,7 @@ class DashboardRepository:
                     JOIN contrato c ON r.contrato_id = c.id
                     JOIN statusrelatorio sr ON r.status_relatorio_id = sr.id
                     WHERE c.gestor_id = $1
-                        AND c.data_exclusao IS NULL
+                        AND c.ativo = true
                         AND sr.nome = 'Pendente de Análise'
                 """
                 result = await self.conn.fetchval(query, gestor_id)
@@ -603,7 +603,7 @@ class DashboardRepository:
             JOIN usuario u_fiscal ON c.fiscal_id = u_fiscal.id
             WHERE
                 c.gestor_id = $1
-                AND c.data_exclusao IS NULL
+                AND c.ativo = true
             ORDER BY
                 -- Ordena por: vencidas primeiro, depois por data de prazo
                 CASE
