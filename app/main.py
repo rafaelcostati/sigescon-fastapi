@@ -14,8 +14,8 @@ import asyncpg
 from app.api.routers import (
     contratado_router, auth_router, usuario_router, perfil_router,
     modalidade_router, status_router, status_relatorio_router,
-    status_pendencia_router, contrato_router, pendencia_router, relatorio_router, 
-    arquivo_router  
+    status_pendencia_router, contrato_router, pendencia_router, relatorio_router,
+    arquivo_router, dashboard_router
 )
 from app.api.routers import usuario_perfil_router
 # Imports dos sistemas avançados
@@ -168,6 +168,7 @@ app.include_router(contrato_router.router, prefix=API_PREFIX)
 app.include_router(pendencia_router.router, prefix=API_PREFIX)
 app.include_router(relatorio_router.router, prefix=API_PREFIX)
 app.include_router(arquivo_router.router, prefix=API_PREFIX)
+app.include_router(dashboard_router.router, prefix=API_PREFIX)
 
 
 # Routers de tabelas auxiliares
@@ -328,6 +329,10 @@ tags_metadata = [
     {
         "name": "Monitoring",
         "description": "Métricas e estatísticas do sistema",
+    },
+    {
+        "name": "Dashboard",
+        "description": "Endpoints para dashboards administrativos e do fiscal",
     }
 ]
 
