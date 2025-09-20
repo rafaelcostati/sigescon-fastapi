@@ -345,3 +345,74 @@ class DashboardService:
             'pendencias_gestao': pendencias_gestao,
             'gestor_id': gestor_id
         }
+
+    # ===== NOVOS MÉTODOS PARA DASHBOARDS MELHORADOS =====
+
+    async def get_dashboard_admin_melhorado(self) -> 'DashboardAdminCompleto':
+        """
+        Busca dados completos melhorados para o dashboard do administrador
+        """
+        from app.schemas.dashboard_schema import DashboardAdminCompleto, FiscalCargaTrabalho
+
+        metrics = await self.dashboard_repo.get_dashboard_admin_completo()
+
+        # Converte a lista de fiscais para objetos Pydantic
+        fiscais_carga = [
+            FiscalCargaTrabalho(**fiscal)
+            for fiscal in metrics['fiscais_maior_carga']
+        ]
+
+        return DashboardAdminCompleto(
+            contratos_com_pendencias=metrics['contratos_com_pendencias'],
+            contratos_ativos=metrics['contratos_ativos'],
+            relatorios_para_analise=metrics['relatorios_para_analise'],
+            total_contratacoes=metrics['total_contratacoes'],
+            usuarios_ativos_30_dias=metrics['usuarios_ativos_30_dias'],
+            fiscais_maior_carga=fiscais_carga
+        )
+
+    async def get_dashboard_fiscal_melhorado(self, fiscal_id: int) -> 'DashboardFiscalCompleto':
+        """
+        Busca dados completos melhorados para o dashboard do fiscal
+        """
+        from app.schemas.dashboard_schema import DashboardFiscalCompleto
+
+        metrics = await self.dashboard_repo.get_dashboard_fiscal_completo(fiscal_id)
+
+        return DashboardFiscalCompleto(
+            minhas_pendencias=metrics['minhas_pendencias'],
+            pendencias_em_atraso=metrics['pendencias_em_atraso'],
+            relatorios_enviados=metrics['relatorios_enviados'],
+            contratos_ativos=metrics['contratos_ativos'],
+            pendencias_proximas_vencimento=metrics['pendencias_proximas_vencimento'],
+            relatorios_rejeitados=metrics['relatorios_rejeitados']
+        )
+
+    async def get_dashboard_gestor_melhorado(self, gestor_id: int) -> 'DashboardGestorCompleto':
+        """
+        Busca dados completos melhorados para o dashboard do gestor
+        """
+        from app.schemas.dashboard_schema import (
+            DashboardGestorCompleto,
+            EquipePerformance,
+            ContratoProximoVencimento
+        )
+
+        metrics = await self.dashboard_repo.get_dashboard_gestor_completo(gestor_id)
+
+        # Converte performance da equipe para objeto Pydantic
+        performance = EquipePerformance(**metrics['performance_equipe'])
+
+        # Converte contratos próximos ao vencimento para objetos Pydantic
+        contratos_proximos = [
+            ContratoProximoVencimento(**contrato)
+            for contrato in metrics['contratos_proximos_vencimento']
+        ]
+
+        return DashboardGestorCompleto(
+            contratos_sob_gestao=metrics['contratos_sob_gestao'],
+            equipe_pendencias_atraso=metrics['equipe_pendencias_atraso'],
+            relatorios_equipe_aguardando=metrics['relatorios_equipe_aguardando'],
+            performance_equipe=performance,
+            contratos_proximos_vencimento=contratos_proximos
+        )

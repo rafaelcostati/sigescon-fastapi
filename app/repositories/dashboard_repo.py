@@ -621,3 +621,358 @@ class DashboardRepository:
         except Exception as e:
             print(f"Erro ao buscar pendências do gestor: {e}. Retornando lista vazia.")
             return []
+
+    # ===== NOVOS MÉTODOS PARA DASHBOARDS MELHORADOS =====
+
+    async def get_dashboard_admin_completo(self) -> Dict[str, Any]:
+        """
+        Busca métricas completas para o dashboard do administrador
+        """
+        try:
+            # Verificar tabelas existentes
+            check_query = """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name IN ('contrato', 'pendenciarelatorio', 'relatoriofiscal', 'usuario', 'statusrelatorio', 'statuspendencia')
+            """
+            existing_tables = await self.conn.fetch(check_query)
+            table_names = [row['table_name'] for row in existing_tables]
+
+            metrics = {
+                'contratos_com_pendencias': 0,
+                'contratos_ativos': 0,
+                'relatorios_para_analise': 0,
+                'total_contratacoes': 0,
+                'usuarios_ativos_30_dias': 0,
+                'fiscais_maior_carga': []
+            }
+
+            # 1. Contratos com pendências ativas
+            if all(table in table_names for table in ['contrato', 'pendenciarelatorio', 'statuspendencia']):
+                query = """
+                    SELECT COUNT(DISTINCT c.id)
+                    FROM contrato c
+                    JOIN pendenciarelatorio p ON c.id = p.contrato_id
+                    JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
+                    WHERE c.ativo = true AND sp.nome = 'Pendente'
+                """
+                result = await self.conn.fetchval(query)
+                metrics['contratos_com_pendencias'] = result or 0
+
+            # 2. Contratos ativos
+            if 'contrato' in table_names:
+                query = "SELECT COUNT(*) FROM contrato WHERE ativo = true"
+                result = await self.conn.fetchval(query)
+                metrics['contratos_ativos'] = result or 0
+
+            # 3. Relatórios para análise
+            if all(table in table_names for table in ['relatoriofiscal', 'statusrelatorio']):
+                query = """
+                    SELECT COUNT(*)
+                    FROM relatoriofiscal r
+                    JOIN statusrelatorio sr ON r.status_id = sr.id
+                    WHERE sr.nome = 'Pendente de Análise'
+                """
+                result = await self.conn.fetchval(query)
+                metrics['relatorios_para_analise'] = result or 0
+
+            # 4. Total de contratações (todos os status)
+            if 'contrato' in table_names:
+                query = "SELECT COUNT(*) FROM contrato"
+                result = await self.conn.fetchval(query)
+                metrics['total_contratacoes'] = result or 0
+
+            # 5. Usuários ativos nos últimos 30 dias
+            if 'usuario' in table_names:
+                query = """
+                    SELECT COUNT(*)
+                    FROM usuario
+                    WHERE ultimo_login >= (CURRENT_DATE - INTERVAL '30 days')
+                    AND ativo = true
+                """
+                result = await self.conn.fetchval(query)
+                metrics['usuarios_ativos_30_dias'] = result or 0
+
+            # 6. Fiscais com maior carga de trabalho (top 5)
+            if all(table in table_names for table in ['usuario', 'contrato', 'pendenciarelatorio', 'statuspendencia']):
+                query = """
+                    SELECT
+                        u.id as fiscal_id,
+                        u.nome as fiscal_nome,
+                        u.email as fiscal_email,
+                        COUNT(p.id) as total_pendencias,
+                        COUNT(CASE WHEN p.data_prazo < CURRENT_DATE THEN 1 END) as pendencias_vencidas,
+                        COUNT(DISTINCT c.id) as contratos_ativos
+                    FROM usuario u
+                    LEFT JOIN contrato c ON u.id = c.fiscal_id AND c.ativo = true
+                    LEFT JOIN pendenciarelatorio p ON c.id = p.contrato_id
+                    LEFT JOIN statuspendencia sp ON p.status_pendencia_id = sp.id AND sp.nome = 'Pendente'
+                    WHERE u.ativo = true
+                    GROUP BY u.id, u.nome, u.email
+                    HAVING COUNT(p.id) > 0
+                    ORDER BY total_pendencias DESC, pendencias_vencidas DESC
+                    LIMIT 5
+                """
+                rows = await self.conn.fetch(query)
+                metrics['fiscais_maior_carga'] = [dict(row) for row in rows]
+
+            return metrics
+
+        except Exception as e:
+            print(f"Erro ao buscar dashboard admin completo: {e}. Retornando métricas zeradas.")
+            return {
+                'contratos_com_pendencias': 0,
+                'contratos_ativos': 0,
+                'relatorios_para_analise': 0,
+                'total_contratacoes': 0,
+                'usuarios_ativos_30_dias': 0,
+                'fiscais_maior_carga': []
+            }
+
+    async def get_dashboard_fiscal_completo(self, fiscal_id: int) -> Dict[str, Any]:
+        """
+        Busca métricas completas para o dashboard do fiscal
+        """
+        try:
+            # Verificar tabelas existentes
+            check_query = """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name IN ('contrato', 'pendenciarelatorio', 'relatoriofiscal', 'statusrelatorio', 'statuspendencia')
+            """
+            existing_tables = await self.conn.fetch(check_query)
+            table_names = [row['table_name'] for row in existing_tables]
+
+            metrics = {
+                'minhas_pendencias': 0,
+                'pendencias_em_atraso': 0,
+                'relatorios_enviados': 0,
+                'contratos_ativos': 0,
+                'pendencias_proximas_vencimento': 0,
+                'relatorios_rejeitados': 0
+            }
+
+            # 1. Minhas pendências (ativas)
+            if all(table in table_names for table in ['contrato', 'pendenciarelatorio', 'statuspendencia']):
+                query = """
+                    SELECT COUNT(*)
+                    FROM pendenciarelatorio p
+                    JOIN contrato c ON p.contrato_id = c.id
+                    JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
+                    WHERE c.fiscal_id = $1 AND c.ativo = true AND sp.nome = 'Pendente'
+                """
+                result = await self.conn.fetchval(query, fiscal_id)
+                metrics['minhas_pendencias'] = result or 0
+
+            # 2. Pendências em atraso
+            if all(table in table_names for table in ['contrato', 'pendenciarelatorio', 'statuspendencia']):
+                query = """
+                    SELECT COUNT(*)
+                    FROM pendenciarelatorio p
+                    JOIN contrato c ON p.contrato_id = c.id
+                    JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
+                    WHERE c.fiscal_id = $1 AND c.ativo = true
+                    AND sp.nome = 'Pendente' AND p.data_prazo < CURRENT_DATE
+                """
+                result = await self.conn.fetchval(query, fiscal_id)
+                metrics['pendencias_em_atraso'] = result or 0
+
+            # 3. Relatórios enviados (total histórico)
+            if all(table in table_names for table in ['contrato', 'relatoriofiscal']):
+                query = """
+                    SELECT COUNT(*)
+                    FROM relatoriofiscal r
+                    JOIN contrato c ON r.contrato_id = c.id
+                    WHERE c.fiscal_id = $1
+                """
+                result = await self.conn.fetchval(query, fiscal_id)
+                metrics['relatorios_enviados'] = result or 0
+
+            # 4. Contratos ativos onde sou fiscal
+            if 'contrato' in table_names:
+                query = """
+                    SELECT COUNT(*)
+                    FROM contrato
+                    WHERE fiscal_id = $1 AND ativo = true
+                """
+                result = await self.conn.fetchval(query, fiscal_id)
+                metrics['contratos_ativos'] = result or 0
+
+            # 5. Pendências próximas do vencimento (próximos 7 dias)
+            if all(table in table_names for table in ['contrato', 'pendenciarelatorio', 'statuspendencia']):
+                query = """
+                    SELECT COUNT(*)
+                    FROM pendenciarelatorio p
+                    JOIN contrato c ON p.contrato_id = c.id
+                    JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
+                    WHERE c.fiscal_id = $1 AND c.ativo = true
+                    AND sp.nome = 'Pendente'
+                    AND p.data_prazo BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days')
+                """
+                result = await self.conn.fetchval(query, fiscal_id)
+                metrics['pendencias_proximas_vencimento'] = result or 0
+
+            # 6. Relatórios rejeitados (precisam reenvio)
+            if all(table in table_names for table in ['contrato', 'relatoriofiscal', 'statusrelatorio']):
+                query = """
+                    SELECT COUNT(*)
+                    FROM relatoriofiscal r
+                    JOIN contrato c ON r.contrato_id = c.id
+                    JOIN statusrelatorio sr ON r.status_id = sr.id
+                    WHERE c.fiscal_id = $1 AND sr.nome = 'Rejeitado com Pendência'
+                """
+                result = await self.conn.fetchval(query, fiscal_id)
+                metrics['relatorios_rejeitados'] = result or 0
+
+            return metrics
+
+        except Exception as e:
+            print(f"Erro ao buscar dashboard fiscal completo: {e}. Retornando métricas zeradas.")
+            return {
+                'minhas_pendencias': 0,
+                'pendencias_em_atraso': 0,
+                'relatorios_enviados': 0,
+                'contratos_ativos': 0,
+                'pendencias_proximas_vencimento': 0,
+                'relatorios_rejeitados': 0
+            }
+
+    async def get_dashboard_gestor_completo(self, gestor_id: int) -> Dict[str, Any]:
+        """
+        Busca métricas completas para o dashboard do gestor
+        """
+        try:
+            # Verificar tabelas existentes
+            check_query = """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name IN ('contrato', 'pendenciarelatorio', 'relatoriofiscal', 'usuario', 'statusrelatorio', 'statuspendencia')
+            """
+            existing_tables = await self.conn.fetch(check_query)
+            table_names = [row['table_name'] for row in existing_tables]
+
+            metrics = {
+                'contratos_sob_gestao': 0,
+                'equipe_pendencias_atraso': 0,
+                'relatorios_equipe_aguardando': 0,
+                'performance_equipe': {
+                    'total_fiscais': 0,
+                    'fiscais_com_atraso': 0,
+                    'taxa_cumprimento_prazos': 0.0,
+                    'pendencias_vencidas_equipe': 0
+                },
+                'contratos_proximos_vencimento': []
+            }
+
+            # 1. Contratos sob gestão
+            if 'contrato' in table_names:
+                query = "SELECT COUNT(*) FROM contrato WHERE gestor_id = $1 AND ativo = true"
+                result = await self.conn.fetchval(query, gestor_id)
+                metrics['contratos_sob_gestao'] = result or 0
+
+            # 2. Equipe com pendências em atraso
+            if all(table in table_names for table in ['contrato', 'pendenciarelatorio', 'statuspendencia']):
+                query = """
+                    SELECT COUNT(DISTINCT c.fiscal_id)
+                    FROM contrato c
+                    JOIN pendenciarelatorio p ON c.id = p.contrato_id
+                    JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
+                    WHERE c.gestor_id = $1 AND c.ativo = true
+                    AND sp.nome = 'Pendente' AND p.data_prazo < CURRENT_DATE
+                """
+                result = await self.conn.fetchval(query, gestor_id)
+                metrics['equipe_pendencias_atraso'] = result or 0
+
+            # 3. Relatórios da equipe aguardando análise
+            if all(table in table_names for table in ['contrato', 'relatoriofiscal', 'statusrelatorio']):
+                query = """
+                    SELECT COUNT(*)
+                    FROM relatoriofiscal r
+                    JOIN contrato c ON r.contrato_id = c.id
+                    JOIN statusrelatorio sr ON r.status_id = sr.id
+                    WHERE c.gestor_id = $1 AND c.ativo = true
+                    AND sr.nome = 'Pendente de Análise'
+                """
+                result = await self.conn.fetchval(query, gestor_id)
+                metrics['relatorios_equipe_aguardando'] = result or 0
+
+            # 4. Performance da equipe
+            if all(table in table_names for table in ['contrato', 'pendenciarelatorio', 'statuspendencia', 'usuario']):
+                # Total de fiscais na equipe
+                query = """
+                    SELECT COUNT(DISTINCT c.fiscal_id)
+                    FROM contrato c
+                    WHERE c.gestor_id = $1 AND c.ativo = true
+                """
+                total_fiscais = await self.conn.fetchval(query, gestor_id) or 0
+                metrics['performance_equipe']['total_fiscais'] = total_fiscais
+
+                # Fiscais com pendências vencidas
+                query = """
+                    SELECT COUNT(DISTINCT c.fiscal_id)
+                    FROM contrato c
+                    JOIN pendenciarelatorio p ON c.id = p.contrato_id
+                    JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
+                    WHERE c.gestor_id = $1 AND c.ativo = true
+                    AND sp.nome = 'Pendente' AND p.data_prazo < CURRENT_DATE
+                """
+                fiscais_com_atraso = await self.conn.fetchval(query, gestor_id) or 0
+                metrics['performance_equipe']['fiscais_com_atraso'] = fiscais_com_atraso
+
+                # Total de pendências vencidas da equipe
+                query = """
+                    SELECT COUNT(*)
+                    FROM contrato c
+                    JOIN pendenciarelatorio p ON c.id = p.contrato_id
+                    JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
+                    WHERE c.gestor_id = $1 AND c.ativo = true
+                    AND sp.nome = 'Pendente' AND p.data_prazo < CURRENT_DATE
+                """
+                pendencias_vencidas = await self.conn.fetchval(query, gestor_id) or 0
+                metrics['performance_equipe']['pendencias_vencidas_equipe'] = pendencias_vencidas
+
+                # Taxa de cumprimento (fiscais sem atraso / total de fiscais)
+                if total_fiscais > 0:
+                    fiscais_em_dia = total_fiscais - fiscais_com_atraso
+                    taxa = (fiscais_em_dia / total_fiscais) * 100
+                    metrics['performance_equipe']['taxa_cumprimento_prazos'] = round(taxa, 2)
+
+            # 5. Contratos próximos ao vencimento (próximos 30 dias)
+            if all(table in table_names for table in ['contrato', 'usuario']):
+                query = """
+                    SELECT
+                        c.id as contrato_id,
+                        c.numero,
+                        c.objeto,
+                        c.data_fim,
+                        (c.data_fim - CURRENT_DATE)::int as dias_restantes,
+                        u.nome as fiscal_nome
+                    FROM contrato c
+                    JOIN usuario u ON c.fiscal_id = u.id
+                    WHERE c.gestor_id = $1 AND c.ativo = true
+                    AND c.data_fim BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '30 days')
+                    ORDER BY c.data_fim ASC
+                    LIMIT 10
+                """
+                rows = await self.conn.fetch(query, gestor_id)
+                metrics['contratos_proximos_vencimento'] = [dict(row) for row in rows]
+
+            return metrics
+
+        except Exception as e:
+            print(f"Erro ao buscar dashboard gestor completo: {e}. Retornando métricas zeradas.")
+            return {
+                'contratos_sob_gestao': 0,
+                'equipe_pendencias_atraso': 0,
+                'relatorios_equipe_aguardando': 0,
+                'performance_equipe': {
+                    'total_fiscais': 0,
+                    'fiscais_com_atraso': 0,
+                    'taxa_cumprimento_prazos': 0.0,
+                    'pendencias_vencidas_equipe': 0
+                },
+                'contratos_proximos_vencimento': []
+            }

@@ -128,3 +128,69 @@ class PendenciasVencidasAdminResponse(BaseModel):
     pendencias_criticas: int  # > 30 dias
     pendencias_altas: int     # 15-30 dias
     pendencias_medias: int    # 1-14 dias
+
+
+# ===== NOVOS SCHEMAS PARA DASHBOARDS MELHORADOS =====
+
+class FiscalCargaTrabalho(BaseModel):
+    """Fiscal com informações de carga de trabalho"""
+    fiscal_id: int
+    fiscal_nome: str
+    fiscal_email: str
+    total_pendencias: int
+    pendencias_vencidas: int
+    contratos_ativos: int
+
+
+class DashboardAdminCompleto(BaseModel):
+    """Dashboard completo do administrador com todas as métricas"""
+    # Métricas básicas
+    contratos_com_pendencias: int
+    contratos_ativos: int
+    relatorios_para_analise: int
+    total_contratacoes: int
+
+    # Métricas adicionais solicitadas
+    usuarios_ativos_30_dias: int
+    fiscais_maior_carga: List[FiscalCargaTrabalho]
+
+
+class DashboardFiscalCompleto(BaseModel):
+    """Dashboard completo do fiscal com todas as métricas"""
+    # Métricas básicas
+    minhas_pendencias: int
+    pendencias_em_atraso: int
+    relatorios_enviados: int
+    contratos_ativos: int
+
+    # Métricas adicionais solicitadas
+    pendencias_proximas_vencimento: int  # próximos 7 dias
+    relatorios_rejeitados: int  # precisam reenvio
+
+
+class EquipePerformance(BaseModel):
+    """Performance da equipe do gestor"""
+    total_fiscais: int
+    fiscais_com_atraso: int
+    taxa_cumprimento_prazos: float  # porcentagem
+    pendencias_vencidas_equipe: int
+
+
+class ContratoProximoVencimento(BaseModel):
+    """Contrato próximo ao vencimento"""
+    contrato_id: int
+    numero: str
+    objeto: str
+    data_fim: date
+    dias_restantes: int
+    fiscal_nome: str
+
+
+class DashboardGestorCompleto(BaseModel):
+    """Dashboard completo do gestor com todas as métricas"""
+    # Métricas solicitadas
+    contratos_sob_gestao: int
+    equipe_pendencias_atraso: int
+    relatorios_equipe_aguardando: int
+    performance_equipe: EquipePerformance
+    contratos_proximos_vencimento: List[ContratoProximoVencimento]

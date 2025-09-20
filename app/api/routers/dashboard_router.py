@@ -21,7 +21,10 @@ from app.schemas.dashboard_schema import (
     ContadoresDashboard,
     DashboardAdminResponse,
     DashboardFiscalResponse,
-    PendenciasVencidasAdminResponse
+    PendenciasVencidasAdminResponse,
+    DashboardAdminCompleto,
+    DashboardFiscalCompleto,
+    DashboardGestorCompleto
 )
 
 router = APIRouter(
@@ -321,3 +324,97 @@ async def get_resumo_atividades(
             "acao_necessaria": False,
             "mensagem": "Nenhum perfil ativo encontrado"
         }
+
+
+# ===== NOVOS ENDPOINTS MELHORADOS =====
+
+@router.get("/admin/melhorado", response_model=DashboardAdminCompleto, summary="Dashboard admin melhorado")
+async def get_dashboard_admin_melhorado(
+    service: DashboardService = Depends(get_dashboard_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Dashboard completo do administrador com métricas avançadas.
+
+    **Métricas incluídas:**
+    - Contratos com pendências ativas
+    - Contratos ativos (status ativo)
+    - Relatórios aguardando análise
+    - Total de contratações (todos os status)
+    - **Usuários ativos** nos últimos 30 dias
+    - **Top 5 fiscais** com maior carga de trabalho
+
+    **Ideal para:**
+    - Visão geral executiva do sistema
+    - Identificar gargalos operacionais
+    - Monitorar carga de trabalho da equipe
+    - Acompanhar atividade dos usuários
+    """
+    return await service.get_dashboard_admin_melhorado()
+
+
+@router.get("/fiscal/melhorado", response_model=DashboardFiscalCompleto, summary="Dashboard fiscal melhorado")
+async def get_dashboard_fiscal_melhorado(
+    service: DashboardService = Depends(get_dashboard_service),
+    current_user: Usuario = Depends(get_current_fiscal_user)
+):
+    """
+    Dashboard completo do fiscal com métricas de produtividade.
+
+    **Métricas incluídas:**
+    - Minhas pendências ativas
+    - Pendências em atraso
+    - Total de relatórios enviados
+    - Contratos ativos onde sou fiscal
+    - **Pendências próximas** do vencimento (7 dias)
+    - **Relatórios rejeitados** que precisam reenvio
+
+    **Ideal para:**
+    - Priorizar trabalho diário
+    - Identificar urgências
+    - Acompanhar performance pessoal
+    - Evitar atrasos
+    """
+    return await service.get_dashboard_fiscal_melhorado(current_user.id)
+
+
+@router.get("/gestor/melhorado", response_model=DashboardGestorCompleto, summary="Dashboard gestor melhorado")
+async def get_dashboard_gestor_melhorado(
+    service: DashboardService = Depends(get_dashboard_service),
+    current_user: Usuario = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_connection)
+):
+    """
+    Dashboard completo do gestor com métricas de equipe.
+
+    **Métricas incluídas:**
+    - Contratos sob minha gestão
+    - Equipe com pendências em atraso
+    - Relatórios da equipe aguardando análise
+    - **Performance da equipe** (taxa de cumprimento)
+    - **Contratos próximos** do vencimento (30 dias)
+
+    **Performance inclui:**
+    - Total de fiscais na equipe
+    - Fiscais com pendências vencidas
+    - Taxa de cumprimento de prazos (%)
+    - Total de pendências vencidas da equipe
+
+    **Ideal para:**
+    - Gestão de equipe
+    - Monitorar performance
+    - Planejamento estratégico
+    - Identificar necessidades de treinamento
+    """
+    # Verificar se o usuário é gestor ou admin
+    usuario_perfil_repo = UsuarioPerfilRepository(conn)
+    is_gestor = await usuario_perfil_repo.has_profile(current_user.id, "Gestor")
+    is_admin = await usuario_perfil_repo.has_profile(current_user.id, "Administrador")
+
+    if not (is_gestor or is_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Perfil de Gestor ou Administrador necessário."
+        )
+
+    return await service.get_dashboard_gestor_melhorado(current_user.id)
