@@ -1,22 +1,17 @@
 #!/bin/bash
-# Script para resetar banco de dados SIGESCON
-# Executa o script Python de reset e seed
-#
-# Uso:
-#   ./reset_database.sh           # Seed completo (com exemplos)
-#   ./reset_database.sh --clean   # Seed clean (apenas essenciais)
+# Script para resetar banco de dados SIGESCON - MODO CLEAN
+# Cria apenas dados essenciais (perfis, status, admin)
 
 set -e  # Sair se houver erro
 
-# Verifica se foi passado --clean
-CLEAN_MODE=""
-if [[ "$1" == "--clean" ]]; then
-    CLEAN_MODE="--clean"
-    echo "🚀 SIGESCON - Reset do Banco de Dados (MODO CLEAN)"
-else
-    echo "🚀 SIGESCON - Reset do Banco de Dados (MODO COMPLETO)"
-fi
-echo "===================================="
+echo "🚀 SIGESCON - Reset CLEAN do Banco de Dados"
+echo "==========================================="
+echo "Este script criará apenas dados essenciais:"
+echo "   • Perfis (Administrador, Gestor, Fiscal)"
+echo "   • Modalidades de contrato"
+echo "   • Status (contrato, relatório, pendência)"
+echo "   • Usuário administrador do .env"
+echo ""
 
 # Verifica se está no diretório correto
 if [ ! -f "app/main.py" ]; then
@@ -63,11 +58,13 @@ if [ -t 0 ]; then
     fi
 fi
 
-# Executa o script Python
-echo "🔄 Executando reset e seed..."
-python scripts/quick_reset.py $CLEAN_MODE
+# Executa o script Python em modo clean
+echo "🔄 Executando reset clean..."
+python scripts/quick_reset.py --clean
 
 echo ""
-echo "✅ Banco resetado com sucesso!"
+echo "✅ Banco resetado com sucesso (modo clean)!"
 echo "🔗 Acesse: http://localhost:8000/docs"
 echo "👤 Login: ${ADMIN_EMAIL:-admin@sigescon.gov.br} / ${ADMIN_PASSWORD:-admin123}"
+echo ""
+echo "💡 Para criar dados de exemplo, use: ./reset_database.sh"

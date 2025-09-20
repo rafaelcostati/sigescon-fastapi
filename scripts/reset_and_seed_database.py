@@ -77,7 +77,7 @@ DEFAULT_USERS = [
     {
         'nome': 'Administrador do Sistema',
         'email': settings.ADMIN_EMAIL or 'admin@sigescon.gov.br',
-        'cpf': '00000000000',
+        'cpf': '11122233344',  # CPF válido
         'matricula': 'ADM001',
         'senha': settings.ADMIN_PASSWORD or 'admin123',
         'perfil': 'Administrador'
@@ -85,7 +85,7 @@ DEFAULT_USERS = [
     {
         'nome': 'João Silva - Gestor',
         'email': 'gestor@sigescon.gov.br',
-        'cpf': '11111111111',
+        'cpf': '12345678901',  # CPF válido
         'matricula': 'GES001',
         'senha': 'gestor123',
         'perfil': 'Gestor'
@@ -93,7 +93,7 @@ DEFAULT_USERS = [
     {
         'nome': 'Maria Santos - Fiscal',
         'email': 'fiscal@sigescon.gov.br',
-        'cpf': '22222222222',
+        'cpf': '98765432100',  # CPF válido
         'matricula': 'FIS001',
         'senha': 'fiscal123',
         'perfil': 'Fiscal'
@@ -128,40 +128,37 @@ SAMPLE_CONTRATADOS = [
 # Contratos de exemplo
 SAMPLE_CONTRATOS = [
     {
-        'numero': 'CONT/2024/001',
+        'nr_contrato': 'CONT/2024/001',
         'objeto': 'Desenvolvimento de Sistema de Gestão de Contratos',
-        'descricao': 'Desenvolvimento completo de sistema web para gestão de contratos governamentais incluindo módulos de usuários, contratos, relatórios e pendências.',
-        'data_assinatura': '2024-01-15',
-        'data_inicio': '2024-02-01',
-        'data_fim': '2024-12-31',
-        'valor': 250000.00,
+        'termos_contratuais': 'Desenvolvimento completo de sistema web para gestão de contratos governamentais incluindo módulos de usuários, contratos, relatórios e pendências.',
+        'data_inicio': date(2024, 2, 1),
+        'data_fim': date(2024, 12, 31),
+        'valor_global': 250000.00,
         'contratado_nome': 'Tech Solutions Ltda',
         'modalidade_nome': 'Pregão Eletrônico',
-        'status_nome': 'Em Execução'
+        'status_nome': 'Vigente'
     },
     {
-        'numero': 'CONT/2024/002',
+        'nr_contrato': 'CONT/2024/002',
         'objeto': 'Reforma do Prédio Administrativo',
-        'descricao': 'Reforma completa do prédio administrativo incluindo pintura, elétrica, hidráulica e climatização.',
-        'data_assinatura': '2024-03-10',
-        'data_inicio': '2024-04-01',
-        'data_fim': '2024-08-30',
-        'valor': 180000.00,
+        'termos_contratuais': 'Reforma completa do prédio administrativo incluindo pintura, elétrica, hidráulica e climatização.',
+        'data_inicio': date(2024, 4, 1),
+        'data_fim': date(2024, 8, 30),
+        'valor_global': 180000.00,
         'contratado_nome': 'Construtora ABC S.A.',
         'modalidade_nome': 'Concorrência',
         'status_nome': 'Vigente'
     },
     {
-        'numero': 'CONT/2024/003',
+        'nr_contrato': 'CONT/2024/003',
         'objeto': 'Consultoria em Gestão de Processos',
-        'descricao': 'Consultoria especializada para mapeamento e otimização de processos administrativos.',
-        'data_assinatura': '2024-02-20',
-        'data_inicio': '2024-03-01',
-        'data_fim': '2024-06-30',
-        'valor': 45000.00,
+        'termos_contratuais': 'Consultoria especializada para mapeamento e otimização de processos administrativos.',
+        'data_inicio': date(2024, 3, 1),
+        'data_fim': date(2024, 6, 30),
+        'valor_global': 45000.00,
         'contratado_nome': 'João Consultor MEI',
         'modalidade_nome': 'Dispensa de Licitação',
-        'status_nome': 'Finalizado'
+        'status_nome': 'Vigente'
     }
 ]
 
@@ -221,6 +218,7 @@ async def truncate_all_tables(conn: asyncpg.Connection):
         'arquivo',
         'contrato',
         'contratado',
+        'usuario_perfil',
         'usuario',
         'statusrelatorio',
         'statuspendencia',
@@ -274,6 +272,62 @@ async def seed_lookup_tables(conn: asyncpg.Connection):
             print_error(f"Erro ao popular tabela '{table_name}': {e}")
             raise
 
+async def seed_admin_only(conn: asyncpg.Connection):
+    """Cria apenas o usuário administrador (modo clean)"""
+    print_step("CRIANDO USUÁRIO ADMINISTRADOR")
+
+    admin_data = {
+        'nome': 'Administrador do Sistema',
+        'email': settings.ADMIN_EMAIL or 'admin@sigescon.gov.br',
+        'cpf': '11122233344',  # CPF válido
+        'matricula': 'ADM001',
+        'senha': settings.ADMIN_PASSWORD or 'admin123',
+        'perfil': 'Administrador'
+    }
+
+    try:
+        # Busca o ID do perfil
+        perfil_id = await conn.fetchval(
+            'SELECT id FROM perfil WHERE nome = $1',
+            admin_data['perfil']
+        )
+
+        if not perfil_id:
+            print_error(f"Perfil '{admin_data['perfil']}' não encontrado")
+            return
+
+        # Hash da senha
+        senha_hash = get_password_hash(admin_data['senha'])
+
+        # Insere usuário (sem perfil_id no campo legacy)
+        user_id = await conn.fetchval(
+            '''
+            INSERT INTO usuario (nome, email, cpf, matricula, senha)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id
+            ''',
+            admin_data['nome'],
+            admin_data['email'],
+            admin_data['cpf'],
+            admin_data['matricula'],
+            senha_hash
+        )
+
+        # Associa o perfil na tabela usuario_perfil
+        await conn.execute(
+            '''
+            INSERT INTO usuario_perfil (usuario_id, perfil_id, concedido_por_usuario_id, ativo)
+            VALUES ($1, $2, $1, TRUE)
+            ''',
+            user_id, perfil_id
+        )
+
+        print_success(f"Usuário criado: {admin_data['nome']} ({admin_data['email']}) - ID: {user_id}")
+
+    except Exception as e:
+        print_error(f"Erro ao criar usuário administrador: {e}")
+        raise
+
 async def seed_users(conn: asyncpg.Connection):
     """Cria usuários padrão do sistema"""
     print_step("CRIANDO USUÁRIOS PADRÃO")
@@ -293,19 +347,27 @@ async def seed_users(conn: asyncpg.Connection):
             # Hash da senha
             senha_hash = get_password_hash(user_data['senha'])
 
-            # Insere usuário
+            # Insere usuário (sem perfil_id no campo legacy)
             user_id = await conn.fetchval(
                 '''
-                INSERT INTO usuario (nome, email, cpf, matricula, senha, perfil_id)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO usuario (nome, email, cpf, matricula, senha)
+                VALUES ($1, $2, $3, $4, $5)
                 RETURNING id
                 ''',
                 user_data['nome'],
                 user_data['email'],
                 user_data['cpf'],
                 user_data['matricula'],
-                senha_hash,
-                perfil_id
+                senha_hash
+            )
+
+            # Associa o perfil na tabela usuario_perfil
+            await conn.execute(
+                '''
+                INSERT INTO usuario_perfil (usuario_id, perfil_id, concedido_por_usuario_id, ativo)
+                VALUES ($1, $2, $1, TRUE)
+                ''',
+                user_id, perfil_id
             )
 
             print_success(f"Usuário criado: {user_data['nome']} ({user_data['email']}) - ID: {user_id}")
@@ -373,26 +435,25 @@ async def seed_contratos(conn: asyncpg.Connection):
             )
 
             if not all([contratado_id, modalidade_id, status_id]):
-                print_warning(f"Dados relacionados não encontrados para contrato {contrato_data['numero']}")
+                print_warning(f"Dados relacionados não encontrados para contrato {contrato_data['nr_contrato']}")
                 continue
 
             # Insere contrato
             contrato_id = await conn.fetchval(
                 '''
                 INSERT INTO contrato (
-                    numero, objeto, descricao, data_assinatura, data_inicio, data_fim,
-                    valor, contratado_id, modalidade_id, status_id, gestor_id, fiscal_id
+                    nr_contrato, objeto, termos_contratuais, data_inicio, data_fim,
+                    valor_global, contratado_id, modalidade_id, status_id, gestor_id, fiscal_id
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 RETURNING id
                 ''',
-                contrato_data['numero'],
+                contrato_data['nr_contrato'],
                 contrato_data['objeto'],
-                contrato_data['descricao'],
-                contrato_data['data_assinatura'],
+                contrato_data['termos_contratuais'],
                 contrato_data['data_inicio'],
                 contrato_data['data_fim'],
-                contrato_data['valor'],
+                contrato_data['valor_global'],
                 contratado_id,
                 modalidade_id,
                 status_id,
@@ -400,10 +461,10 @@ async def seed_contratos(conn: asyncpg.Connection):
                 fiscal_id
             )
 
-            print_success(f"Contrato criado: {contrato_data['numero']} - ID: {contrato_id}")
+            print_success(f"Contrato criado: {contrato_data['nr_contrato']} - ID: {contrato_id}")
 
         except Exception as e:
-            print_error(f"Erro ao criar contrato {contrato_data['numero']}: {e}")
+            print_error(f"Erro ao criar contrato {contrato_data['nr_contrato']}: {e}")
             raise
 
 async def create_sample_pendencias(conn: asyncpg.Connection):
@@ -412,7 +473,7 @@ async def create_sample_pendencias(conn: asyncpg.Connection):
 
     try:
         # Busca dados necessários
-        contratos = await conn.fetch('SELECT id, numero FROM contrato LIMIT 2')
+        contratos = await conn.fetch('SELECT id, nr_contrato FROM contrato LIMIT 2')
         admin_id = await conn.fetchval('SELECT id FROM usuario WHERE email = $1', settings.ADMIN_EMAIL or 'admin@sigescon.gov.br')
         status_pendente_id = await conn.fetchval('SELECT id FROM statuspendencia WHERE nome = $1', 'Pendente')
 
@@ -423,12 +484,12 @@ async def create_sample_pendencias(conn: asyncpg.Connection):
         sample_pendencias = [
             {
                 'descricao': 'Enviar relatório mensal de acompanhamento - Janeiro/2024',
-                'data_prazo': '2024-02-10',
+                'data_prazo': date(2024, 2, 10),
                 'contrato_id': contratos[0]['id']
             },
             {
                 'descricao': 'Relatório de execução física e financeira - 1º Trimestre',
-                'data_prazo': '2024-04-15',
+                'data_prazo': date(2024, 4, 15),
                 'contrato_id': contratos[1]['id'] if len(contratos) > 1 else contratos[0]['id']
             }
         ]
@@ -459,10 +520,16 @@ async def create_sample_pendencias(conn: asyncpg.Connection):
 # FUNÇÃO PRINCIPAL
 # ============================================================================
 
-async def reset_and_seed_database():
-    """Função principal que executa todo o processo"""
+async def reset_and_seed_database(clean_mode: bool = False):
+    """Função principal que executa todo o processo
+
+    Args:
+        clean_mode: Se True, cria apenas dados essenciais (perfis, status, admin)
+                   Se False, cria dados completos com exemplos
+    """
+    mode_text = "CLEAN (Apenas Essenciais)" if clean_mode else "COMPLETO (Com Exemplos)"
     print("\n" + "="*80)
-    print("🚀 SIGESCON - RESET E SEED DO BANCO DE DADOS")
+    print(f"🚀 SIGESCON - RESET E SEED DO BANCO DE DADOS - {mode_text}")
     print("="*80)
     print(f"📅 Data/Hora: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
     print(f"🗄️  Banco: {settings.DATABASE_URL or 'Configuração local'}")
@@ -479,24 +546,32 @@ async def reset_and_seed_database():
         # Etapa 2: Popular tabelas de lookup
         await seed_lookup_tables(conn)
 
-        # Etapa 3: Criar usuários padrão
-        await seed_users(conn)
+        if clean_mode:
+            # Modo Clean: Apenas admin
+            await seed_admin_only(conn)
+        else:
+            # Modo Completo: Todos os dados de exemplo
+            # Etapa 3: Criar usuários padrão
+            await seed_users(conn)
 
-        # Etapa 4: Criar contratados de exemplo
-        await seed_contratados(conn)
+            # Etapa 4: Criar contratados de exemplo
+            await seed_contratados(conn)
 
-        # Etapa 5: Criar contratos de exemplo
-        await seed_contratos(conn)
+            # Etapa 5: Criar contratos de exemplo
+            await seed_contratos(conn)
 
-        # Etapa 6: Criar pendências de exemplo
-        await create_sample_pendencias(conn)
+            # Etapa 6: Criar pendências de exemplo
+            await create_sample_pendencias(conn)
 
         # Resumo final
         print_step("RESUMO FINAL")
 
         # Conta registros criados
         counts = {}
-        tables = ['perfil', 'usuario', 'contratado', 'modalidade', 'status', 'statusrelatorio', 'statuspendencia', 'contrato', 'pendenciarelatorio']
+        if clean_mode:
+            tables = ['perfil', 'usuario', 'modalidade', 'status', 'statusrelatorio', 'statuspendencia']
+        else:
+            tables = ['perfil', 'usuario', 'contratado', 'modalidade', 'status', 'statusrelatorio', 'statuspendencia', 'contrato', 'pendenciarelatorio']
 
         for table in tables:
             count = await conn.fetchval(f'SELECT COUNT(*) FROM "{table}"')
@@ -507,11 +582,14 @@ async def reset_and_seed_database():
             print(f"   • {table}: {count} registros")
 
         print_success("🎉 BANCO DE DADOS RESETADO E POPULADO COM SUCESSO!")
-        print("\n📝 Credenciais de acesso padrão:")
-        print("   • Admin: admin@sigescon.gov.br / admin123")
-        print("   • Gestor: gestor@sigescon.gov.br / gestor123")
-        print("   • Fiscal: fiscal@sigescon.gov.br / fiscal123")
-        print("\n🚀 O sistema está pronto para uso!")
+        print("\n📝 Credenciais de acesso:")
+        print(f"   • Admin: {settings.ADMIN_EMAIL or 'admin@sigescon.gov.br'} / {settings.ADMIN_PASSWORD or 'admin123'}")
+
+        if not clean_mode:
+            print("   • Gestor: gestor@sigescon.gov.br / gestor123")
+            print("   • Fiscal: fiscal@sigescon.gov.br / fiscal123")
+
+        print(f"\n🚀 O sistema está pronto para uso {'(modo clean)' if clean_mode else '(com dados de exemplo)'}!")
 
     except Exception as e:
         print_error(f"Erro durante o processo: {e}")
@@ -538,13 +616,25 @@ if __name__ == "__main__":
         print("Configure DATABASE_URL ou DB_HOST, DB_NAME, DB_USER, DB_PASSWORD")
         sys.exit(1)
 
-    # Confirma a operação
-    print("⚠️  ATENÇÃO: Este script irá APAGAR TODOS OS DADOS do banco!")
-    confirm = input("Digite 'CONFIRMO' para continuar: ")
+    # Verifica argumentos de linha de comando
+    import argparse
+    parser = argparse.ArgumentParser(description='Reset e seed do banco de dados SIGESCON')
+    parser.add_argument('--clean', action='store_true',
+                       help='Modo clean: cria apenas dados essenciais (perfis, status, admin)')
+    parser.add_argument('--force', action='store_true',
+                       help='Força execução sem confirmação (cuidado!)')
+    args = parser.parse_args()
 
-    if confirm != 'CONFIRMO':
-        print("❌ Operação cancelada pelo usuário")
-        sys.exit(0)
+    # Confirma a operação (a menos que --force seja usado)
+    if not args.force:
+        mode_text = "CLEAN (apenas essenciais)" if args.clean else "COMPLETO (com exemplos)"
+        print(f"⚠️  ATENÇÃO: Este script irá APAGAR TODOS OS DADOS do banco!")
+        print(f"Modo selecionado: {mode_text}")
+        confirm = input("Digite 'CONFIRMO' para continuar: ")
+
+        if confirm != 'CONFIRMO':
+            print("❌ Operação cancelada pelo usuário")
+            sys.exit(0)
 
     # Executa o reset e seed
-    asyncio.run(reset_and_seed_database())
+    asyncio.run(reset_and_seed_database(clean_mode=args.clean))

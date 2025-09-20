@@ -78,8 +78,8 @@ async def admin_credentials():
     password = os.getenv("ADMIN_PASSWORD")
     if not email or not password:
         # Fallback para valores padrão se env não estiver carregado
-        email = "admin@sigescon.pge.pa.gov.br"
-        password = "xpto1661WIN"
+        email = os.getenv("ADMIN_EMAIL")
+        password = os.getenv("ADMIN_PASSWORD")
     return {"username": email, "password": password}
 
 @pytest_asyncio.fixture(scope="function")
