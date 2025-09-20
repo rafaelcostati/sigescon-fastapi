@@ -240,10 +240,10 @@ class DashboardService:
         for pendencia in pendencias_data:
             pendencia_obj = PendenciaVencidaAdmin(
                 pendencia_id=pendencia['pendencia_id'],
-                titulo=pendencia['titulo'],
+                titulo=pendencia['descricao'],  # Usando descricao como titulo
                 descricao=pendencia['descricao'],
-                data_criacao=pendencia['data_criacao'],
-                prazo_entrega=pendencia['prazo_entrega'],
+                data_criacao=pendencia['created_at'],
+                prazo_entrega=pendencia['data_prazo'],  # Corrigido o nome da coluna
                 dias_em_atraso=pendencia['dias_em_atraso'],
                 contrato_id=pendencia['contrato_id'],
                 contrato_numero=pendencia['contrato_numero'],
@@ -262,3 +262,86 @@ class DashboardService:
             pendencias_altas=stats['pendencias_altas'],
             pendencias_medias=stats['pendencias_medias']
         )
+
+    async def get_pendencias_gestor(self, gestor_id: int) -> Dict[str, Any]:
+        """
+        Busca todas as pendências dos contratos gerenciados pelo gestor
+        """
+        pendencias_data = await self.dashboard_repo.get_pendencias_gestor(gestor_id)
+
+        # Organiza as pendências por status
+        pendencias_por_status = {
+            'vencidas': [],
+            'pendentes': [],
+            'concluidas': [],
+            'canceladas': []
+        }
+
+        for pendencia in pendencias_data:
+            status_classificacao = pendencia['status_classificacao']
+
+            pendencia_formatada = {
+                'pendencia_id': pendencia['pendencia_id'],
+                'descricao': pendencia['descricao'],
+                'created_at': pendencia['created_at'],
+                'data_prazo': pendencia['data_prazo'],
+                'status_pendencia': pendencia['status_pendencia'],
+                'contrato_id': pendencia['contrato_id'],
+                'contrato_numero': pendencia['contrato_numero'],
+                'contrato_objeto': pendencia['contrato_objeto'],
+                'fiscal_nome': pendencia['fiscal_nome'],
+                'fiscal_email': pendencia['fiscal_email'],
+                'dias_diferenca': pendencia['dias_diferenca']
+            }
+
+            if status_classificacao == 'vencida':
+                pendencias_por_status['vencidas'].append(pendencia_formatada)
+            elif status_classificacao == 'pendente':
+                pendencias_por_status['pendentes'].append(pendencia_formatada)
+            elif status_classificacao == 'concluida':
+                pendencias_por_status['concluidas'].append(pendencia_formatada)
+            elif status_classificacao == 'cancelada':
+                pendencias_por_status['canceladas'].append(pendencia_formatada)
+
+        # Calcula estatísticas
+        total_pendencias = len(pendencias_data)
+        estatisticas = {
+            'total': total_pendencias,
+            'vencidas': len(pendencias_por_status['vencidas']),
+            'pendentes': len(pendencias_por_status['pendentes']),
+            'concluidas': len(pendencias_por_status['concluidas']),
+            'canceladas': len(pendencias_por_status['canceladas'])
+        }
+
+        return {
+            'pendencias': pendencias_por_status,
+            'estatisticas': estatisticas,
+            'gestor_id': gestor_id
+        }
+
+    async def get_dashboard_gestor_completo(self, gestor_id: int) -> Dict[str, Any]:
+        """
+        Busca dados completos para dashboard do gestor
+        """
+        # Busca contadores específicos do gestor
+        gestor_contadores = await self.dashboard_repo.get_contadores_gestor(gestor_id)
+        contadores = ContadoresDashboard(
+            relatorios_para_analise=0,
+            contratos_com_pendencias=0,
+            usuarios_ativos=0,
+            contratos_ativos=0,
+            minhas_pendencias=0,
+            pendencias_em_atraso=0,
+            relatorios_enviados_mes=0,
+            contratos_sob_gestao=gestor_contadores['contratos_sob_gestao'],
+            relatorios_equipe_pendentes=gestor_contadores['relatorios_equipe_pendentes']
+        )
+
+        # Busca pendências dos contratos sob gestão
+        pendencias_gestao = await self.get_pendencias_gestor(gestor_id)
+
+        return {
+            'contadores': contadores,
+            'pendencias_gestao': pendencias_gestao,
+            'gestor_id': gestor_id
+        }

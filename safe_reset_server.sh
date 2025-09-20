@@ -1,10 +1,10 @@
 #!/bin/bash
-# Script universal para reset com dados básicos (funciona local e servidor)
+# Script para reset seguro do servidor (sem privilégios de superusuário)
 
 set -e
 
-echo "🔧 SIGESCON - RESET UNIVERSAL (DADOS BÁSICOS)"
-echo "============================================="
+echo "🔧 SIGESCON - RESET SEGURO DO SERVIDOR"
+echo "===================================="
 
 # Verifica se está no diretório correto
 if [ ! -f "app/main.py" ]; then
@@ -36,13 +36,12 @@ export $(grep -v '^#' .env | xargs)
 echo "📋 Configurações:"
 echo "   • Banco: ${DATABASE_URL}"
 echo "   • Admin: ${ADMIN_EMAIL:-admin@sigescon.pge.pa.gov.br}"
-echo "   • Modo: DADOS BÁSICOS (perfis, status, modalidades, admin)"
 echo ""
 
 # Pergunta confirmação
 if [ -t 0 ]; then
     echo "⚠️  ATENÇÃO: Todos os dados serão APAGADOS!"
-    echo "Este modo insere apenas dados essenciais (perfis, status, modalidades, usuário admin)"
+    echo "Este script usa método seguro (sem privilégios de superusuário)"
     read -p "Continuar? (s/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Ss]$ ]]; then
@@ -51,11 +50,11 @@ if [ -t 0 ]; then
     fi
 fi
 
-# Executa reset universal básico
-echo "🔄 Executando reset universal..."
-python scripts/universal_reset.py
+# Executa reset seguro
+echo "🔄 Executando reset seguro..."
+python scripts/safe_reset_server.py
 
 echo ""
-echo "✅ Reset básico concluído!"
-echo "🔗 Acesse: http://localhost:8000/docs"
+echo "✅ Reset concluído!"
+echo "🔗 Acesse: http://10.96.0.67:8000/docs"
 echo "👤 Login: ${ADMIN_EMAIL:-admin@sigescon.pge.pa.gov.br} / ${ADMIN_PASSWORD:-admin123}"

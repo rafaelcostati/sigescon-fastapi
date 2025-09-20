@@ -7,6 +7,7 @@ import asyncpg
 from app.core.database import get_connection
 from app.repositories.usuario_repo import UsuarioRepository
 from app.repositories.perfil_repo import PerfilRepository
+from app.repositories.usuario_perfil_repo import UsuarioPerfilRepository
 from app.core.security import verify_password
 from app.core.config import settings
 
@@ -27,10 +28,10 @@ async def get_admin_for_docs(
     )
     
     user_repo = UsuarioRepository(conn)
-    
+
     correct_username = settings.ADMIN_EMAIL
     user = await user_repo.get_user_by_email(credentials.username)
-    
+
     # Validações seguras
     if not (
         user
@@ -38,11 +39,12 @@ async def get_admin_for_docs(
         and verify_password(credentials.password, user['senha'])
     ):
         raise credentials_exception
-        
-    perfil_repo = PerfilRepository(conn)
-    perfil = await perfil_repo.get_perfil_by_id(user['perfil_id'])
-    
-    if not perfil or perfil.get("nome") != "Administrador":
+
+    # Verificar se o usuário tem perfil de administrador
+    usuario_perfil_repo = UsuarioPerfilRepository(conn)
+    is_admin = await usuario_perfil_repo.has_profile(user['id'], "Administrador")
+
+    if not is_admin:
         raise credentials_exception
     
     return True

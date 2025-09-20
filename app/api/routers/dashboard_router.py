@@ -124,6 +124,76 @@ async def get_pendencias_vencidas_admin(
     return await service.get_pendencias_vencidas_admin(limit)
 
 
+# --- Endpoints Para Gestor ---
+
+@router.get("/gestor/pendencias", summary="Pendências dos contratos sob gestão")
+async def get_pendencias_gestor(
+    service: DashboardService = Depends(get_dashboard_service),
+    current_user: Usuario = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_connection)
+):
+    """
+    Lista todas as pendências dos contratos gerenciados pelo gestor logado.
+
+    Retorna pendências organizadas por status:
+    - **Vencidas**: Pendências em atraso que precisam de ação urgente
+    - **Pendentes**: Pendências ativas aguardando envio de relatório
+    - **Concluídas**: Pendências já finalizadas (relatório aprovado)
+    - **Canceladas**: Pendências canceladas pelo administrador
+
+    Inclui informações detalhadas:
+    - Dados do contrato (número, objeto)
+    - Fiscal responsável
+    - Prazos e status
+    - Dias em atraso ou restantes
+
+    Disponível para usuários com perfil de Gestor ou Administrador.
+    """
+    # Verificar se o usuário é gestor ou admin
+    usuario_perfil_repo = UsuarioPerfilRepository(conn)
+    is_gestor = await usuario_perfil_repo.has_profile(current_user.id, "Gestor")
+    is_admin = await usuario_perfil_repo.has_profile(current_user.id, "Administrador")
+
+    if not (is_gestor or is_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Perfil de Gestor ou Administrador necessário."
+        )
+
+    return await service.get_pendencias_gestor(current_user.id)
+
+
+@router.get("/gestor/completo", summary="Dashboard completo do gestor")
+async def get_dashboard_gestor_completo(
+    service: DashboardService = Depends(get_dashboard_service),
+    current_user: Usuario = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_connection)
+):
+    """
+    Retorna dados completos para o dashboard do gestor.
+
+    Inclui:
+    - Contadores específicos do gestor (contratos sob gestão, relatórios pendentes)
+    - Lista completa de pendências dos contratos sob gestão
+    - Estatísticas de status das pendências
+
+    Endpoint otimizado para carregar todo o dashboard do gestor de uma vez.
+    Disponível para usuários com perfil de Gestor ou Administrador.
+    """
+    # Verificar se o usuário é gestor ou admin
+    usuario_perfil_repo = UsuarioPerfilRepository(conn)
+    is_gestor = await usuario_perfil_repo.has_profile(current_user.id, "Gestor")
+    is_admin = await usuario_perfil_repo.has_profile(current_user.id, "Administrador")
+
+    if not (is_gestor or is_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Perfil de Gestor ou Administrador necessário."
+        )
+
+    return await service.get_dashboard_gestor_completo(current_user.id)
+
+
 # --- Endpoints Para Fiscal ---
 
 @router.get("/fiscal/minhas-pendencias", response_model=MinhasPendenciasResponse)
