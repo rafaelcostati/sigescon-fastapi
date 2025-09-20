@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Script para executar testes e validar a migração
+# Script para executar testes e validar o sistema SIGESCON
 # run_tests.sh
 
 echo "========================================="
-echo "   SIGESCON - Validação de Migração"
+echo "   SIGESCON - Validação do Sistema"
 echo "========================================="
 echo ""
 
@@ -73,6 +73,7 @@ declare -a test_modules=(
     "tests/test_security_authorization.py"
     "tests/test_notification_system.py"
     "tests/test_data_integrity.py"
+    "tests/test_dashboard.py"
 )
 
 # Contadores
@@ -195,18 +196,12 @@ fi
 
 if [ $failed_tests -eq 0 ]; then
     echo -e "${GREEN}🎉 Todos os testes passaram!${NC}"
-    echo "A migração está progredindo corretamente."
+    echo "Sistema SIGESCON operando corretamente."
 else
     echo -e "${RED}⚠️  Alguns testes falharam.${NC}"
     echo "Verifique os detalhes dos erros acima para debug."
 fi
 
-echo ""
-echo "📝 Próximos passos:"
-echo "  1. Implementar sistema de permissões robusto"
-echo "  2. Migrar tabelas auxiliares (Perfis, Modalidades, Status)"
-echo "  3. Implementar módulo de Contratos com upload de arquivos"
-echo "  4. Adicionar sistema de notificações por email"
 echo ""
 
 # Limpar se iniciamos o servidor
