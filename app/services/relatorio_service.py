@@ -124,9 +124,9 @@ class RelatorioService:
 
     async def _update_pendencia_para_analise(self, pendencia_id: int):
         """Atualiza status da pendência para indicar que tem relatório aguardando análise"""
-        # Neste caso, mantemos como 'Pendente' pois o administrador ainda precisa analisar
-        # O status 'pendente de análise' é específico do relatório, não da pendência
-        pass
+        # Atualiza para o novo status 'Aguardando Análise' (ID=4)
+        await self.pendencia_repo.update_pendencia_status(pendencia_id, 4)
+        print(f"✅ Pendência {pendencia_id} alterada para 'Aguardando Análise'")
 
     async def _notify_admin_new_report(self, contrato: dict, pendencia: dict, fiscal: Usuario):
         """Notifica administrador sobre novo relatório submetido"""
