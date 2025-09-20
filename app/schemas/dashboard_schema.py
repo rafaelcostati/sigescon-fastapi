@@ -96,3 +96,35 @@ class DashboardFiscalResponse(BaseModel):
     """Response completa para dashboard do fiscal"""
     contadores: ContadoresDashboard
     minhas_pendencias: List[MinhasPendencias]
+
+
+class PendenciaVencidaAdmin(BaseModel):
+    """Pendência vencida com informações completas para administrador"""
+    pendencia_id: int
+    titulo: str
+    descricao: str
+    data_criacao: datetime
+    prazo_entrega: date
+    dias_em_atraso: int
+
+    # Informações do contrato
+    contrato_id: int
+    contrato_numero: str
+    contrato_objeto: str
+
+    # Responsáveis
+    fiscal_nome: str
+    gestor_nome: str
+
+    # Classificação de urgência
+    urgencia: str  # "CRÍTICA", "ALTA", "MÉDIA"
+
+
+class PendenciasVencidasAdminResponse(BaseModel):
+    """Response para pendências vencidas do administrador"""
+    pendencias_vencidas: List[PendenciaVencidaAdmin]
+    total_pendencias_vencidas: int
+    contratos_afetados: int
+    pendencias_criticas: int  # > 30 dias
+    pendencias_altas: int     # 15-30 dias
+    pendencias_medias: int    # 1-14 dias

@@ -19,7 +19,8 @@ from app.schemas.dashboard_schema import (
     MinhasPendenciasResponse,
     ContadoresDashboard,
     DashboardAdminResponse,
-    DashboardFiscalResponse
+    DashboardFiscalResponse,
+    PendenciasVencidasAdminResponse
 )
 
 router = APIRouter(
@@ -87,6 +88,39 @@ async def get_dashboard_admin_completo(
     Endpoint otimizado para carregar todo o dashboard administrativo de uma vez.
     """
     return await service.get_dashboard_admin_completo()
+
+
+@router.get("/admin/pendencias-vencidas", response_model=PendenciasVencidasAdminResponse)
+async def get_pendencias_vencidas_admin(
+    limit: int = Query(50, ge=1, le=200, description="Limite de pendências retornadas"),
+    service: DashboardService = Depends(get_dashboard_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Lista todas as pendências vencidas do sistema com informações detalhadas.
+
+    - **limit**: Número máximo de pendências a retornar (padrão: 50, máximo: 200)
+
+    Retorna pendências ordenadas por urgência:
+    - **CRÍTICAS** (>30 dias): Aparecem primeiro
+    - **ALTAS** (15-30 dias): Segundo lugar
+    - **MÉDIAS** (1-14 dias): Por último
+
+    Dentro de cada nível, ordena pelos mais atrasados primeiro.
+
+    **Informações incluídas:**
+    - Detalhes da pendência (título, descrição, prazo)
+    - Dias em atraso e classificação de urgência
+    - Dados do contrato (número, objeto)
+    - Responsáveis (fiscal e gestor)
+    - Estatísticas de urgência
+
+    **Ideal para:**
+    - Identificar pendências críticas que precisam ação imediata
+    - Cobrar fiscais com pendências em atraso
+    - Relatórios de acompanhamento para gestão
+    """
+    return await service.get_pendencias_vencidas_admin(limit)
 
 
 # --- Endpoints Para Fiscal ---

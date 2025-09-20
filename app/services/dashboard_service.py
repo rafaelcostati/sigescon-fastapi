@@ -11,7 +11,9 @@ from app.schemas.dashboard_schema import (
     ContratoPendenciaResumo,
     MinhasPendencias,
     DashboardAdminResponse,
-    DashboardFiscalResponse
+    DashboardFiscalResponse,
+    PendenciasVencidasAdminResponse,
+    PendenciaVencidaAdmin
 )
 from app.schemas.usuario_schema import Usuario
 
@@ -221,4 +223,42 @@ class DashboardService:
         return DashboardFiscalResponse(
             contadores=contadores,
             minhas_pendencias=minhas_pendencias.pendencias
+        )
+
+    async def get_pendencias_vencidas_admin(self, limit: int = 50) -> PendenciasVencidasAdminResponse:
+        """
+        Busca pendências vencidas detalhadamente para o administrador
+        """
+        # Busca pendências vencidas
+        pendencias_data = await self.dashboard_repo.get_pendencias_vencidas_admin(limit)
+
+        # Busca estatísticas
+        stats = await self.dashboard_repo.get_estatisticas_pendencias_vencidas()
+
+        # Processa as pendências
+        pendencias = []
+        for pendencia in pendencias_data:
+            pendencia_obj = PendenciaVencidaAdmin(
+                pendencia_id=pendencia['pendencia_id'],
+                titulo=pendencia['titulo'],
+                descricao=pendencia['descricao'],
+                data_criacao=pendencia['data_criacao'],
+                prazo_entrega=pendencia['prazo_entrega'],
+                dias_em_atraso=pendencia['dias_em_atraso'],
+                contrato_id=pendencia['contrato_id'],
+                contrato_numero=pendencia['contrato_numero'],
+                contrato_objeto=pendencia['contrato_objeto'],
+                fiscal_nome=pendencia['fiscal_nome'],
+                gestor_nome=pendencia['gestor_nome'],
+                urgencia=pendencia['urgencia']
+            )
+            pendencias.append(pendencia_obj)
+
+        return PendenciasVencidasAdminResponse(
+            pendencias_vencidas=pendencias,
+            total_pendencias_vencidas=stats['total_pendencias_vencidas'],
+            contratos_afetados=stats['contratos_afetados'],
+            pendencias_criticas=stats['pendencias_criticas'],
+            pendencias_altas=stats['pendencias_altas'],
+            pendencias_medias=stats['pendencias_medias']
         )

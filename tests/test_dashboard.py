@@ -102,6 +102,55 @@ class TestDashboardAdmin:
         print(f"--> Contadores: {contadores['relatorios_para_analise']} relatórios, {contadores['contratos_ativos']} contratos")
 
     @pytest.mark.asyncio
+    async def test_admin_pendencias_vencidas(self, async_client: AsyncClient, admin_headers: Dict[str, str]):
+        """Testa endpoint de pendências vencidas detalhado."""
+        print("\n--- Testando Pendências Vencidas Detalhadas ---")
+
+        response = await async_client.get(
+            "/api/v1/dashboard/admin/pendencias-vencidas",
+            headers=admin_headers
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verifica estrutura da resposta
+        assert "pendencias_vencidas" in data
+        assert "total_pendencias_vencidas" in data
+        assert "contratos_afetados" in data
+        assert "pendencias_criticas" in data
+        assert "pendencias_altas" in data
+        assert "pendencias_medias" in data
+
+        # Verifica tipos
+        assert isinstance(data["pendencias_vencidas"], list)
+        assert isinstance(data["total_pendencias_vencidas"], int)
+        assert isinstance(data["contratos_afetados"], int)
+
+        print(f"--> {data['total_pendencias_vencidas']} pendências vencidas encontradas")
+        print(f"--> {data['contratos_afetados']} contratos afetados")
+        print(f"--> Críticas: {data['pendencias_criticas']}, Altas: {data['pendencias_altas']}, Médias: {data['pendencias_medias']}")
+
+        # Se há pendências, verifica estrutura de uma
+        if data["pendencias_vencidas"]:
+            pendencia = data["pendencias_vencidas"][0]
+            campos_obrigatorios = [
+                "pendencia_id", "titulo", "descricao", "data_criacao", "prazo_entrega",
+                "dias_em_atraso", "contrato_id", "contrato_numero", "contrato_objeto",
+                "fiscal_nome", "gestor_nome", "urgencia"
+            ]
+
+            for campo in campos_obrigatorios:
+                assert campo in pendencia
+                assert pendencia[campo] is not None
+
+            # Verifica se urgência é uma das opções válidas
+            assert pendencia["urgencia"] in ["CRÍTICA", "ALTA", "MÉDIA"]
+
+            # Verifica se dias_em_atraso é positivo (está realmente vencida)
+            assert pendencia["dias_em_atraso"] > 0
+
+    @pytest.mark.asyncio
     async def test_admin_contratos_pendentes_com_limite(self, async_client: AsyncClient, admin_headers: Dict[str, str]):
         """Testa endpoint com parâmetro de limite."""
         print("\n--- Testando Limite de Resultados ---")
@@ -223,7 +272,8 @@ class TestDashboardGeral:
         endpoints = [
             "/api/v1/dashboard/contadores",
             "/api/v1/dashboard/resumo-atividades",
-            "/api/v1/dashboard/admin/contratos-com-pendencias"
+            "/api/v1/dashboard/admin/contratos-com-pendencias",
+            "/api/v1/dashboard/admin/pendencias-vencidas"
         ]
 
         for endpoint in endpoints:

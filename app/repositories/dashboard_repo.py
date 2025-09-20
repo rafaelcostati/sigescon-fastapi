@@ -202,6 +202,88 @@ class DashboardRepository:
 
         return contadores
 
+    async def get_pendencias_vencidas_admin(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Busca todas as pendências vencidas do sistema para o administrador
+        com informações detalhadas e classificação de urgência
+        """
+        query = """
+        SELECT
+            p.id as pendencia_id,
+            p.titulo,
+            p.descricao,
+            p.data_criacao,
+            p.prazo_entrega,
+            EXTRACT(DAY FROM CURRENT_DATE - p.prazo_entrega)::int as dias_em_atraso,
+
+            -- Informações do contrato
+            c.id as contrato_id,
+            c.nr_contrato as contrato_numero,
+            c.objeto as contrato_objeto,
+
+            -- Responsáveis
+            u_fiscal.nome as fiscal_nome,
+            u_gestor.nome as gestor_nome,
+
+            -- Classificação de urgência baseada nos dias em atraso
+            CASE
+                WHEN EXTRACT(DAY FROM CURRENT_DATE - p.prazo_entrega) > 30 THEN 'CRÍTICA'
+                WHEN EXTRACT(DAY FROM CURRENT_DATE - p.prazo_entrega) BETWEEN 15 AND 30 THEN 'ALTA'
+                ELSE 'MÉDIA'
+            END as urgencia
+
+        FROM pendencias p
+        JOIN contratos c ON p.contrato_id = c.id
+        JOIN usuarios u_fiscal ON c.fiscal_id = u_fiscal.id
+        JOIN usuarios u_gestor ON c.gestor_id = u_gestor.id
+        JOIN status_pendencia sp ON p.status_pendencia_id = sp.id
+        WHERE
+            c.data_exclusao IS NULL
+            AND sp.nome = 'Pendente'
+            AND p.prazo_entrega IS NOT NULL
+            AND p.prazo_entrega < CURRENT_DATE
+        ORDER BY
+            -- Ordena por urgência (críticas primeiro) e depois por dias em atraso (maior primeiro)
+            CASE
+                WHEN EXTRACT(DAY FROM CURRENT_DATE - p.prazo_entrega) > 30 THEN 1
+                WHEN EXTRACT(DAY FROM CURRENT_DATE - p.prazo_entrega) BETWEEN 15 AND 30 THEN 2
+                ELSE 3
+            END,
+            EXTRACT(DAY FROM CURRENT_DATE - p.prazo_entrega) DESC
+        LIMIT $1
+        """
+        rows = await self.conn.fetch(query, limit)
+        return [dict(row) for row in rows]
+
+    async def get_estatisticas_pendencias_vencidas(self) -> Dict[str, int]:
+        """
+        Busca estatísticas das pendências vencidas para o dashboard do administrador
+        """
+        query = """
+        SELECT
+            COUNT(*) as total_pendencias_vencidas,
+            COUNT(DISTINCT c.id) as contratos_afetados,
+            SUM(CASE WHEN EXTRACT(DAY FROM CURRENT_DATE - p.prazo_entrega) > 30 THEN 1 ELSE 0 END) as pendencias_criticas,
+            SUM(CASE WHEN EXTRACT(DAY FROM CURRENT_DATE - p.prazo_entrega) BETWEEN 15 AND 30 THEN 1 ELSE 0 END) as pendencias_altas,
+            SUM(CASE WHEN EXTRACT(DAY FROM CURRENT_DATE - p.prazo_entrega) BETWEEN 1 AND 14 THEN 1 ELSE 0 END) as pendencias_medias
+        FROM pendencias p
+        JOIN contratos c ON p.contrato_id = c.id
+        JOIN status_pendencia sp ON p.status_pendencia_id = sp.id
+        WHERE
+            c.data_exclusao IS NULL
+            AND sp.nome = 'Pendente'
+            AND p.prazo_entrega IS NOT NULL
+            AND p.prazo_entrega < CURRENT_DATE
+        """
+        result = await self.conn.fetchrow(query)
+        return dict(result) if result else {
+            'total_pendencias_vencidas': 0,
+            'contratos_afetados': 0,
+            'pendencias_criticas': 0,
+            'pendencias_altas': 0,
+            'pendencias_medias': 0
+        }
+
     async def get_contadores_gestor(self, gestor_id: int) -> Dict[str, int]:
         """
         Busca contadores para o dashboard do gestor
