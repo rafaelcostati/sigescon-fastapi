@@ -198,39 +198,39 @@ class TestDashboardFiscal:
     """Testes para endpoints de dashboard do fiscal."""
 
     @pytest.mark.asyncio
-    async def test_fiscal_minhas_pendencias_sem_perfil(self, async_client: AsyncClient, admin_headers: Dict[str, str]):
-        """Testa que admin sem perfil fiscal não pode acessar pendências de fiscal."""
-        print("\n--- Testando Acesso Negado para Pendências de Fiscal ---")
+    async def test_fiscal_minhas_pendencias_com_admin(self, async_client: AsyncClient, admin_headers: Dict[str, str]):
+        """Testa que admin pode acessar pendências de fiscal (comportamento correto)."""
+        print("\n--- Testando Acesso Admin para Pendências de Fiscal ---")
 
         response = await async_client.get(
             "/api/v1/dashboard/fiscal/minhas-pendencias",
             headers=admin_headers
         )
 
-        # Admin puro não tem perfil de fiscal, deve dar 403
-        assert response.status_code == 403
+        # Admin tem acesso a rotas de fiscal
+        assert response.status_code == 200
         data = response.json()
-        # Verifica se tem campo detail ou message
-        error_message = data.get("detail", data.get("message", "")).lower()
-        assert "fiscal" in error_message
-        print("--> Acesso negado corretamente para admin sem perfil fiscal")
+        assert "pendencias" in data
+        assert "total_pendencias" in data
+        assert "pendencias_em_atraso" in data
+        assert "pendencias_proximas_vencimento" in data
+        print("--> Admin pode acessar pendências de fiscal corretamente")
 
     @pytest.mark.asyncio
-    async def test_fiscal_dashboard_completo_sem_perfil(self, async_client: AsyncClient, admin_headers: Dict[str, str]):
-        """Testa que admin sem perfil fiscal não pode acessar dashboard fiscal."""
-        print("\n--- Testando Dashboard Fiscal sem Perfil ---")
+    async def test_fiscal_dashboard_completo_com_admin(self, async_client: AsyncClient, admin_headers: Dict[str, str]):
+        """Testa que admin pode acessar dashboard fiscal (comportamento correto)."""
+        print("\n--- Testando Dashboard Fiscal com Admin ---")
 
         response = await async_client.get(
             "/api/v1/dashboard/fiscal/completo",
             headers=admin_headers
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 200
         data = response.json()
-        # Verifica se tem campo detail ou message
-        error_message = data.get("detail", data.get("message", "")).lower()
-        assert "fiscal" in error_message
-        print("--> Dashboard fiscal protegido corretamente")
+        assert "contadores" in data
+        assert "minhas_pendencias" in data
+        print("--> Admin pode acessar dashboard fiscal corretamente")
 
 
 class TestDashboardFiscalPendenciasVencidas:
@@ -252,8 +252,11 @@ class TestDashboardFiscalPendenciasVencidas:
             headers=admin_headers
         )
 
-        # Deve dar 403 porque admin não é fiscal
-        assert response.status_code == 403
+        # Admin pode acessar rotas de fiscal (comportamento correto)
+        assert response.status_code == 200
+        data = response.json()
+        assert "pendencias" in data
+        assert "total_pendencias" in data
         print("--> Endpoint existe e está protegido")
 
     @pytest.mark.asyncio
@@ -357,13 +360,16 @@ class TestDashboardFiscalPendenciasVencidas:
         """Testa que o dashboard completo do fiscal inclui pendências vencidas."""
         print("\n--- Testando Dashboard Fiscal Completo ---")
 
-        # Como admin não é fiscal, deve dar 403
+        # Admin pode acessar rotas de fiscal (comportamento correto)
         response = await async_client.get(
             "/api/v1/dashboard/fiscal/completo",
             headers=admin_headers
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 200
+        data = response.json()
+        assert "contadores" in data
+        assert "minhas_pendencias" in data
         print("--> Dashboard fiscal está protegido corretamente")
 
         # Verifica estrutura do schema de resposta

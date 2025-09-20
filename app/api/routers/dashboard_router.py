@@ -5,8 +5,9 @@ from typing import Optional
 
 from app.core.database import get_connection
 from app.schemas.usuario_schema import Usuario
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, get_current_fiscal_user
 from app.api.permissions import admin_required, require_admin_or_fiscal
+from app.repositories.usuario_perfil_repo import UsuarioPerfilRepository
 
 # Repositórios e Serviços
 from app.repositories.dashboard_repo import DashboardRepository
@@ -128,7 +129,7 @@ async def get_pendencias_vencidas_admin(
 @router.get("/fiscal/minhas-pendencias", response_model=MinhasPendenciasResponse)
 async def get_minhas_pendencias(
     service: DashboardService = Depends(get_dashboard_service),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_fiscal_user)
 ):
     """
     Lista todas as pendências ativas do fiscal logado.
@@ -139,22 +140,15 @@ async def get_minhas_pendencias(
     3. Pendências por data de criação
 
     Inclui informações de contrato e contadores de atraso.
-    Disponível para usuários com perfil de Fiscal.
+    Disponível para usuários com perfil de Fiscal ou Administrador.
     """
-    # Verificar se o usuário tem perfil de fiscal (simplificado)
-    if current_user.perfil_id != 3:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você precisa ter perfil de Fiscal para acessar suas pendências"
-        )
-
     return await service.get_minhas_pendencias_fiscal(current_user.id)
 
 
 @router.get("/fiscal/completo", response_model=DashboardFiscalResponse)
 async def get_dashboard_fiscal_completo(
     service: DashboardService = Depends(get_dashboard_service),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_fiscal_user)
 ):
     """
     Retorna dados completos para o dashboard do fiscal.
@@ -164,15 +158,8 @@ async def get_dashboard_fiscal_completo(
     - Lista completa de pendências ativas
 
     Endpoint otimizado para carregar todo o dashboard do fiscal de uma vez.
-    Disponível para usuários com perfil de Fiscal.
+    Disponível para usuários com perfil de Fiscal ou Administrador.
     """
-    # Verificar se o usuário tem perfil de fiscal (simplificado)
-    if current_user.perfil_id != 3:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você precisa ter perfil de Fiscal para acessar o dashboard fiscal"
-        )
-
     return await service.get_dashboard_fiscal_completo(current_user.id)
 
 
@@ -201,28 +188,28 @@ async def get_contadores_dashboard(
 @router.get("/resumo-atividades")
 async def get_resumo_atividades(
     service: DashboardService = Depends(get_dashboard_service),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_connection)
 ):
     """
     Endpoint de conveniência que retorna um resumo das atividades baseado no perfil do usuário.
 
-    Retorna diferentes dados dependendo do perfil ativo:
+    Retorna diferentes dados dependendo dos perfis do usuário:
     - **Administrador**: Contratos com ação necessária
     - **Fiscal**: Pendências pessoais urgentes
     - **Gestor**: Status dos contratos sob gestão
 
     Ideal para notificações e alertas no frontend.
     """
-    # Simplificação: usar perfil_id para determinar o perfil
-    perfil_nome = "Outros"
-    if current_user.perfil_id == 1:
-        perfil_nome = "Administrador"
-    elif current_user.perfil_id == 2:
-        perfil_nome = "Gestor"
-    elif current_user.perfil_id == 3:
-        perfil_nome = "Fiscal"
+    # Verificar perfis do usuário usando o sistema de múltiplos perfis
+    usuario_perfil_repo = UsuarioPerfilRepository(conn)
 
-    if perfil_nome == "Administrador":
+    is_admin = await usuario_perfil_repo.has_profile(current_user.id, "Administrador")
+    is_fiscal = await usuario_perfil_repo.has_profile(current_user.id, "Fiscal")
+    is_gestor = await usuario_perfil_repo.has_profile(current_user.id, "Gestor")
+
+    # Prioridade: Admin > Fiscal > Gestor
+    if is_admin:
         # Para admin: contratos que precisam de ação
         relatorios_pendentes = await service.get_contratos_com_relatorios_pendentes(5)
         contratos_pendencias = await service.get_contratos_com_pendencias(5)
@@ -234,7 +221,7 @@ async def get_resumo_atividades(
             "acao_necessaria": relatorios_pendentes.total_relatorios_pendentes > 0 or contratos_pendencias.total_pendencias > 0
         }
 
-    elif perfil_nome == "Fiscal":
+    elif is_fiscal:
         # Para fiscal: suas pendências urgentes
         minhas_pendencias = await service.get_minhas_pendencias_fiscal(current_user.id)
 
@@ -246,13 +233,21 @@ async def get_resumo_atividades(
             "acao_necessaria": minhas_pendencias.total_pendencias > 0
         }
 
-    else:
-        # Para outros perfis ou gestores
+    elif is_gestor:
+        # Para gestores
         contadores = await service.get_contadores_dashboard(current_user)
 
         return {
-            "perfil": perfil_nome,
+            "perfil": "Gestor",
             "contratos_sob_gestao": contadores.contratos_sob_gestao,
             "relatorios_equipe_pendentes": contadores.relatorios_equipe_pendentes,
             "acao_necessaria": contadores.relatorios_equipe_pendentes > 0
+        }
+
+    else:
+        # Para usuários sem perfis específicos
+        return {
+            "perfil": "Outros",
+            "acao_necessaria": False,
+            "mensagem": "Nenhum perfil ativo encontrado"
         }
