@@ -75,7 +75,9 @@ Sistema robusto de gestão de contratos desenvolvido com **FastAPI**, oferecendo
 
 ### Core Features
 - 🔐 **Autenticação JWT** - Sistema seguro de autenticação com tokens e migração automática de senhas
-- 👥 **Sistema de Perfis Múltiplos** - Permite que um único usuário possua vários perfis (ex: Gestor e Fiscal) com alternância de contexto e permissões dinâmicas.
+- 👥 **Sistema de Perfis Múltiplos** - Permite que um único usuário possua vários perfis (ex: Gestor e Fiscal) com alternância de contexto e permissões dinâmicas
+- 🔄 **Contexto de Sessão Ativo** - Alternância real entre perfis com persistência e isolamento automático de dados
+- 🛡️ **Isolamento de Dados** - Fiscal vê apenas seus contratos, Gestor vê apenas os seus, Admin vê todos
 - 📄 **Gestão de Contratos** - CRUD completo com validações avançadas e soft delete
 - 📎 **Upload de Arquivos** - Suporte para múltiplos formatos com validação e organização automática
 - 📊 **Relatórios Fiscais** - Fluxo completo de submissão, análise e aprovação/rejeição
@@ -91,9 +93,10 @@ Sistema robusto de gestão de contratos desenvolvido com **FastAPI**, oferecendo
 ### Módulos Principais
 
 #### 👤 **Usuários**
-- Criação e gestão de usuários com validações completas
+- Criação e gestão de usuários com validações completas (sem dependência de estruturas legadas)
 - Alteração e reset de senha (própria e administrativa)
-- Atribuição de múltiplos perfis com histórico completo de concessões e revogações.
+- Sistema de múltiplos perfis com concessão/revogação dinâmica
+- Contexto de sessão ativo com alternância real entre perfis
 - Listagem paginada com filtros avançados
 - Migração automática de senhas do sistema legado
 
@@ -543,15 +546,31 @@ graph LR
 
 ### Níveis de Acesso
 
-O sistema utiliza um modelo de perfis flexível, onde um usuário pode ter múltiplos papéis. As permissões são contextuais, baseadas no perfil que está ativo na sessão do usuário.
+O sistema utiliza um modelo de perfis flexível com **isolamento automático de dados**, onde um usuário pode ter múltiplos papéis e alternar entre eles com persistência real. As permissões são contextuais, baseadas no perfil que está ativo na sessão do usuário.
 
-| Perfil        | Permissões Principais (quando ativo)                 |
-|---------------|------------------------------------------------------|
-| **Administrador** | Acesso total ao sistema, incluindo criação de usuários, gestão de perfis e aprovação de relatórios. |
-| **Gestor** | Visualização e gestão de contratos sob sua responsabilidade, análise de relatórios da sua equipe. |
-| **Fiscal** | Submissão de relatórios para seus contratos designados e visualização de pendências. |
+| Perfil        | Permissões Principais (quando ativo) | Isolamento de Dados |
+|---------------|------------------------------------------------------|---------------------|
+| **Administrador** | Acesso total ao sistema, incluindo criação de usuários, gestão de perfis e aprovação de relatórios. | Vê **todos** os contratos |
+| **Gestor** | Visualização e gestão de contratos sob sua responsabilidade, análise de relatórios da sua equipe. | Vê **apenas** contratos onde é gestor |
+| **Fiscal** | Submissão de relatórios para seus contratos designados e visualização de pendências. | Vê **apenas** contratos onde é fiscal/substituto |
 
-Um usuário com os perfis de **Gestor** e **Fiscal** pode, por exemplo, alternar seu contexto na aplicação para executar tarefas específicas de cada função sem a necessidade de fazer logout.
+#### **Exemplo Prático de Isolamento:**
+```
+Usuário: João Silva
+- Fiscal nos contratos: CON-001, CON-002
+- Gestor no contrato: CON-003
+
+Sessão como Fiscal (perfil ativo):
+GET /api/v1/contratos/ → Retorna apenas CON-001 e CON-002
+
+Alterna para Gestor:
+POST /auth/alternar-perfil {"novo_perfil_id": 2}
+
+Sessão como Gestor (perfil ativo):
+GET /api/v1/contratos/ → Retorna apenas CON-003
+```
+
+A alternância entre perfis é **persistente** e **automática**, não requerendo logout e garantindo isolamento rigoroso dos dados.
 
 ## 💻 Desenvolvimento
 

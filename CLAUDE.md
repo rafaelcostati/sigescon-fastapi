@@ -211,8 +211,9 @@ chmod +x run_tests.sh
 ### Sistema de Autenticação
 - **JWT Tokens** - Autenticação segura com expiração
 - **Múltiplos Perfis** - Usuário pode ter vários papéis (Admin, Gestor, Fiscal)
-- **Contexto de Sessão** - Alternância entre perfis sem logout
-- **Permissões Granulares** - Controle de acesso por perfil
+- **Contexto de Sessão Ativo** - Alternância entre perfis com persistência real
+- **Isolamento de Dados** - Controle rigoroso baseado no perfil ativo
+- **Permissões Hierárquicas** - Admin > Gestor > Fiscal com filtragem automática
 
 ### Gestão de Usuários
 - **CRUD Completo** - Criar, listar, atualizar, deletar
@@ -225,6 +226,7 @@ chmod +x run_tests.sh
 - **Gerenciamento de Arquivos** - Listar, baixar e excluir arquivos por contrato
 - **Associações** - Gestores, fiscais, substitutos
 - **Filtros Avançados** - Por data, status, responsáveis
+- **Isolamento por Perfil** - Fiscal vê apenas seus contratos, Gestor vê seus contratos
 - **Soft Delete** - Preservação de histórico
 
 ### Relatórios Fiscais
@@ -250,8 +252,8 @@ chmod +x run_tests.sh
 ### Autenticação
 ```
 POST   /auth/login                    # Login com email/senha
-POST   /auth/alternar-perfil          # Alternar perfil ativo
-GET    /auth/contexto                 # Contexto atual da sessão
+POST   /auth/alternar-perfil          # Alternar perfil ativo (com persistência)
+GET    /auth/contexto                 # Contexto atual da sessão (atualizado após alternância)
 GET    /auth/dashboard                # Dados para dashboard
 GET    /auth/permissoes               # Permissões do usuário
 ```
@@ -277,9 +279,9 @@ POST   /api/v1/usuarios/{id}/perfis/revogar   # Revogar perfis
 
 ### Contratos
 ```
-GET    /api/v1/contratos              # Listar contratos (filtros)
+GET    /api/v1/contratos              # Listar contratos (filtros + isolamento por perfil ativo)
 POST   /api/v1/contratos              # Criar contrato + upload
-GET    /api/v1/contratos/{id}         # Detalhes do contrato
+GET    /api/v1/contratos/{id}         # Detalhes do contrato (verificação de acesso por perfil)
 PATCH  /api/v1/contratos/{id}         # Atualizar contrato
 DELETE /api/v1/contratos/{id}         # Deletar contrato
 ```
@@ -370,24 +372,45 @@ pytest --cov=app tests/
 ## 🔒 Sistema de Permissões
 
 ### Perfis de Usuário
-| Perfil | Permissões |
-|--------|------------|
-| **Administrador** | Acesso total - CRUD usuários, contratos, aprovar relatórios |
-| **Gestor** | Visualizar contratos sob gestão, analisar relatórios da equipe |
-| **Fiscal** | Submeter relatórios, visualizar pendências designadas |
+| Perfil | Permissões | Isolamento de Dados |
+|--------|------------|---------------------|
+| **Administrador** | Acesso total - CRUD usuários, contratos, aprovar relatórios | Vê todos os contratos |
+| **Gestor** | Visualizar contratos sob gestão, analisar relatórios da equipe | Vê apenas contratos onde é gestor |
+| **Fiscal** | Submeter relatórios, visualizar pendências designadas | Vê apenas contratos onde é fiscal/substituto |
 
-### Contexto de Sessão
+### Contexto de Sessão Ativo
 - Usuário pode ter **múltiplos perfis** simultaneamente
-- **Alternância de contexto** sem necessidade de logout
+- **Alternância de contexto** com persistência real (sem logout)
+- **Isolamento automático** de dados baseado no perfil ativo
 - Permissões **dinâmicas** baseadas no perfil ativo
 - **Token JWT** inclui informações do contexto atual
 
+### Exemplo de Isolamento
+```
+Usuário: João (Fiscal contratos 1,2 + Gestor contrato 3)
+
+Como Fiscal (perfil ativo):
+GET /api/v1/contratos/ → Retorna apenas contratos 1 e 2
+
+Alterna para Gestor:
+POST /auth/alternar-perfil {"novo_perfil_id": 2}
+
+Como Gestor (perfil ativo):
+GET /api/v1/contratos/ → Retorna apenas contrato 3
+```
+
 ### Decoradores de Permissão
 ```python
+# Permissões tradicionais (verificam se usuário TEM o perfil)
 @admin_required          # Apenas administradores
 @fiscal_required         # Fiscais e superiores
 @gestor_required         # Gestores e superiores
 @owner_or_admin          # Próprio usuário ou admin
+
+# Permissões baseadas no contexto ativo (verificam perfil ATIVO)
+@require_active_admin              # Perfil ativo deve ser Admin
+@require_active_admin_or_manager   # Perfil ativo deve ser Admin ou Gestor
+@require_active_admin_or_fiscal    # Perfil ativo deve ser Admin ou Fiscal
 ```
 
 ---
@@ -408,7 +431,8 @@ DELETE /api/v1/contratos/{id}/arquivos/{arquivo_id}       # Remove arquivo
 ```
 
 ### Características Técnicas
-- **Validação de Permissões** - Usuários só acessam arquivos de contratos autorizados
+- **Isolamento por Perfil** - Usuários só acessam arquivos de contratos permitidos pelo perfil ativo
+- **Validação de Permissões** - Verificação automática baseada no contexto ativo
 - **Verificação de Integridade** - Validação de existência física dos arquivos
 - **Cleanup Automático** - Remoção tanto do banco quanto do sistema de arquivos
 - **Metadados Completos** - Nome, tipo, tamanho e data de criação
@@ -685,22 +709,37 @@ SELECT numero, objeto, data_assinatura FROM contratos WHERE data_exclusao IS NUL
 ## 🎯 Status da Migração (Flask → FastAPI)
 
 ### ✅ Concluído
-- [x] **Sistema de Usuários** - CRUD completo com testes
-- [x] **Autenticação JWT** - Login e contexto de sessão
+- [x] **Sistema de Usuários** - CRUD completo com testes (sem dependência de perfil_id legado)
+- [x] **Autenticação JWT** - Login e contexto de sessão com persistência real
 - [x] **Múltiplos Perfis** - Concessão/revogação dinâmica
+- [x] **Contexto de Sessão Ativo** - Alternância com persistência e isolamento automático
+- [x] **Isolamento de Dados** - Filtros automáticos por perfil ativo em contratos
+- [x] **Permissões Hierárquicas** - Admin > Gestor > Fiscal com controle rigoroso
 - [x] **Contratados** - CRUD com validações
 - [x] **Tabelas Auxiliares** - Perfis, Status, Modalidades
-- [x] **Contratos** - Gestão completa com upload múltiplo
-- [x] **Gerenciamento de Arquivos** - Listar, baixar e excluir arquivos de contratos
+- [x] **Contratos** - Gestão completa com upload múltiplo e isolamento por perfil
+- [x] **Gerenciamento de Arquivos** - Listar, baixar e excluir arquivos com isolamento
 - [x] **Relatórios e Pendências** - Workflow implementado
 - [x] **Sistema de Emails** - SMTP assíncrono
 - [x] **Scheduler** - Notificações automáticas
 - [x] **Middleware** - Auditoria e logging
-- [x] **Testes** - Cobertura abrangente incluindo upload múltiplo
+- [x] **Testes** - Cobertura abrangente incluindo contexto e isolamento
 - [x] **Documentação** - Swagger protegido
 
 ### 🚀 Em Produção
-O sistema está **100% funcional** e em **produção ativa**, oferecendo todas as funcionalidades do sistema Flask original com melhorias significativas em performance e manutenibilidade.
+O sistema está **100% funcional** e em **produção ativa**, oferecendo todas as funcionalidades do sistema Flask original com melhorias significativas em:
+
+#### **Novas Funcionalidades Implementadas:**
+- **Isolamento Automático de Dados** - Fiscal vê apenas seus contratos, Gestor vê apenas os seus
+- **Contexto de Sessão Persistente** - Alternância real entre perfis sem relogin
+- **Permissões Hierárquicas** - Controle granular baseado no perfil ativo
+- **Sistema de Múltiplos Perfis Completo** - Sem dependência de estruturas legadas
+
+#### **Melhorias Técnicas:**
+- **Performance e Manutenibilidade** aprimoradas
+- **Arquitetura Clean** com isolamento real de dados
+- **Testes Abrangentes** validando todo o fluxo de contexto
+- **API RESTful** com isolamento transparente
 
 ---
 
