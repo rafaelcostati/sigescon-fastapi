@@ -9,8 +9,11 @@ from app.core.config import settings
 from app.core.database import get_connection
 from app.repositories.usuario_repo import UsuarioRepository
 from app.repositories.usuario_perfil_repo import UsuarioPerfilRepository
+from app.repositories.session_context_repo import SessionContextRepository
+from app.services.session_context_service import SessionContextService
 from app.schemas.token_schema import TokenData
 from app.schemas.usuario_schema import Usuario
+from app.schemas.session_context_schema import ContextoSessao
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -111,3 +114,38 @@ async def get_current_manager_user(
             detail="Acesso restrito a gestores e administradores",
         )
     return current_user
+
+async def get_current_context(
+    current_user: Usuario = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_connection)
+) -> ContextoSessao:
+    """
+    Retorna o contexto de sessão atual do usuário
+    """
+    from app.repositories.contrato_repo import ContratoRepository
+
+    session_service = SessionContextService(
+        session_repo=SessionContextRepository(conn),
+        usuario_repo=UsuarioRepository(conn),
+        usuario_perfil_repo=UsuarioPerfilRepository(conn),
+        contrato_repo=ContratoRepository(conn)
+    )
+
+    context = await session_service.get_session_context_by_user(current_user.id)
+
+    if not context:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contexto de sessão não encontrado"
+        )
+
+    return context
+
+async def get_current_user_with_context(
+    current_user: Usuario = Depends(get_current_user),
+    context: ContextoSessao = Depends(get_current_context)
+) -> tuple[Usuario, ContextoSessao]:
+    """
+    Retorna o usuário atual e seu contexto de sessão
+    """
+    return current_user, context

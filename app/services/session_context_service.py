@@ -168,6 +168,46 @@ class SessionContextService:
         # Retorna contexto atualizado
         return await self.get_session_context(sessao_id)
 
+    async def switch_profile_context(self, sessao_id: str, usuario_id: int,
+                                   novo_perfil_id: int, justificativa: str,
+                                   ip_address: Optional[str] = None,
+                                   user_agent: Optional[str] = None) -> ContextoSessao:
+        """Método específico para alternância de perfil via endpoint"""
+
+        # Valida se o usuário pode usar este perfil
+        if not await self.session_repo.validate_profile_for_user(usuario_id, novo_perfil_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuário não tem permissão para usar este perfil"
+            )
+
+        # Atualiza no banco
+        success = await self.session_repo.update_active_profile(
+            sessao_id=sessao_id,
+            novo_perfil_id=novo_perfil_id,
+            justificativa=justificativa,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erro ao alternar perfil"
+            )
+
+        # Retorna contexto atualizado
+        return await self.get_session_context(sessao_id)
+
+    async def get_session_context_by_user(self, usuario_id: int) -> Optional[ContextoSessao]:
+        """Busca contexto de sessão ativo do usuário"""
+        session_data = await self.session_repo.get_active_session_by_user(usuario_id)
+
+        if not session_data:
+            return None
+
+        return await self.get_session_context(session_data['sessao_id'])
+
     async def get_dashboard_data(self, sessao_id: str) -> DashboardData:
         """Retorna dados do dashboard baseados no perfil ativo"""
         context = await self.get_session_context(sessao_id)

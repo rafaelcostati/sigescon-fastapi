@@ -153,18 +153,19 @@ class ContratoService:
 
         return contrato_response
 
-    async def get_contrato_by_id(self, contrato_id: int) -> Optional[Contrato]:
-        contrato_data = await self.contrato_repo.find_contrato_by_id(contrato_id)
+    async def get_contrato_by_id(self, contrato_id: int, user_context: Optional[Dict] = None) -> Optional[Contrato]:
+        contrato_data = await self.contrato_repo.find_contrato_by_id(contrato_id, user_context=user_context)
         if contrato_data:
             return Contrato.model_validate(contrato_data)
         return None
 
-    async def get_all_contratos(self, page: int, per_page: int, filters: Optional[Dict] = None) -> ContratoPaginated:
+    async def get_all_contratos(self, page: int, per_page: int, filters: Optional[Dict] = None, user_context: Optional[Dict] = None) -> ContratoPaginated:
         offset = (page - 1) * per_page
         contratos_data, total_items = await self.contrato_repo.get_all_contratos(
             filters=filters,
             limit=per_page,
-            offset=offset
+            offset=offset,
+            user_context=user_context
         )
         total_pages = math.ceil(total_items / per_page) if total_items > 0 else 1
         return ContratoPaginated(

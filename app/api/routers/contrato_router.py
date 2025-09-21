@@ -7,7 +7,7 @@ from datetime import date
 
 from app.core.database import get_connection
 from app.schemas.usuario_schema import Usuario
-from app.api.dependencies import get_current_user, get_current_admin_user
+from app.api.dependencies import get_current_user, get_current_admin_user, get_current_user_with_context
 
 # Repositórios
 from app.repositories.contrato_repo import ContratoRepository
@@ -115,30 +115,35 @@ async def list_contratos(
     pae: Optional[str] = Query(None),
     ano: Optional[int] = Query(None),
     service: ContratoService = Depends(get_contrato_service),
-    current_user: Usuario = Depends(get_current_user)
+    user_context: tuple = Depends(get_current_user_with_context)
 ):
+    current_user, context = user_context
     filters = {'gestor_id': gestor_id, 'fiscal_id': fiscal_id, 'objeto': objeto, 'nr_contrato': nr_contrato, 'status_id': status_id, 'pae': pae, 'ano': ano}
     active_filters = {k: v for k, v in filters.items() if v is not None}
-    return await service.get_all_contratos(page=page, per_page=per_page, filters=active_filters)
+
+    # Criar contexto do usuário para isolamento de dados
+    user_ctx = {
+        'usuario_id': context.usuario_id,
+        'perfil_ativo_nome': context.perfil_ativo_nome
+    }
+
+    return await service.get_all_contratos(page=page, per_page=per_page, filters=active_filters, user_context=user_ctx)
 
 @router.get("/{contrato_id}", response_model=Contrato)
 async def get_contrato_by_id(
-    contrato_id: int, 
-    service: ContratoService = Depends(get_contrato_service), 
-    current_user: Usuario = Depends(get_current_user),  
-    conn: asyncpg.Connection = Depends(get_connection)  
+    contrato_id: int,
+    service: ContratoService = Depends(get_contrato_service),
+    user_context: tuple = Depends(get_current_user_with_context)
 ):
-    
-    from app.api.permissions import PermissionChecker
-    
-    checker = PermissionChecker(conn)
-    if not await checker.can_access_contract(current_user, contrato_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem permissão para acessar este contrato"
-        )
-    
-    contrato = await service.get_contrato_by_id(contrato_id)
+    current_user, context = user_context
+
+    # Criar contexto do usuário para isolamento de dados
+    user_ctx = {
+        'usuario_id': context.usuario_id,
+        'perfil_ativo_nome': context.perfil_ativo_nome
+    }
+
+    contrato = await service.get_contrato_by_id(contrato_id, user_context=user_ctx)
     if not contrato:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
     return contrato

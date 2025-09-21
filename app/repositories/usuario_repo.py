@@ -14,11 +14,10 @@ class UsuarioRepository:
         return dict(user) if user else None
 
     async def get_user_by_id(self, user_id: int) -> Optional[Dict]:
-        """Retorna o usuário sem a senha"""
+        """Retorna o usuário sem a senha - perfil_id legado removido"""
         query = """
-            SELECT u.id, u.nome, u.email, u.cpf, u.matricula, u.perfil_id, u.ativo, u.created_at, u.updated_at, p.nome as perfil_nome 
+            SELECT u.id, u.nome, u.email, u.cpf, u.matricula, u.ativo, u.created_at, u.updated_at
             FROM usuario u
-            LEFT JOIN perfil p ON u.perfil_id = p.id
             WHERE u.id = $1 AND u.ativo = TRUE
         """
         user = await self.conn.fetchrow(query, user_id)
@@ -34,7 +33,6 @@ class UsuarioRepository:
         
         base_query = """
             FROM usuario u
-            LEFT JOIN perfil p ON u.perfil_id = p.id
         """
         where_clauses = ["u.ativo = TRUE"]
         params = []
@@ -53,7 +51,7 @@ class UsuarioRepository:
         
         # Query para buscar os dados paginados
         data_query = f"""
-            SELECT u.id, u.nome, u.email, u.matricula, p.nome as perfil_nome
+            SELECT u.id, u.nome, u.email, u.matricula
             {base_query}
             {where_sql}
             ORDER BY u.nome
@@ -72,7 +70,7 @@ class UsuarioRepository:
         query = """
             INSERT INTO usuario (nome, email, cpf, matricula, senha, perfil_id)
             VALUES ($1, $2, $3, $4, $5, NULL)
-            RETURNING id, nome, email, cpf, matricula, perfil_id, ativo, created_at, updated_at
+            RETURNING id, nome, email, cpf, matricula, ativo, created_at, updated_at
         """
         new_user = await self.conn.fetchrow(
             query,
@@ -90,9 +88,9 @@ class UsuarioRepository:
         
         fields = ", ".join([f"{key} = ${i+2}" for i, key in enumerate(update_data.keys())])
         query = f"""
-            UPDATE usuario SET {fields}, updated_at = NOW() 
+            UPDATE usuario SET {fields}, updated_at = NOW()
             WHERE id = $1 AND ativo = TRUE
-            RETURNING id, nome, email, cpf, matricula, perfil_id, ativo, created_at, updated_at
+            RETURNING id, nome, email, cpf, matricula, ativo, created_at, updated_at
         """
         
         updated_user = await self.conn.fetchrow(query, user_id, *update_data.values())
@@ -127,12 +125,13 @@ class UsuarioRepository:
         return bool(exists)
 
     async def get_users_by_perfil(self, perfil_nome: str) -> List[Dict]:
-        """Busca todos os usuários com um perfil específico"""
+        """Busca todos os usuários com um perfil específico - usa sistema de múltiplos perfis"""
         query = """
-            SELECT u.id, u.nome, u.email, u.cpf, u.matricula, u.perfil_id, u.ativo, u.created_at, u.updated_at, p.nome as perfil_nome
+            SELECT DISTINCT u.id, u.nome, u.email, u.cpf, u.matricula, u.ativo, u.created_at, u.updated_at
             FROM usuario u
-            INNER JOIN perfil p ON u.perfil_id = p.id
-            WHERE p.nome = $1 AND u.ativo = TRUE
+            INNER JOIN usuario_perfil up ON u.id = up.usuario_id
+            INNER JOIN perfil p ON up.perfil_id = p.id
+            WHERE p.nome = $1 AND u.ativo = TRUE AND up.ativo = TRUE AND p.ativo = TRUE
             ORDER BY u.nome
         """
         records = await self.conn.fetch(query, perfil_nome)

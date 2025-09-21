@@ -8,6 +8,8 @@ import uuid
 class SessionContextRepository:
     def __init__(self, conn: asyncpg.Connection):
         self.conn = conn
+        # Estado temporário para simular sessões ativas
+        self._active_profiles = {}
 
     async def get_user_available_profiles(self, usuario_id: int) -> List[Dict]:
         """Busca todos os perfis disponíveis para o usuário"""
@@ -69,15 +71,42 @@ class SessionContextRepository:
         }
 
     async def get_session_context(self, sessao_id: str) -> Optional[Dict]:
-        """Busca contexto de sessão (mock)"""
-        return {
-            'sessao_id': sessao_id,
-            'usuario_id': 1,
-            'perfil_ativo_id': 1,
-            'perfil_ativo_nome': 'Gestor'
-        }
+        """Busca contexto de sessão com estado persistente simulado"""
+        if sessao_id in self._active_profiles:
+            context = self._active_profiles[sessao_id].copy()
+        else:
+            # Padrão para nova sessão
+            context = {
+                'sessao_id': sessao_id,
+                'usuario_id': int(sessao_id.split('-')[-1]) if 'mock-session-' in sessao_id else 1,
+                'perfil_ativo_id': 2,  # Gestor por padrão
+                'perfil_ativo_nome': 'Gestor'
+            }
+            self._active_profiles[sessao_id] = context
+
+        return context
 
     async def update_active_profile(self, sessao_id: str, novo_perfil_id: int, **kwargs) -> bool:
+        """Atualiza perfil ativo com persistência simulada"""
+        # Se a sessão não existe, cria uma nova entrada
+        if sessao_id not in self._active_profiles:
+            usuario_id = int(sessao_id.split('-')[-1]) if 'mock-session-' in sessao_id else 1
+            self._active_profiles[sessao_id] = {
+                'sessao_id': sessao_id,
+                'usuario_id': usuario_id,
+                'perfil_ativo_id': 2,  # Gestor por padrão
+                'perfil_ativo_nome': 'Gestor'
+            }
+
+        # Busca nome do perfil
+        nome_perfil = 'Gestor'
+        if novo_perfil_id == 1:
+            nome_perfil = 'Administrador'
+        elif novo_perfil_id == 3:
+            nome_perfil = 'Fiscal'
+
+        self._active_profiles[sessao_id]['perfil_ativo_id'] = novo_perfil_id
+        self._active_profiles[sessao_id]['perfil_ativo_nome'] = nome_perfil
         return True
 
     async def update_last_activity(self, sessao_id: str) -> bool:
@@ -100,3 +129,13 @@ class SessionContextRepository:
 
     async def get_profile_switch_history(self, usuario_id: int, limit: int = 50) -> List[Dict]:
         return []
+
+    async def get_active_session_by_user(self, usuario_id: int) -> Optional[Dict]:
+        """Busca sessão ativa do usuário"""
+        # Implementação mock - deveria buscar no banco
+        return {
+            'sessao_id': f'mock-session-{usuario_id}',
+            'usuario_id': usuario_id,
+            'perfil_ativo_id': 2,
+            'perfil_ativo_nome': 'Gestor'
+        }

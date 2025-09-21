@@ -23,7 +23,7 @@ class ContratoRepository:
 
 
     # --- QUERY CORRIGIDA ---
-    async def find_contrato_by_id(self, contrato_id: int) -> Optional[Dict]:
+    async def find_contrato_by_id(self, contrato_id: int, user_context: Optional[Dict] = None) -> Optional[Dict]:
         query = """
             SELECT
                 c.*,
@@ -41,10 +41,27 @@ class ContratoRepository:
             LEFT JOIN usuario gestor ON c.gestor_id = gestor.id
             LEFT JOIN usuario fiscal ON c.fiscal_id = fiscal.id
             LEFT JOIN usuario fiscal_sub ON c.fiscal_substituto_id = fiscal_sub.id
-            LEFT JOIN arquivo doc ON c.documento = doc.id 
+            LEFT JOIN arquivo doc ON c.documento = doc.id
             WHERE c.id = $1 AND c.ativo = TRUE
         """
-        contrato = await self.conn.fetchrow(query, contrato_id)
+        params = [contrato_id]
+
+        # Aplicar isolamento por perfil
+        if user_context:
+            usuario_id = user_context.get('usuario_id')
+            perfil_ativo = user_context.get('perfil_ativo_nome')
+
+            if perfil_ativo == 'Fiscal':
+                # Fiscal vê apenas contratos onde é fiscal ou fiscal substituto
+                query += " AND (c.fiscal_id = $2 OR c.fiscal_substituto_id = $2)"
+                params.append(usuario_id)
+            elif perfil_ativo == 'Gestor':
+                # Gestor vê apenas contratos onde é gestor
+                query += " AND c.gestor_id = $2"
+                params.append(usuario_id)
+            # Administrador vê todos (sem filtro adicional)
+
+        contrato = await self.conn.fetchrow(query, *params)
         return dict(contrato) if contrato else None
 
 
@@ -53,7 +70,8 @@ class ContratoRepository:
         filters: Optional[Dict] = None,
         order_by: str = 'c.data_fim DESC',
         limit: int = 10,
-        offset: int = 0
+        offset: int = 0,
+        user_context: Optional[Dict] = None
     ) -> Tuple[List[Dict], int]:
         
         base_query = """
@@ -65,6 +83,24 @@ class ContratoRepository:
         where_clauses = ["c.ativo = TRUE"]
         params = []
         param_idx = 1
+
+        # Aplicar isolamento por perfil
+        if user_context:
+            usuario_id = user_context.get('usuario_id')
+            perfil_ativo = user_context.get('perfil_ativo_nome')
+
+            if perfil_ativo == 'Fiscal':
+                # Fiscal vê apenas contratos onde é fiscal ou fiscal substituto
+                where_clauses.append(f"(c.fiscal_id = ${param_idx} OR c.fiscal_substituto_id = ${param_idx})")
+                params.append(usuario_id)
+                param_idx += 1
+            elif perfil_ativo == 'Gestor':
+                # Gestor vê apenas contratos onde é gestor
+                where_clauses.append(f"c.gestor_id = ${param_idx}")
+                params.append(usuario_id)
+                param_idx += 1
+            # Administrador vê todos (sem filtro adicional)
+
         if filters:
             for key, value in filters.items():
                 if value is None:

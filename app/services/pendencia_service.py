@@ -264,7 +264,7 @@ class PendenciaService:
 
         # Verifica pendências com relatórios pendentes de análise
         from app.repositories.relatorio_repo import RelatorioRepository
-        relatorio_repo = RelatorioRepository(self.pendencia_repo.connection)
+        relatorio_repo = RelatorioRepository(self.pendencia_repo.conn)
         relatorios_pendentes = await relatorio_repo.get_relatorios_pendentes_analise(contrato_id)
         contador["analise_pendente"] = len(relatorios_pendentes)
 

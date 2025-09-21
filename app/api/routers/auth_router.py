@@ -182,16 +182,18 @@ async def switch_profile(
                 detail="Perfil não disponível para este usuário"
             )
         
-        # Cria um novo contexto com o perfil alterado
-        contexto_atualizado = ContextoSessao(
-            usuario_id=current_context.usuario_id,
-            perfil_ativo_id=switch_data.novo_perfil_id,
-            perfil_ativo_nome=perfil_disponivel.nome,
-            perfis_disponiveis=current_context.perfis_disponiveis,
-            pode_alternar=current_context.pode_alternar,
-            sessao_id=current_context.sessao_id
+        # Atualiza o contexto no banco de dados e cria novo token
+        ip_address, user_agent = get_client_info(request)
+
+        contexto_atualizado = await service.switch_profile_context(
+            current_context.sessao_id,
+            current_user.id,
+            switch_data.novo_perfil_id,
+            switch_data.justificativa,
+            ip_address,
+            user_agent
         )
-        
+
         return contexto_atualizado
         
     except HTTPException:
