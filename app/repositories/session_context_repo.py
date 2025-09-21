@@ -1,15 +1,18 @@
-# app/repositories/session_context_repo.py 
+# app/repositories/session_context_repo.py
 import asyncpg
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 import json
 import uuid
 
+# Estado global compartilhado para persistir sessões entre instâncias
+_GLOBAL_ACTIVE_PROFILES = {}
+
 class SessionContextRepository:
     def __init__(self, conn: asyncpg.Connection):
         self.conn = conn
-        # Estado temporário para simular sessões ativas
-        self._active_profiles = {}
+        # Estado temporário para simular sessões ativas - usar estado global compartilhado
+        self._active_profiles = _GLOBAL_ACTIVE_PROFILES
 
     async def get_user_available_profiles(self, usuario_id: int) -> List[Dict]:
         """Busca todos os perfis disponíveis para o usuário"""
@@ -52,16 +55,19 @@ class SessionContextRepository:
             print(f"Erro ao validar perfil: {e}")
             return False
 
-    async def create_session_context(self, usuario_id: int, sessao_id: str, 
+    async def create_session_context(self, usuario_id: int, sessao_id: str,
                                    perfil_ativo_id: int, perfis_disponiveis: List[Dict],
-                                   ip_address: Optional[str] = None, 
+                                   ip_address: Optional[str] = None,
                                    user_agent: Optional[str] = None) -> Dict:
         """Cria um contexto de sessão """
-        return {
+        perfil_ativo_nome = next((p['nome'] for p in perfis_disponiveis if p['id'] == perfil_ativo_id), 'Gestor')
+
+        session_data = {
             'id': 1,
             'usuario_id': usuario_id,
             'sessao_id': sessao_id,
             'perfil_ativo_id': perfil_ativo_id,
+            'perfil_ativo_nome': perfil_ativo_nome,
             'perfis_disponiveis': json.dumps(perfis_disponiveis),
             'data_criacao': datetime.now(),
             'data_ultima_atividade': datetime.now(),
@@ -69,6 +75,11 @@ class SessionContextRepository:
             'user_agent': user_agent,
             'ativo': True
         }
+
+        # Armazena na memória para futuras consultas
+        self._active_profiles[sessao_id] = session_data
+
+        return session_data
 
     async def get_session_context(self, sessao_id: str) -> Optional[Dict]:
         """Busca contexto de sessão com estado persistente simulado"""
@@ -131,11 +142,19 @@ class SessionContextRepository:
         return []
 
     async def get_active_session_by_user(self, usuario_id: int) -> Optional[Dict]:
-        """Busca sessão ativa do usuário"""
-        # Implementação mock - deveria buscar no banco
-        return {
-            'sessao_id': f'mock-session-{usuario_id}',
+        """Busca sessão ativa do usuário com estado persistente"""
+        sessao_id = f'mock-session-{usuario_id}'
+
+        # Se já existe uma sessão salva, retorna ela
+        if sessao_id in self._active_profiles:
+            return self._active_profiles[sessao_id]
+
+        # Senão cria uma nova sessão padrão
+        session_data = {
+            'sessao_id': sessao_id,
             'usuario_id': usuario_id,
             'perfil_ativo_id': 2,
             'perfil_ativo_nome': 'Gestor'
         }
+        self._active_profiles[sessao_id] = session_data
+        return session_data

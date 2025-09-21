@@ -50,7 +50,6 @@ class ContratoRepository:
         if user_context:
             usuario_id = user_context.get('usuario_id')
             perfil_ativo = user_context.get('perfil_ativo_nome')
-
             if perfil_ativo == 'Fiscal':
                 # Fiscal vê apenas contratos onde é fiscal ou fiscal substituto
                 query += " AND (c.fiscal_id = $2 OR c.fiscal_substituto_id = $2)"
@@ -120,9 +119,14 @@ class ContratoRepository:
         data_query = f"""
             SELECT
                 c.id, c.nr_contrato, c.objeto, c.data_fim,
-                ct.nome as contratado_nome, 
-                s.nome as status_nome
+                c.fiscal_id, c.gestor_id,
+                ct.nome as contratado_nome,
+                s.nome as status_nome,
+                fiscal.nome as fiscal_nome,
+                gestor.nome as gestor_nome
             {base_query}
+            LEFT JOIN usuario fiscal ON c.fiscal_id = fiscal.id
+            LEFT JOIN usuario gestor ON c.gestor_id = gestor.id
             {where_sql}
             ORDER BY {order_by}
             LIMIT ${param_idx} OFFSET ${param_idx + 1}

@@ -32,7 +32,8 @@ class SessionContextService:
         
         # Busca perfis disponíveis do usuário
         perfis_disponiveis = await self.session_repo.get_user_available_profiles(usuario_id)
-        
+
+
         if not perfis_disponiveis:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -90,13 +91,14 @@ class SessionContextService:
     async def get_session_context(self, sessao_id: str) -> Optional[ContextoSessao]:
         """Busca contexto de sessão existente"""
         context_data = await self.session_repo.get_session_context(sessao_id)
-        
+
         if not context_data:
             return None
-        
+
+
         # Atualiza última atividade
         await self.session_repo.update_last_activity(sessao_id)
-        
+
         # Busca perfis disponíveis atualizados
         perfis_disponiveis = await self.session_repo.get_user_available_profiles(
             context_data['usuario_id']

@@ -143,6 +143,7 @@ async def get_contrato_by_id(
         'perfil_ativo_nome': context.perfil_ativo_nome
     }
 
+
     contrato = await service.get_contrato_by_id(contrato_id, user_context=user_ctx)
     if not contrato:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")

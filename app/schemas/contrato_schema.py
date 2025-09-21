@@ -62,15 +62,19 @@ class ContratoUpdate(BaseModel):
     doe: Optional[str] = Field(None, max_length=50)
     data_doe: Optional[date] = None
 
-# Schema para a resposta da listagem 
+# Schema para a resposta da listagem
 class ContratoList(BaseModel):
     id: int
     nr_contrato: str
     objeto: str
     data_fim: date
+    fiscal_id: Optional[int] = None
+    gestor_id: Optional[int] = None
     contratado_nome: Optional[str] = None
     status_nome: Optional[str] = None
-    
+    fiscal_nome: Optional[str] = None
+    gestor_nome: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 # Schema para a resposta paginada da API

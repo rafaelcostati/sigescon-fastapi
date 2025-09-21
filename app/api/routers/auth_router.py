@@ -17,7 +17,7 @@ from app.schemas.session_context_schema import (
     ContextoSessao, DashboardData, PermissaoContextual
 )
 from app.schemas.usuario_schema import Usuario
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, get_current_context, get_token_payload
 from app.core.security import authenticate_user, create_access_token
 from app.core.config import settings
 
@@ -101,9 +101,10 @@ async def login_for_access_token(
             detail=f"Erro ao criar contexto de sessão: {str(e)}"
         )
 
-    # Cria token JWT incluindo user_id
+    # Cria token JWT incluindo user_id e session_id
     access_token = create_access_token(data={
-        "sub": str(user['id'])
+        "sub": str(user['id']),
+        "session_id": contexto.sessao_id
     })
 
     # Verifica se precisa de seleção manual de perfil
@@ -157,37 +158,43 @@ async def switch_profile(
     request: Request,
     switch_data: AlternarPerfilRequest,
     service: SessionContextService = Depends(get_session_context_service),
-    current_user: Usuario = Depends(get_current_user)
+    payload: dict = Depends(get_token_payload)
 ):
     """ Alterna o perfil ativo na sessão atual"""
     try:
-        # Busca contexto atual do usuário
-        current_context = await service.get_session_context_by_user(current_user.id)
-        
+        user_id = int(payload.get("sub"))
+        session_id = payload.get("session_id")
+
+        # Busca contexto atual usando session_id se disponível, senão user_id
+        if session_id:
+            current_context = await service.get_session_context(session_id)
+        else:
+            current_context = await service.get_session_context_by_user(user_id)
+
         if not current_context:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Contexto de sessão não encontrado"
             )
-        
+
         # Valida se o novo perfil está disponível
         perfil_disponivel = next(
             (p for p in current_context.perfis_disponiveis if p.id == switch_data.novo_perfil_id),
             None
         )
-        
+
         if not perfil_disponivel:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Perfil não disponível para este usuário"
             )
-        
-        # Atualiza o contexto no banco de dados e cria novo token
+
+        # Atualiza o contexto no banco de dados
         ip_address, user_agent = get_client_info(request)
 
         contexto_atualizado = await service.switch_profile_context(
             current_context.sessao_id,
-            current_user.id,
+            user_id,
             switch_data.novo_perfil_id,
             switch_data.justificativa,
             ip_address,
@@ -205,29 +212,11 @@ async def switch_profile(
         )
 
 @router.get("/contexto", response_model=ContextoSessao, summary="Contexto atual da sessão do usuário")
-async def get_current_context(
-    service: SessionContextService = Depends(get_session_context_service),
-    current_user: Usuario = Depends(get_current_user)
+async def get_current_context_endpoint(
+    current_context: ContextoSessao = Depends(get_current_context)
 ):
     """Retorna o contexto atual da sessão do usuário"""
-    try:
-        context = await service.get_session_context_by_user(current_user.id)
-        
-        if not context:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Contexto de sessão não encontrado"
-            )
-        
-        return context
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar contexto: {str(e)}"
-        )
+    return current_context
 
 @router.get("/dashboard", response_model=DashboardData, summary="Dados do dashboard baseados no perfil ativo")
 async def get_dashboard_data(
@@ -307,35 +296,3 @@ async def login_legacy(
 
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.get("/contexto", response_model=ContextoSessao)
-async def get_current_context_fixed(
-    service: SessionContextService = Depends(get_session_context_service),
-    current_user: Usuario = Depends(get_current_user)
-):
-    try:
-        context = await service.get_session_context_by_user(current_user.id)
-        if not context:
-            raise HTTPException(status_code=404, detail="Contexto não encontrado")
-        return context
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao buscar contexto: {str(e)}")
-
-@router.get("/dashboard", response_model=DashboardData)  
-async def get_dashboard_data_fixed(
-    service: SessionContextService = Depends(get_session_context_service),
-    current_user: Usuario = Depends(get_current_user)
-):
-    try:
-        return await service.get_dashboard_data_by_user(current_user.id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro no dashboard: {str(e)}")
-
-@router.get("/permissoes", response_model=PermissaoContextual)
-async def get_contextual_permissions_fixed(
-    service: SessionContextService = Depends(get_session_context_service),
-    current_user: Usuario = Depends(get_current_user)
-):
-    try:
-        return await service.get_contextual_permissions_by_user(current_user.id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro nas permissões: {str(e)}")

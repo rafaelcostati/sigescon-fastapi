@@ -115,12 +115,32 @@ async def get_current_manager_user(
         )
     return current_user
 
+async def get_token_payload(
+    token: str = Depends(oauth2_scheme)
+) -> dict:
+    """
+    Extrai e valida o payload do token JWT
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Não foi possível validar as credenciais",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        return payload
+    except JWTError:
+        raise credentials_exception
+
 async def get_current_context(
-    current_user: Usuario = Depends(get_current_user),
+    payload: dict = Depends(get_token_payload),
     conn: asyncpg.Connection = Depends(get_connection)
 ) -> ContextoSessao:
     """
-    Retorna o contexto de sessão atual do usuário
+    Retorna o contexto de sessão atual usando session_id do token
     """
     from app.repositories.contrato_repo import ContratoRepository
 
@@ -131,7 +151,16 @@ async def get_current_context(
         contrato_repo=ContratoRepository(conn)
     )
 
-    context = await session_service.get_session_context_by_user(current_user.id)
+    # Extrai session_id do token se disponível
+    session_id = payload.get("session_id")
+    user_id = payload.get("sub")
+
+    if session_id:
+        # Usa session_id para buscar contexto específico
+        context = await session_service.get_session_context(session_id)
+    else:
+        # Fallback para busca por user_id (compatibilidade com tokens antigos)
+        context = await session_service.get_session_context_by_user(int(user_id))
 
     if not context:
         raise HTTPException(

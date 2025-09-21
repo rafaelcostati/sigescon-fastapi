@@ -283,6 +283,15 @@ class TestContextoSessaoAlternancia:
         assert user_response.status_code == 201
         user = user_response.json()
 
+        # Conceder apenas um perfil (Fiscal)
+        perfil_data = {"perfil_ids": [3]}  # Fiscal
+        perfil_response = await async_client.post(
+            f"/api/v1/usuarios/{user['id']}/perfis/conceder",
+            json=perfil_data,
+            headers=admin_headers
+        )
+        assert perfil_response.status_code == 200
+
         # Login
         login_response = await async_client.post("/auth/login", data={
             "username": user_data["email"],

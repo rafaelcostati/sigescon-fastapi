@@ -190,9 +190,9 @@ async def test_contract_permissions(async_client: AsyncClient, admin_headers: Di
     other_fiscal_token = login_resp.json()["access_token"]
     other_fiscal_headers = {"Authorization": f"Bearer {other_fiscal_token}"}
     
-    # 4. Fiscal sem permissão NÃO pode ver detalhes do contrato
+    # 4. Fiscal sem permissão NÃO pode ver detalhes do contrato (isolamento de dados)
     get_response = await async_client.get(f"/api/v1/contratos/{contrato_id}", headers=other_fiscal_headers)
-    assert get_response.status_code == 403  # Forbidden
+    assert get_response.status_code == 404  # Not Found (devido ao isolamento por perfil)
     
     # 5. Admin PODE ver o contrato
     admin_get_response = await async_client.get(f"/api/v1/contratos/{contrato_id}", headers=admin_headers)

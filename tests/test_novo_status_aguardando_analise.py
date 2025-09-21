@@ -189,8 +189,8 @@ class TestNovoStatusAguardandoAnalise:
         assert contador_atualizado.status_code == 200
         contador_data_atualizado = contador_atualizado.json()
 
-        # Deve ter 1 pendência em "aguardando_analise" e 0 em "pendentes"
-        assert contador_data_atualizado["aguardando_analise"] >= 1
+        # Deve ter 1 pendência em "analise_pendente" e 0 em "pendentes"
+        assert contador_data_atualizado["analise_pendente"] >= 1
         print(f"✓ Contador atualizado: {contador_data_atualizado}")
         print("✅ Contador refletindo corretamente o novo status!")
 
