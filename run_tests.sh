@@ -74,6 +74,9 @@ declare -a test_modules=(
     "tests/test_notification_system.py"
     "tests/test_data_integrity.py"
     "tests/test_dashboard.py"
+    "tests/test_novo_status_aguardando_analise.py"
+    "tests/test_contexto_sessao_alternancia_perfis.py"
+    "tests/test_isolamento_dados_perfil.py"
 )
 
 # Contadores
