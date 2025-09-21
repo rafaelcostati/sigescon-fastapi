@@ -309,7 +309,7 @@ class TestDashboardFiscalPendenciasVencidas:
         # Verifica que a query ordena vencidas primeiro
         assert "ORDER BY" in codigo_metodo
         assert "CASE WHEN" in codigo_metodo  # Ordenação condicional
-        assert "prazo_entrega < CURRENT_DATE" in codigo_metodo  # Identifica vencidas
+        assert "data_prazo < CURRENT_DATE" in codigo_metodo  # Identifica vencidas
 
         print("--> Query ordena pendências vencidas primeiro")
 

@@ -86,7 +86,7 @@ async def contract_prerequisites(async_client: AsyncClient, admin_headers: Dict)
         "fiscal_id": fiscal["id"],
         "contratado_id": contratado["id"],
         "modalidade_id": modalidades_resp.json()[0]["id"],
-        "status_id": next(s for s in status_list_resp.json() if s['nome'] == 'Vigente')['id']
+        "status_id": next(s for s in status_list_resp.json() if s['nome'] == 'Ativo')['id']
     }
 
 # --- Suite de Testes para Contratos ---

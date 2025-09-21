@@ -58,5 +58,5 @@ async def test_get_seeded_status(async_client: AsyncClient, admin_headers: Dict)
     response = await async_client.get("/api/v1/status/", headers=admin_headers)
     assert response.status_code == 200
     status_list = [s['nome'] for s in response.json()]
-    assert "Vigente" in status_list
+    assert "Ativo" in status_list
     assert "Encerrado" in status_list

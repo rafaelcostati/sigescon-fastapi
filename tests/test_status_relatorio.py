@@ -1,5 +1,6 @@
 # tests/test_status_relatorio.py
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from typing import Dict
 import os
@@ -11,12 +12,12 @@ load_dotenv()
 def admin_credentials() -> Dict:
     return {"username": os.getenv("ADMIN_EMAIL"), "password": os.getenv("ADMIN_PASSWORD")}
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def admin_token(async_client: AsyncClient, admin_credentials: Dict) -> str:
     response = await async_client.post("/auth/login", data=admin_credentials)
     return response.json()["access_token"]
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def admin_headers(admin_token: str) -> Dict:
     return {"Authorization": f"Bearer {admin_token}"}
 
