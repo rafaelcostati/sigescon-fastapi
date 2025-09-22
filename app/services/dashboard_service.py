@@ -1,6 +1,7 @@
 # app/services/dashboard_service.py
 from typing import List, Dict, Any
 from datetime import datetime
+from fastapi import HTTPException
 from app.repositories.dashboard_repo import DashboardRepository
 from app.schemas.dashboard_schema import (
     ContratosComPendencias,
@@ -419,3 +420,58 @@ class DashboardService:
             performance_equipe=performance,
             contratos_proximos_vencimento=contratos_proximos
         )
+
+    async def get_relatorios_pendentes_analise(self) -> Dict[str, Any]:
+        """
+        Busca todos os relatórios individuais pendentes de análise
+        """
+        # Usar o método do dashboard_repo que vamos criar
+        relatorios_data = await self.dashboard_repo.get_all_relatorios_pendentes_analise()
+        
+        return {
+            "relatorios_pendentes": relatorios_data,
+            "total_relatorios_pendentes": len(relatorios_data)
+        }
+
+    async def cancelar_pendencia(self, pendencia_id: int) -> Dict[str, Any]:
+        """
+        Cancela uma pendência que ainda não foi respondida pelo fiscal
+        """
+        # Importar repositórios necessários
+        from app.repositories.pendencia_repo import PendenciaRepository
+        from app.repositories.status_pendencia_repo import StatusPendenciaRepository
+        from app.core.database import get_connection
+        
+        async with get_connection() as conn:
+            pendencia_repo = PendenciaRepository(conn)
+            status_repo = StatusPendenciaRepository(conn)
+            
+            # Verificar se a pendência existe
+            pendencia = await pendencia_repo.get_pendencia_by_id(pendencia_id)
+            if not pendencia:
+                raise HTTPException(status_code=404, detail="Pendência não encontrada")
+            
+            # Verificar se a pendência ainda pode ser cancelada (não foi respondida)
+            if pendencia['status_pendencia_id'] != 1:  # 1 = Pendente
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Pendência não pode ser cancelada. Status atual não permite cancelamento."
+                )
+            
+            # Buscar ID do status "Cancelada"
+            status_cancelada = await status_repo.get_status_by_name("Cancelada")
+            if not status_cancelada:
+                # Se não existe, criar o status
+                status_cancelada_id = 5  # Assumindo ID 5 para cancelada
+            else:
+                status_cancelada_id = status_cancelada['id']
+            
+            # Atualizar status da pendência para cancelada
+            await pendencia_repo.update_pendencia_status(pendencia_id, status_cancelada_id)
+            
+            return {
+                "message": "Pendência cancelada com sucesso",
+                "pendencia_id": pendencia_id,
+                "status_anterior": "Pendente",
+                "status_atual": "Cancelada"
+            }

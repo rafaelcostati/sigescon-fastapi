@@ -738,6 +738,63 @@ class DashboardRepository:
                 'fiscais_maior_carga': []
             }
 
+    async def get_all_relatorios_pendentes_analise(self) -> List[Dict[str, Any]]:
+        """
+        Busca todos os relatórios individuais com status 'Pendente de Análise' do sistema
+        """
+        try:
+            # Verificar se as tabelas existem
+            check_query = """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name IN ('relatoriofiscal', 'contrato', 'contratado', 'usuario', 'statusrelatorio', 'arquivo', 'pendenciarelatorio')
+            """
+            existing_tables = await self.conn.fetch(check_query)
+            table_names = [row['table_name'] for row in existing_tables]
+
+            required_tables = ['relatoriofiscal', 'contrato', 'contratado', 'usuario', 'statusrelatorio']
+            missing_tables = [table for table in required_tables if table not in table_names]
+
+            if missing_tables:
+                print(f"Tabelas não encontradas: {missing_tables}. Retornando lista vazia.")
+                return []
+
+            query = """
+            SELECT
+                rf.id,
+                rf.contrato_id,
+                rf.mes_competencia,
+                rf.observacoes_fiscal as observacoes,
+                rf.created_at as data_envio,
+                rf.arquivo_id,
+                rf.pendencia_id,
+                c.nr_contrato as contrato_numero,
+                c.objeto as contrato_objeto,
+                ct.nome as contratado_nome,
+                u_fiscal.nome as fiscal_nome,
+                u_gestor.nome as gestor_nome,
+                COALESCE(a.nome_arquivo, 'relatorio.pdf') as arquivo_nome,
+                COALESCE(p.descricao, 'Relatório Fiscal') as pendencia_titulo,
+                s.nome as status_relatorio
+            FROM relatoriofiscal rf
+            JOIN contrato c ON rf.contrato_id = c.id
+            JOIN contratado ct ON c.contratado_id = ct.id
+            JOIN usuario u_fiscal ON rf.fiscal_usuario_id = u_fiscal.id
+            JOIN usuario u_gestor ON c.gestor_id = u_gestor.id
+            JOIN statusrelatorio s ON rf.status_id = s.id
+            LEFT JOIN arquivo a ON rf.arquivo_id = a.id
+            LEFT JOIN pendenciarelatorio p ON rf.pendencia_id = p.id
+            WHERE s.nome = 'Pendente de Análise'
+            ORDER BY rf.created_at ASC
+            """
+            records = await self.conn.fetch(query)
+            return [dict(r) for r in records]
+
+        except Exception as e:
+            print(f"Erro ao buscar relatórios pendentes de análise: {e}. Retornando lista vazia.")
+            return []
+
     async def get_dashboard_fiscal_completo(self, fiscal_id: int) -> Dict[str, Any]:
         """
         Busca métricas completas para o dashboard do fiscal

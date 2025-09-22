@@ -126,3 +126,36 @@ class RelatorioRepository:
             WHERE id = $3
         """
         await self.conn.execute(query, novo_arquivo_id, status_id, relatorio_id)
+
+    async def get_all_relatorios_pendentes_analise(self) -> List[Dict]:
+        """Busca todos os relatórios com status 'Pendente de Análise' do sistema"""
+        query = """
+            SELECT
+                rf.id,
+                rf.contrato_id,
+                rf.mes_competencia,
+                rf.observacoes_fiscal,
+                rf.created_at as data_envio,
+                rf.arquivo_id,
+                rf.pendencia_id,
+                c.nr_contrato as contrato_numero,
+                c.objeto as contrato_objeto,
+                ct.nome as contratado_nome,
+                u_fiscal.nome as fiscal_nome,
+                u_gestor.nome as gestor_nome,
+                a.nome_arquivo as arquivo_nome,
+                p.descricao as pendencia_titulo,
+                s.nome as status_relatorio
+            FROM relatoriofiscal rf
+            JOIN contrato c ON rf.contrato_id = c.id
+            JOIN contratado ct ON c.contratado_id = ct.id
+            JOIN usuario u_fiscal ON rf.fiscal_usuario_id = u_fiscal.id
+            JOIN usuario u_gestor ON c.gestor_id = u_gestor.id
+            JOIN statusrelatorio s ON rf.status_id = s.id
+            LEFT JOIN arquivo a ON rf.arquivo_id = a.id
+            LEFT JOIN pendenciarelatorio p ON rf.pendencia_id = p.id
+            WHERE s.nome = 'Pendente de Análise'
+            ORDER BY rf.created_at ASC
+        """
+        records = await self.conn.fetch(query)
+        return [dict(r) for r in records]

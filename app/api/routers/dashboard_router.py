@@ -94,6 +94,44 @@ async def get_dashboard_admin_completo(
     return await service.get_dashboard_admin_completo()
 
 
+@router.get("/admin/relatorios-pendentes-analise")
+async def get_relatorios_pendentes_analise(
+    service: DashboardService = Depends(get_dashboard_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Lista todos os relatórios individuais aguardando análise pelo administrador.
+    
+    Retorna uma lista detalhada de cada relatório pendente, incluindo:
+    - Dados do relatório (ID, data de envio, observações do fiscal)
+    - Informações do contrato (número, objeto, contratado)
+    - Dados do fiscal responsável
+    - Arquivo anexado
+    - Pendência relacionada
+    
+    Útil para a tela de análise de relatórios onde o admin precisa 
+    aprovar ou rejeitar cada relatório individualmente.
+    """
+    return await service.get_relatorios_pendentes_analise()
+
+
+@router.patch("/admin/cancelar-pendencia/{pendencia_id}")
+async def cancelar_pendencia(
+    pendencia_id: int,
+    service: DashboardService = Depends(get_dashboard_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Cancela uma pendência que ainda não foi respondida pelo fiscal.
+    
+    Altera o status da pendência para "Cancelada", impedindo que o fiscal
+    precise enviar relatório para esta pendência.
+    
+    Disponível apenas para administradores.
+    """
+    return await service.cancelar_pendencia(pendencia_id)
+
+
 @router.get("/admin/pendencias-vencidas", response_model=PendenciasVencidasAdminResponse)
 async def get_pendencias_vencidas_admin(
     limit: int = Query(50, ge=1, le=200, description="Limite de pendências retornadas"),
