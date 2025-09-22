@@ -372,7 +372,6 @@ class DashboardRepository:
                     FROM contrato c
                     WHERE (c.fiscal_id = $1 OR c.fiscal_substituto_id = $1)
                         AND c.ativo = true
-                        AND c.data_exclusao IS NULL
                 """
                 result = await self.conn.fetchval(query, fiscal_id)
                 contadores['contratos_ativos'] = result or 0
