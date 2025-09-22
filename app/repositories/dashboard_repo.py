@@ -18,12 +18,12 @@ class DashboardRepository:
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
-            AND table_name IN ('contrato', 'contratados', 'usuario', 'status', 'relatoriofiscal', 'statusrelatorio')
+            AND table_name IN ('contrato', 'contratado', 'usuario', 'status', 'relatoriofiscal', 'statusrelatorio')
             """
             existing_tables = await self.conn.fetch(check_query)
             table_names = [row['table_name'] for row in existing_tables]
 
-            required_tables = ['contrato', 'contratados', 'usuario', 'status', 'relatoriofiscal', 'statusrelatorio']
+            required_tables = ['contrato', 'contratado', 'usuario', 'status', 'relatoriofiscal', 'statusrelatorio']
             missing_tables = [table for table in required_tables if table not in table_names]
 
             if missing_tables:
@@ -42,15 +42,15 @@ class DashboardRepository:
                 u_fiscal.nome as fiscal_nome,
                 s.nome as status_nome,
                 COUNT(r.id) as relatorios_pendentes_count,
-                MAX(r.data_submissao) as ultimo_relatorio_data,
+                MAX(r.created_at) as ultimo_relatorio_data,
                 u_ultimo_fiscal.nome as ultimo_relatorio_fiscal
             FROM contrato c
-            JOIN contratados ct ON c.contratado_id = ct.id
+            JOIN contratado ct ON c.contratado_id = ct.id
             JOIN usuario u_gestor ON c.gestor_id = u_gestor.id
             JOIN usuario u_fiscal ON c.fiscal_id = u_fiscal.id
             JOIN status s ON c.status_id = s.id
             JOIN relatoriofiscal r ON r.contrato_id = c.id
-            JOIN statusrelatorio sr ON r.status_relatorio_id = sr.id
+            JOIN statusrelatorio sr ON r.status_id = sr.id
             LEFT JOIN usuario u_ultimo_fiscal ON r.fiscal_usuario_id = u_ultimo_fiscal.id
             WHERE
                 c.ativo = true
@@ -58,7 +58,7 @@ class DashboardRepository:
             GROUP BY
                 c.id, c.nr_contrato, c.objeto, c.data_inicio, c.data_fim,
                 ct.nome, u_gestor.nome, u_fiscal.nome, s.nome, u_ultimo_fiscal.nome
-            ORDER BY MAX(r.data_submissao) ASC
+            ORDER BY MAX(r.created_at) ASC
             LIMIT $1
             """
             rows = await self.conn.fetch(query, limit)
@@ -78,12 +78,12 @@ class DashboardRepository:
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
-            AND table_name IN ('contrato', 'contratados', 'usuario', 'status', 'pendenciarelatorio', 'statuspendencia')
+            AND table_name IN ('contrato', 'contratado', 'usuario', 'status', 'pendenciarelatorio', 'statuspendencia')
             """
             existing_tables = await self.conn.fetch(check_query)
             table_names = [row['table_name'] for row in existing_tables]
 
-            required_tables = ['contrato', 'contratados', 'usuario', 'status', 'pendenciarelatorio', 'statuspendencia']
+            required_tables = ['contrato', 'contratado', 'usuario', 'status', 'pendenciarelatorio', 'statuspendencia']
             missing_tables = [table for table in required_tables if table not in table_names]
 
             if missing_tables:
@@ -105,7 +105,7 @@ class DashboardRepository:
                 SUM(CASE WHEN p.data_prazo < CURRENT_DATE THEN 1 ELSE 0 END) as pendencias_em_atraso,
                 MAX(p.created_at) as ultima_pendencia_data
             FROM contrato c
-            JOIN contratados ct ON c.contratado_id = ct.id
+            JOIN contratado ct ON c.contratado_id = ct.id
             JOIN usuario u_gestor ON c.gestor_id = u_gestor.id
             JOIN usuario u_fiscal ON c.fiscal_id = u_fiscal.id
             JOIN status s ON c.status_id = s.id
@@ -330,8 +330,8 @@ class DashboardRepository:
                     JOIN contrato c ON r.contrato_id = c.id
                     WHERE r.fiscal_usuario_id = $1
                         AND c.ativo = true
-                        AND EXTRACT(MONTH FROM r.data_submissao) = EXTRACT(MONTH FROM CURRENT_DATE)
-                        AND EXTRACT(YEAR FROM r.data_submissao) = EXTRACT(YEAR FROM CURRENT_DATE)
+                        AND EXTRACT(MONTH FROM r.created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
+                        AND EXTRACT(YEAR FROM r.created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
                 """
                 result = await self.conn.fetchval(query, fiscal_id)
                 contadores['relatorios_enviados_mes'] = result or 0
