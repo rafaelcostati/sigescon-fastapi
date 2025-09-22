@@ -235,7 +235,7 @@ async def setup_basico():
 
         admin_user_id = await conn.fetchval(
             """
-            INSERT INTO usuario (nome, email, cpf, senha, ativo, created_at, updated_at)
+            INSERT INTO usuario (nome, email, cpf, senha_hash, ativo, created_at, updated_at)
             VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW())
             RETURNING id
             """,
@@ -377,7 +377,7 @@ async def setup_completo():
         admin_password = os.getenv('ADMIN_PASSWORD', 'Admin@123')
 
         admin_user_id = await conn.fetchval(
-            """INSERT INTO usuario (nome, email, cpf, senha, ativo, created_at, updated_at)
+            """INSERT INTO usuario (nome, email, cpf, senha_hash, ativo, created_at, updated_at)
                VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW()) RETURNING id""",
             'Administrador do Sistema', admin_email, '00000000000', get_password_hash(admin_password)
         )
@@ -397,7 +397,7 @@ async def setup_completo():
 
         # Fiscal 1
         fiscal1_id = await conn.fetchval(
-            """INSERT INTO usuario (nome, email, cpf, senha, ativo, created_at, updated_at)
+            """INSERT INTO usuario (nome, email, cpf, senha_hash, ativo, created_at, updated_at)
                VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW()) RETURNING id""",
             'João Silva Fiscal', 'joao.fiscal@sigescon.gov.br', generate_cpf(), get_password_hash('Fiscal@123')
         )
@@ -408,7 +408,7 @@ async def setup_completo():
 
         # Fiscal 2
         fiscal2_id = await conn.fetchval(
-            """INSERT INTO usuario (nome, email, cpf, senha, ativo, created_at, updated_at)
+            """INSERT INTO usuario (nome, email, cpf, senha_hash, ativo, created_at, updated_at)
                VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW()) RETURNING id""",
             'Maria Santos Fiscal', 'maria.fiscal@sigescon.gov.br', generate_cpf(), get_password_hash('Fiscal@123')
         )
@@ -419,7 +419,7 @@ async def setup_completo():
 
         # Gestor
         gestor_id = await conn.fetchval(
-            """INSERT INTO usuario (nome, email, cpf, senha, ativo, created_at, updated_at)
+            """INSERT INTO usuario (nome, email, cpf, senha_hash, ativo, created_at, updated_at)
                VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW()) RETURNING id""",
             'Carlos Gestor Silva', 'carlos.gestor@sigescon.gov.br', generate_cpf(), get_password_hash('Gestor@123')
         )
@@ -538,7 +538,7 @@ async def setup_completo():
 
             # Criar arquivo de exemplo para pendência aguardando análise
             arquivo_id = await conn.fetchval(
-                """INSERT INTO arquivo (nome_arquivo, path_armazenamento, tipo_arquivo, tamanho_bytes,
+                """INSERT INTO arquivo (nome_arquivo, caminho_arquivo, tipo_mime, tamanho_bytes,
                                       contrato_id, created_at)
                    VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id""",
                 f'relatorio_exemplo_contrato_{i+1}.pdf',
@@ -548,10 +548,10 @@ async def setup_completo():
 
             # Criar relatório para pendência aguardando análise
             await conn.execute(
-                """INSERT INTO relatoriofiscal (contrato_id, arquivo_id, status_id, mes_competencia,
+                """INSERT INTO relatoriofiscal (contrato_id, arquivo_id, status_id, titulo,
                                                pendencia_id, fiscal_usuario_id, created_at, updated_at)
                    VALUES ($1, $2, 1, $3, $4, $5, NOW(), NOW())""",
-                contrato_id, arquivo_id, date(2025, 9, 1), pendencia_analise_id, fiscal_id
+                contrato_id, arquivo_id, f'Relatório Mensal - Contrato {i+1}', pendencia_analise_id, fiscal_id
             )
 
         print("✅ Pendências de teste criadas")
