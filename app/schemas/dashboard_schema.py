@@ -74,6 +74,7 @@ class ContadoresDashboard(BaseModel):
     contratos_com_pendencias: int
     usuarios_ativos: int
     contratos_ativos: int
+    total_contratacoes: int
 
     # Para Fiscal
     minhas_pendencias: int

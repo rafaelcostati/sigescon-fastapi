@@ -209,6 +209,7 @@ class DashboardRepository:
                 'contratos_com_pendencias': 0,
                 'usuarios_ativos': 0,
                 'contratos_ativos': 0,
+                'total_contratacoes': 0,
                 'minhas_pendencias': 0,
                 'pendencias_em_atraso': 0,
                 'relatorios_enviados_mes': 0,
@@ -258,6 +259,12 @@ class DashboardRepository:
                 result = await self.conn.fetchval(query)
                 contadores['contratos_ativos'] = result or 0
 
+            # Total de contratações (todos os status)
+            if 'contrato' in table_names:
+                query = "SELECT COUNT(*) FROM contrato"
+                result = await self.conn.fetchval(query)
+                contadores['total_contratacoes'] = result or 0
+
             return contadores
 
         except Exception as e:
@@ -267,6 +274,7 @@ class DashboardRepository:
                 'contratos_com_pendencias': 0,
                 'usuarios_ativos': 0,
                 'contratos_ativos': 0,
+                'total_contratacoes': 0,
                 'minhas_pendencias': 0,
                 'pendencias_em_atraso': 0,
                 'relatorios_enviados_mes': 0,

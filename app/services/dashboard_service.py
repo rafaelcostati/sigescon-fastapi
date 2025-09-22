@@ -180,6 +180,7 @@ class DashboardService:
             contratos_com_pendencias=admin_contadores['contratos_com_pendencias'],
             usuarios_ativos=admin_contadores['usuarios_ativos'],
             contratos_ativos=admin_contadores['contratos_ativos'],
+            total_contratacoes=admin_contadores['total_contratacoes'],
             minhas_pendencias=0,
             pendencias_em_atraso=0,
             relatorios_enviados_mes=0,
