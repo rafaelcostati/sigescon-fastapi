@@ -24,7 +24,8 @@ from app.schemas.dashboard_schema import (
     PendenciasVencidasAdminResponse,
     DashboardAdminCompleto,
     DashboardFiscalCompleto,
-    DashboardGestorCompleto
+    DashboardGestorCompleto,
+    DashboardFiscalMelhorado
 )
 
 router = APIRouter(
@@ -456,3 +457,36 @@ async def get_dashboard_gestor_melhorado(
         )
 
     return await service.get_dashboard_gestor_melhorado(current_user.id)
+
+
+@router.get("/fiscal/melhorado", response_model=DashboardFiscalMelhorado, summary="Dashboard fiscal melhorado versão 2")
+async def get_dashboard_fiscal_melhorado_v2(
+    service: DashboardService = Depends(get_dashboard_service),
+    current_user: Usuario = Depends(get_current_fiscal_user)
+):
+    """
+    Dashboard melhorado do fiscal com todas as métricas específicas.
+
+    **Versão Melhorada - Conforme solicitado:**
+    - minhas_pendencias: 3
+    - pendencias_em_atraso: 1
+    - relatorios_enviados: 12
+    - contratos_ativos: 4
+    - pendencias_proximas_vencimento: 2
+    - relatorios_rejeitados: 1
+
+    **Métricas incluídas:**
+    - Minhas pendências ativas
+    - Pendências em atraso
+    - Total de relatórios enviados
+    - Contratos ativos onde sou fiscal
+    - **Pendências próximas** do vencimento (7 dias)
+    - **Relatórios rejeitados** que precisam reenvio
+
+    **Ideal para:**
+    - Priorizar trabalho diário
+    - Identificar urgências
+    - Acompanhar performance pessoal
+    - Evitar atrasos
+    """
+    return await service.get_dashboard_fiscal_melhorado_v2(current_user.id)

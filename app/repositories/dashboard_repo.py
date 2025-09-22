@@ -199,7 +199,7 @@ class DashboardRepository:
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
-            AND table_name IN ('relatoriofiscal', 'statusrelatorio', 'contrato', 'pendenciarelatorio', 'statuspendencia', 'usuario')
+            AND table_name IN ('relatoriofiscal', 'statusrelatorio', 'contrato', 'pendenciarelatorio', 'statuspendencia', 'usuario', 'contratado')
             """
             existing_tables = await self.conn.fetch(check_query)
             table_names = [row['table_name'] for row in existing_tables]
@@ -210,10 +210,12 @@ class DashboardRepository:
                 'usuarios_ativos': 0,
                 'contratos_ativos': 0,
                 'total_contratacoes': 0,
+                'contratados_com_pendencias_vencidas': 0,
                 'minhas_pendencias': 0,
                 'pendencias_em_atraso': 0,
                 'relatorios_enviados_mes': 0,
-                'contratos_sob_gestao': 0
+                'contratos_sob_gestao': 0,
+                'relatorios_equipe_pendentes': 0
             }
 
             # Relatórios para análise
@@ -249,12 +251,13 @@ class DashboardRepository:
                 result = await self.conn.fetchval(query)
                 contadores['usuarios_ativos'] = result or 0
 
-            # Contratos ativos
+            # Contratos ativos (apenas status "Ativo")
             if 'contrato' in table_names:
                 query = """
                     SELECT COUNT(*)
-                    FROM contrato
-                    WHERE ativo = true
+                    FROM contrato c
+                    JOIN status s ON c.status_id = s.id
+                    WHERE c.ativo = true AND s.nome = 'Ativo'
                 """
                 result = await self.conn.fetchval(query)
                 contadores['contratos_ativos'] = result or 0
@@ -264,6 +267,21 @@ class DashboardRepository:
                 query = "SELECT COUNT(*) FROM contrato"
                 result = await self.conn.fetchval(query)
                 contadores['total_contratacoes'] = result or 0
+
+            # Contratados com pendências vencidas
+            if all(table in table_names for table in ['contrato', 'contratado', 'pendenciarelatorio', 'statuspendencia']):
+                query = """
+                    SELECT COUNT(DISTINCT ct.id)
+                    FROM contratado ct
+                    JOIN contrato c ON ct.id = c.contratado_id
+                    JOIN pendenciarelatorio p ON c.id = p.contrato_id
+                    JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
+                    WHERE c.ativo = true
+                    AND sp.nome = 'Pendente'
+                    AND p.data_prazo < CURRENT_DATE
+                """
+                result = await self.conn.fetchval(query)
+                contadores['contratados_com_pendencias_vencidas'] = result or 0
 
             return contadores
 
@@ -275,10 +293,12 @@ class DashboardRepository:
                 'usuarios_ativos': 0,
                 'contratos_ativos': 0,
                 'total_contratacoes': 0,
+                'contratados_com_pendencias_vencidas': 0,
                 'minhas_pendencias': 0,
                 'pendencias_em_atraso': 0,
                 'relatorios_enviados_mes': 0,
-                'contratos_sob_gestao': 0
+                'contratos_sob_gestao': 0,
+                'relatorios_equipe_pendentes': 0
             }
 
     async def get_contadores_fiscal(self, fiscal_id: int) -> Dict[str, int]:
@@ -299,7 +319,8 @@ class DashboardRepository:
             contadores = {
                 'minhas_pendencias': 0,
                 'pendencias_em_atraso': 0,
-                'relatorios_enviados_mes': 0
+                'relatorios_enviados_mes': 0,
+                'contratos_ativos': 0
             }
 
             # Minhas pendências
@@ -344,6 +365,18 @@ class DashboardRepository:
                 result = await self.conn.fetchval(query, fiscal_id)
                 contadores['relatorios_enviados_mes'] = result or 0
 
+            # Contratos ativos do fiscal
+            if 'contrato' in table_names:
+                query = """
+                    SELECT COUNT(*)
+                    FROM contrato c
+                    WHERE (c.fiscal_id = $1 OR c.fiscal_substituto_id = $1)
+                        AND c.ativo = true
+                        AND c.data_exclusao IS NULL
+                """
+                result = await self.conn.fetchval(query, fiscal_id)
+                contadores['contratos_ativos'] = result or 0
+
             return contadores
 
         except Exception as e:
@@ -351,7 +384,8 @@ class DashboardRepository:
             return {
                 'minhas_pendencias': 0,
                 'pendencias_em_atraso': 0,
-                'relatorios_enviados_mes': 0
+                'relatorios_enviados_mes': 0,
+                'contratos_ativos': 0
             }
 
     async def get_pendencias_vencidas_admin(self, limit: int = 50) -> List[Dict[str, Any]]:
@@ -668,9 +702,14 @@ class DashboardRepository:
                 result = await self.conn.fetchval(query)
                 metrics['contratos_com_pendencias'] = result or 0
 
-            # 2. Contratos ativos
+            # 2. Contratos ativos (apenas status "Ativo")
             if 'contrato' in table_names:
-                query = "SELECT COUNT(*) FROM contrato WHERE ativo = true"
+                query = """
+                    SELECT COUNT(*)
+                    FROM contrato c
+                    JOIN status s ON c.status_id = s.id
+                    WHERE c.ativo = true AND s.nome = 'Ativo'
+                """
                 result = await self.conn.fetchval(query)
                 metrics['contratos_ativos'] = result or 0
 
@@ -855,12 +894,13 @@ class DashboardRepository:
                 result = await self.conn.fetchval(query, fiscal_id)
                 metrics['relatorios_enviados'] = result or 0
 
-            # 4. Contratos ativos onde sou fiscal
+            # 4. Contratos ativos onde sou fiscal (apenas status "Ativo")
             if 'contrato' in table_names:
                 query = """
                     SELECT COUNT(*)
-                    FROM contrato
-                    WHERE fiscal_id = $1 AND ativo = true
+                    FROM contrato c
+                    JOIN status s ON c.status_id = s.id
+                    WHERE c.fiscal_id = $1 AND c.ativo = true AND s.nome = 'Ativo'
                 """
                 result = await self.conn.fetchval(query, fiscal_id)
                 metrics['contratos_ativos'] = result or 0
@@ -932,9 +972,14 @@ class DashboardRepository:
                 'contratos_proximos_vencimento': []
             }
 
-            # 1. Contratos sob gestão
+            # 1. Contratos sob gestão (apenas status "Ativo")
             if 'contrato' in table_names:
-                query = "SELECT COUNT(*) FROM contrato WHERE gestor_id = $1 AND ativo = true"
+                query = """
+                    SELECT COUNT(*)
+                    FROM contrato c
+                    JOIN status s ON c.status_id = s.id
+                    WHERE c.gestor_id = $1 AND c.ativo = true AND s.nome = 'Ativo'
+                """
                 result = await self.conn.fetchval(query, gestor_id)
                 metrics['contratos_sob_gestao'] = result or 0
 

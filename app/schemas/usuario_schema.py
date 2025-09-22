@@ -17,15 +17,23 @@ class UsuarioBase(BaseModel):
         """Remove formatação e valida o CPF, permitindo o CPF padrão do admin."""
         # Remove caracteres não numéricos
         cpf = re.sub(r'\D', '', v)
-        
+
         if len(cpf) != 11:
             raise ValueError('CPF deve ter 11 dígitos')
-        
+
         # Permite o CPF do admin do seeder, mas rejeita outros CPFs inválidos.
         if len(set(cpf)) == 1 and cpf != '00000000000':
             raise ValueError('CPF inválido')
-            
+
         return cpf
+
+    @field_validator('matricula')
+    @classmethod
+    def validate_matricula(cls, v: Optional[str]) -> Optional[str]:
+        """Converte string vazia em None para permitir múltiplos usuários sem matrícula."""
+        if v is not None and v.strip() == '':
+            return None
+        return v
 
 class UsuarioCreate(UsuarioBase):
     senha: str = Field(..., min_length=6, description="Senha do usuário")
@@ -47,13 +55,21 @@ class UsuarioUpdate(BaseModel):
         """Valida CPF se fornecido, permitindo o CPF padrão do admin."""
         if v is None:
             return v
-            
+
         cpf = re.sub(r'\D', '', v)
         if len(cpf) != 11:
             raise ValueError('CPF deve ter 11 dígitos')
         if len(set(cpf)) == 1 and cpf != '00000000000':
             raise ValueError('CPF inválido')
         return cpf
+
+    @field_validator('matricula')
+    @classmethod
+    def validate_matricula_update(cls, v: Optional[str]) -> Optional[str]:
+        """Converte string vazia em None para permitir múltiplos usuários sem matrícula."""
+        if v is not None and v.strip() == '':
+            return None
+        return v
 
 class UsuarioChangePassword(BaseModel):
     senha_antiga: str = Field(..., description="Senha atual do usuário")

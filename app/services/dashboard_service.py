@@ -164,6 +164,7 @@ class DashboardService:
             usuarios_ativos=contadores_dict.get('usuarios_ativos', 0),
             contratos_ativos=contadores_dict.get('contratos_ativos', 0),
             total_contratacoes=contadores_dict.get('total_contratacoes', 0),
+            contratados_com_pendencias_vencidas=contadores_dict.get('contratados_com_pendencias_vencidas', 0),
             minhas_pendencias=contadores_dict.get('minhas_pendencias', 0),
             pendencias_em_atraso=contadores_dict.get('pendencias_em_atraso', 0),
             relatorios_enviados_mes=contadores_dict.get('relatorios_enviados_mes', 0),
@@ -183,6 +184,7 @@ class DashboardService:
             usuarios_ativos=admin_contadores['usuarios_ativos'],
             contratos_ativos=admin_contadores['contratos_ativos'],
             total_contratacoes=admin_contadores['total_contratacoes'],
+            contratados_com_pendencias_vencidas=admin_contadores['contratados_com_pendencias_vencidas'],
             minhas_pendencias=0,
             pendencias_em_atraso=0,
             relatorios_enviados_mes=0,
@@ -212,13 +214,14 @@ class DashboardService:
             relatorios_para_analise=0,
             contratos_com_pendencias=0,
             usuarios_ativos=0,
-            contratos_ativos=0,
+            contratos_ativos=fiscal_contadores['contratos_ativos'],
             total_contratacoes=0,
             minhas_pendencias=fiscal_contadores['minhas_pendencias'],
             pendencias_em_atraso=fiscal_contadores['pendencias_em_atraso'],
             relatorios_enviados_mes=fiscal_contadores['relatorios_enviados_mes'],
             contratos_sob_gestao=0,
-            relatorios_equipe_pendentes=0
+            relatorios_equipe_pendentes=0,
+            contratados_com_pendencias_vencidas=0
         )
 
         # Busca pendências do fiscal
@@ -338,7 +341,9 @@ class DashboardService:
             pendencias_em_atraso=0,
             relatorios_enviados_mes=0,
             contratos_sob_gestao=gestor_contadores['contratos_sob_gestao'],
-            relatorios_equipe_pendentes=gestor_contadores['relatorios_equipe_pendentes']
+            relatorios_equipe_pendentes=gestor_contadores['relatorios_equipe_pendentes'],
+            contratados_com_pendencias_vencidas=0,
+            total_contratacoes=0
         )
 
         # Busca pendências dos contratos sob gestão
@@ -475,3 +480,21 @@ class DashboardService:
                 "status_anterior": "Pendente",
                 "status_atual": "Cancelada"
             }
+
+    async def get_dashboard_fiscal_melhorado_v2(self, fiscal_id: int):
+        """
+        Busca dados melhorados do dashboard fiscal conforme especificação solicitada
+        """
+        from app.schemas.dashboard_schema import DashboardFiscalMelhorado
+
+        # Reutiliza o método existente do repositório
+        metrics = await self.dashboard_repo.get_dashboard_fiscal_completo(fiscal_id)
+
+        return DashboardFiscalMelhorado(
+            minhas_pendencias=metrics['minhas_pendencias'],
+            pendencias_em_atraso=metrics['pendencias_em_atraso'],
+            relatorios_enviados=metrics['relatorios_enviados'],
+            contratos_ativos=metrics['contratos_ativos'],
+            pendencias_proximas_vencimento=metrics['pendencias_proximas_vencimento'],
+            relatorios_rejeitados=metrics['relatorios_rejeitados']
+        )

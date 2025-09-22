@@ -75,6 +75,7 @@ class ContadoresDashboard(BaseModel):
     usuarios_ativos: int
     contratos_ativos: int
     total_contratacoes: int
+    contratados_com_pendencias_vencidas: int
 
     # Para Fiscal
     minhas_pendencias: int
@@ -195,3 +196,13 @@ class DashboardGestorCompleto(BaseModel):
     relatorios_equipe_aguardando: int
     performance_equipe: EquipePerformance
     contratos_proximos_vencimento: List[ContratoProximoVencimento]
+
+
+class DashboardFiscalMelhorado(BaseModel):
+    """Dashboard melhorado para fiscais com métricas específicas"""
+    minhas_pendencias: int
+    pendencias_em_atraso: int
+    relatorios_enviados: int
+    contratos_ativos: int
+    pendencias_proximas_vencimento: int
+    relatorios_rejeitados: int
