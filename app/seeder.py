@@ -54,7 +54,7 @@ async def seed_data(conn: asyncpg.Connection):
                 # Cria o usuário sem perfil_id (campo legacy)
                 admin_user_id = await conn.fetchval(
                     """
-                    INSERT INTO usuario (nome, email, cpf, senha)
+                    INSERT INTO usuario (nome, email, cpf, senha_hash)
                     VALUES ($1, $2, $3, $4)
                     RETURNING id
                     """,

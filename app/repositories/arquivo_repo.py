@@ -15,7 +15,7 @@ class ArquivoRepository:
         contrato_id: int
     ) -> Dict:
         query = """
-            INSERT INTO arquivo (nome_arquivo, path_armazenamento, tipo_arquivo, tamanho_bytes, contrato_id)
+            INSERT INTO arquivo (nome_arquivo, caminho_arquivo, tipo_mime, tamanho_bytes, contrato_id)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
         """

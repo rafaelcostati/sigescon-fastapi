@@ -8,11 +8,10 @@ class UsuarioPerfilBase(BaseModel):
     perfil_id: int = Field(..., description="ID do perfil")
 
 class UsuarioPerfilCreate(UsuarioPerfilBase):
-    observacoes: Optional[str] = Field(None, description="Justificativa para concessão do perfil")
+    pass
 
 class UsuarioPerfilGrantRequest(BaseModel):
     perfil_ids: List[int] = Field(..., description="Lista de IDs dos perfis a conceder")
-    observacoes: Optional[str] = Field(None, description="Justificativa para concessão dos perfis")
 
 class UsuarioPerfilRevokeRequest(BaseModel):
     perfil_ids: List[int] = Field(..., description="Lista de IDs dos perfis a revogar")
@@ -22,7 +21,6 @@ class UsuarioPerfil(UsuarioPerfilBase):
     ativo: bool = Field(default=True, description="Status ativo do perfil")  
     perfil_nome: str
     data_concessao: datetime
-    observacoes: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -59,7 +57,6 @@ class HistoricoPerfilConcessao(BaseModel):
     data_concessao: datetime
     concedido_por_usuario_id: Optional[int] = None
     concedido_por_nome: Optional[str] = None
-    observacoes: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -70,4 +67,3 @@ class ValidacaoPerfil(BaseModel):
     pode_ser_gestor: bool
     pode_ser_admin: bool
     perfis_ativos: List[str]
-    observacoes: Optional[str] = None

@@ -34,7 +34,6 @@ class Contrato(ContratoBase):
     gestor_nome: Optional[str] = None
     fiscal_nome: Optional[str] = None
     fiscal_substituto_nome: Optional[str] = None
-    documento_nome_arquivo: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 

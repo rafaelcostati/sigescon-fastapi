@@ -72,11 +72,10 @@ class UsuarioPerfilService:
         # Concede os perfis
         granted_profiles = []
         for perfil_id in request.perfil_ids:
-            profile_data = await self.usuario_perfil_repo.add_profile_to_user(
+            profile_result = await self.usuario_perfil_repo.add_profile_to_user(
                 usuario_id=usuario_id,
                 perfil_id=perfil_id,
-                concedido_por=admin_id,
-                observacoes=request.observacoes
+                concedido_por=admin_id
             )
             
             # Busca dados completos do perfil concedido
@@ -224,14 +223,13 @@ class UsuarioPerfilService:
             await self.usuario_perfil_repo.add_profile_to_user(
                 usuario_id=usuario_id,
                 perfil_id=user['perfil_id'],
-                concedido_por=admin_id,
-                observacoes="Migração automática do sistema de perfil único"
+                concedido_por=admin_id
             )
         
         return await self.get_user_complete_info(usuario_id)
 
     async def bulk_grant_profile(self, usuario_ids: List[int], perfil_id: int, 
-                                admin_id: int, observacoes: Optional[str] = None) -> dict:
+                                admin_id: int) -> dict:
         """Concede um perfil a múltiplos usuários"""
         # Verifica se o perfil existe
         if not await self.perfil_repo.get_perfil_by_id(perfil_id):
@@ -267,8 +265,7 @@ class UsuarioPerfilService:
                 await self.usuario_perfil_repo.add_profile_to_user(
                     usuario_id=usuario_id,
                     perfil_id=perfil_id,
-                    concedido_por=admin_id,
-                    observacoes=observacoes
+                    concedido_por=admin_id
                 )
                 results["success"].append(usuario_id)
                 

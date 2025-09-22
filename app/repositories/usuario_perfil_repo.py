@@ -10,7 +10,7 @@ class UsuarioPerfilRepository:
         """Busca todos os perfis ativos de um usuário """
         query = """
             SELECT up.id, up.usuario_id, up.perfil_id, p.nome as perfil_nome,
-                   up.data_concessao, up.observacoes, up.ativo
+                   up.data_concessao, up.ativo
             FROM usuario_perfil up
             JOIN perfil p ON up.perfil_id = p.id
             WHERE up.usuario_id = $1 AND up.ativo = TRUE AND p.ativo = TRUE
@@ -53,22 +53,36 @@ class UsuarioPerfilRepository:
         return bool(result)
 
     async def add_profile_to_user(self, usuario_id: int, perfil_id: int, 
-                                 concedido_por: int, observacoes: Optional[str] = None) -> Dict:
+                                 concedido_por: int) -> Dict:
         """Adiciona um perfil a um usuário """
-        query = """
-            INSERT INTO usuario_perfil (usuario_id, perfil_id, concedido_por_usuario_id, observacoes, ativo)
-            VALUES ($1, $2, $3, $4, TRUE)
-            ON CONFLICT (usuario_id, perfil_id) 
-            DO UPDATE SET ativo = TRUE, data_concessao = NOW(), 
-                         concedido_por_usuario_id = $3, observacoes = $4
-            RETURNING id, usuario_id, perfil_id, ativo, data_concessao, observacoes
-        """
-        record = await self.conn.fetchrow(query, usuario_id, perfil_id, concedido_por, observacoes)
+        # Primeiro verifica se já existe
+        existing = await self.conn.fetchrow("""
+            SELECT id FROM usuario_perfil 
+            WHERE usuario_id = $1 AND perfil_id = $2
+        """, usuario_id, perfil_id)
+        
+        if existing:
+            # Atualiza o registro existente
+            query = """
+                UPDATE usuario_perfil 
+                SET ativo = TRUE, data_concessao = NOW(), concedido_por_usuario_id = $3
+                WHERE usuario_id = $1 AND perfil_id = $2
+                RETURNING id, usuario_id, perfil_id, ativo, data_concessao
+            """
+            record = await self.conn.fetchrow(query, usuario_id, perfil_id, concedido_por)
+        else:
+            # Insere novo registro
+            query = """
+                INSERT INTO usuario_perfil (usuario_id, perfil_id, concedido_por_usuario_id, ativo)
+                VALUES ($1, $2, $3, TRUE)
+                RETURNING id, usuario_id, perfil_id, ativo, data_concessao
+            """
+            record = await self.conn.fetchrow(query, usuario_id, perfil_id, concedido_por)
         
         # Busca informações completas incluindo nome do perfil
         complete_query = """
             SELECT up.id, up.usuario_id, up.perfil_id, p.nome as perfil_nome,
-                   up.data_concessao, up.observacoes, up.ativo
+                   up.data_concessao, up.ativo
             FROM usuario_perfil up
             JOIN perfil p ON up.perfil_id = p.id
             WHERE up.id = $1

@@ -103,6 +103,18 @@ async def create_contrato(
     return await service.create_contrato(contrato_create, documento_contrato)
 
 
+@router.get("/next-number", response_model=dict)
+async def get_next_contract_number(
+    service: ContratoService = Depends(get_contrato_service),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Retorna o próximo número de contrato disponível.
+    Útil para sugerir um número ao criar um novo contrato.
+    """
+    next_number = await service.contrato_repo.get_next_available_nr_contrato()
+    return {"next_number": next_number}
+
 @router.get("/", response_model=ContratoPaginated)
 async def list_contratos(
     page: int = Query(1, ge=1, description="Número da página"),

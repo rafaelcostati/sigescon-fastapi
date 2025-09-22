@@ -68,7 +68,7 @@ class UsuarioRepository:
         # Os perfis devem ser concedidos posteriormente via /usuarios/{id}/perfis/conceder
         
         query = """
-            INSERT INTO usuario (nome, email, cpf, matricula, senha, perfil_id)
+            INSERT INTO usuario (nome, email, cpf, matricula, senha_hash, perfil_id)
             VALUES ($1, $2, $3, $4, $5, NULL)
             RETURNING id, nome, email, cpf, matricula, ativo, created_at, updated_at
         """
@@ -104,13 +104,17 @@ class UsuarioRepository:
 
     async def update_user_password(self, user_id: int, new_hash: str) -> bool:
         """Atualiza apenas a senha de um usuário"""
-        query = "UPDATE usuario SET senha = $2, updated_at = NOW() WHERE id = $1 AND ativo = TRUE"
+        query = "UPDATE usuario SET senha_hash = $2, updated_at = NOW() WHERE id = $1 AND ativo = TRUE"
         result = await self.conn.execute(query, user_id, new_hash)
         return result.endswith('1')
+    
+    async def update_user_password_hash(self, user_id: int, new_hash: str) -> bool:
+        """Atualiza o hash da senha de um usuário (alias para update_user_password)"""
+        return await self.update_user_password(user_id, new_hash)
 
     async def get_user_with_password(self, user_id: int) -> Optional[Dict]:
         """Retorna o usuário com a senha para verificação de senha antiga"""
-        query = "SELECT id, senha FROM usuario WHERE id = $1 AND ativo = TRUE"
+        query = "SELECT id, senha_hash FROM usuario WHERE id = $1 AND ativo = TRUE"
         user = await self.conn.fetchrow(query, user_id)
         return dict(user) if user else None
 

@@ -90,6 +90,10 @@ async def database_exception_handler(request: Request, exc: asyncpg.PostgresErro
     sqlstate = getattr(exc, 'sqlstate', None)
     user_message = error_mappings.get(sqlstate, "Erro interno do banco de dados")
     
+    # Mensagem específica para número de contrato duplicado
+    if sqlstate == "23505" and "idx_unique_contrato_nr_contrato_ativo" in str(exc):
+        user_message = "Este número de contrato já está em uso. Por favor, escolha um número diferente."
+    
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={

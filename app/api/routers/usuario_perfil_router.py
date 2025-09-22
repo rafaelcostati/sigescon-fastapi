@@ -169,9 +169,8 @@ async def migrate_user_to_multiple_profiles(
 async def bulk_grant_profile(
     usuario_ids: List[int],
     perfil_id: int,
-    observacoes: str = None,
     service: UsuarioPerfilService = Depends(get_usuario_perfil_service),
     admin_user: Usuario = Depends(admin_required)
 ):
     """Concede um perfil a múltiplos usuários de uma vez"""
-    return await service.bulk_grant_profile(usuario_ids, perfil_id, admin_user.id, observacoes)
+    return await service.bulk_grant_profile(usuario_ids, perfil_id, admin_user.id)

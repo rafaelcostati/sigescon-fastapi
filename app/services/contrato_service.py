@@ -42,18 +42,29 @@ class ContratoService:
 
     async def _validate_foreign_keys(self, contrato: ContratoCreate | ContratoUpdate):
         """Valida se todas as chaves estrangeiras existem"""
-        if hasattr(contrato, 'contratado_id') and contrato.contratado_id and not await self.contratado_repo.get_contratado_by_id(contrato.contratado_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contratado não encontrado")
-        if hasattr(contrato, 'modalidade_id') and contrato.modalidade_id and not await self.modalidade_repo.get_modalidade_by_id(contrato.modalidade_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Modalidade não encontrada")
-        if hasattr(contrato, 'status_id') and contrato.status_id and not await self.status_repo.get_status_by_id(contrato.status_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status não encontrado")
-        if hasattr(contrato, 'gestor_id') and contrato.gestor_id and not await self.usuario_repo.get_user_by_id(contrato.gestor_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gestor não encontrado")
-        if hasattr(contrato, 'fiscal_id') and contrato.fiscal_id and not await self.usuario_repo.get_user_by_id(contrato.fiscal_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fiscal não encontrado")
-        if hasattr(contrato, 'fiscal_substituto_id') and contrato.fiscal_substituto_id and not await self.usuario_repo.get_user_by_id(contrato.fiscal_substituto_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fiscal Substituto não encontrado")
+        if hasattr(contrato, 'contratado_id') and contrato.contratado_id:
+            if not await self.contratado_repo.get_contratado_by_id(contrato.contratado_id):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contratado não encontrado")
+        
+        if hasattr(contrato, 'modalidade_id') and contrato.modalidade_id:
+            if not await self.modalidade_repo.get_modalidade_by_id(contrato.modalidade_id):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Modalidade não encontrada")
+        
+        if hasattr(contrato, 'status_id') and contrato.status_id:
+            if not await self.status_repo.get_status_by_id(contrato.status_id):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status não encontrado")
+        
+        if hasattr(contrato, 'gestor_id') and contrato.gestor_id:
+            if not await self.usuario_repo.get_user_by_id(contrato.gestor_id):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gestor não encontrado")
+        
+        if hasattr(contrato, 'fiscal_id') and contrato.fiscal_id:
+            if not await self.usuario_repo.get_user_by_id(contrato.fiscal_id):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fiscal não encontrado")
+        
+        if hasattr(contrato, 'fiscal_substituto_id') and contrato.fiscal_substituto_id:
+            if not await self.usuario_repo.get_user_by_id(contrato.fiscal_substituto_id):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fiscal Substituto não encontrado")
 
     async def _send_contract_assignment_email(self, contrato_data: Dict, fiscal_id: int, gestor_id: int, is_update: bool = False, old_fiscal_id: Optional[int] = None):
         """Envia emails de notificação para fiscal e gestor quando um contrato é criado ou atualizado"""
@@ -109,13 +120,25 @@ class ContratoService:
 
     async def create_contrato(self, contrato_create: ContratoCreate, files: Optional[List[UploadFile]] = None) -> Contrato:
         """Cria um novo contrato e, opcionalmente, anexa múltiplos arquivos"""
+        
+        # Dados recebidos validados pelo Pydantic
+        
+        # Validação de chaves estrangeiras
         await self._validate_foreign_keys(contrato_create)
+        
+        # Validação de número duplicado
+        if await self.contrato_repo.exists_nr_contrato(contrato_create.nr_contrato):
+            next_available = await self.contrato_repo.get_next_available_nr_contrato()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=f"Já existe um contrato ativo com o número '{contrato_create.nr_contrato}'. Sugestão: use o número '{next_available}'."
+            )
 
         # Cria o contrato primeiro para obter um ID
         new_contrato_data = await self.contrato_repo.create_contrato(contrato_create)
         contrato_id = new_contrato_data['id']
 
-        # Se arquivos foram enviados, guarda-os e associa-os ao contrato
+        # Processamento de arquivos
         if files and any(file.filename for file in files if file):
             # Filtra apenas arquivos válidos
             valid_files = [file for file in files if file and file.filename and file.filename.strip()]
@@ -135,21 +158,20 @@ class ContratoService:
                     # Vincula o ID do arquivo ao contrato
                     await self.arquivo_repo.link_arquivo_to_contrato(arquivo_data['id'], contrato_id)
         
-        # Retorna o contrato completo, agora com a informação do arquivo, se houver
-        contrato_final = await self.contrato_repo.find_contrato_by_id(contrato_id)
-        contrato_response = Contrato.model_validate(contrato_final)
+        # Retorna o contrato completo com JOINs
+        contrato_response = Contrato.model_validate(new_contrato_data)
 
-        # Enviar emails de notificação 
+        # Envio de emails de notificação
         try:
             await self._send_contract_assignment_email(
-                contrato_data=contrato_final,
+                contrato_data=new_contrato_data,
                 fiscal_id=contrato_create.fiscal_id,
                 gestor_id=contrato_create.gestor_id,
                 is_update=False
             )
         except Exception as e:
             # Log do erro, mas não falha a criação do contrato
-            print(f"Erro ao enviar emails de notificação para contrato {contrato_id}: {e}")
+            logger.warning(f"Erro ao enviar emails de notificação para contrato {contrato_id}: {e}")
 
         return contrato_response
 
@@ -191,6 +213,15 @@ class ContratoService:
             existing_contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
             if not existing_contrato:
                 return None
+            
+            # Se está atualizando o número do contrato, verifica se já existe
+            if hasattr(contrato_update, 'nr_contrato') and contrato_update.nr_contrato:
+                if await self.contrato_repo.exists_nr_contrato(contrato_update.nr_contrato, exclude_id=contrato_id):
+                    next_available = await self.contrato_repo.get_next_available_nr_contrato()
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST, 
+                        detail=f"Já existe um contrato ativo com o número '{contrato_update.nr_contrato}'. Sugestão: use o número '{next_available}'."
+                    )
 
             # Processa arquivos se fornecidos
             if documento_contrato and any(file.filename for file in documento_contrato if file):

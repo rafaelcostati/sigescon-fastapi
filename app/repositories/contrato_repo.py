@@ -1,8 +1,11 @@
 # app/repositories/contrato_repo.py
 import asyncpg
+import logging
 from typing import List, Optional, Dict, Tuple
 
 from app.schemas.contrato_schema import ContratoCreate, ContratoUpdate
+
+logger = logging.getLogger(__name__)
 
 class ContratoRepository:
     def __init__(self, conn: asyncpg.Connection):
@@ -10,6 +13,7 @@ class ContratoRepository:
 
     async def create_contrato(self, contrato: ContratoCreate) -> Dict:
         contrato_data = contrato.model_dump()
+        
         fields = ", ".join(contrato_data.keys())
         placeholders = ", ".join([f"${i+1}" for i in range(len(contrato_data))])
         
@@ -18,12 +22,16 @@ class ContratoRepository:
             VALUES ({placeholders})
             RETURNING id
         """
+        
         new_contrato_id = await self.conn.fetchval(query, *contrato_data.values())
         return await self.find_contrato_by_id(new_contrato_id)
 
 
     # --- QUERY CORRIGIDA ---
     async def find_contrato_by_id(self, contrato_id: int, user_context: Optional[Dict] = None) -> Optional[Dict]:
+        # Garante que contrato_id seja um inteiro
+        contrato_id = int(contrato_id)
+        
         query = """
             SELECT
                 c.*,
@@ -32,8 +40,7 @@ class ContratoRepository:
                 s.nome AS status_nome,
                 gestor.nome AS gestor_nome,
                 fiscal.nome AS fiscal_nome,
-                fiscal_sub.nome AS fiscal_substituto_nome,
-                doc.nome_arquivo AS documento_nome_arquivo 
+                fiscal_sub.nome AS fiscal_substituto_nome
             FROM contrato c
             LEFT JOIN contratado ct ON c.contratado_id = ct.id
             LEFT JOIN modalidade m ON c.modalidade_id = m.id
@@ -41,7 +48,6 @@ class ContratoRepository:
             LEFT JOIN usuario gestor ON c.gestor_id = gestor.id
             LEFT JOIN usuario fiscal ON c.fiscal_id = fiscal.id
             LEFT JOIN usuario fiscal_sub ON c.fiscal_substituto_id = fiscal_sub.id
-            LEFT JOIN arquivo doc ON c.documento = doc.id
             WHERE c.id = $1 AND c.ativo = TRUE
         """
         params = [contrato_id]
@@ -50,11 +56,16 @@ class ContratoRepository:
         if user_context:
             usuario_id = user_context.get('usuario_id')
             perfil_ativo = user_context.get('perfil_ativo_nome')
-            if perfil_ativo == 'Fiscal':
+            
+            # Garante que usuario_id seja um inteiro
+            if usuario_id is not None:
+                usuario_id = int(usuario_id)
+            
+            if perfil_ativo == 'Fiscal' and usuario_id is not None:
                 # Fiscal vê apenas contratos onde é fiscal ou fiscal substituto
                 query += " AND (c.fiscal_id = $2 OR c.fiscal_substituto_id = $2)"
                 params.append(usuario_id)
-            elif perfil_ativo == 'Gestor':
+            elif perfil_ativo == 'Gestor' and usuario_id is not None:
                 # Gestor vê apenas contratos onde é gestor
                 query += " AND c.gestor_id = $2"
                 params.append(usuario_id)
@@ -168,7 +179,7 @@ class ContratoRepository:
             SELECT
                 id,
                 nome_arquivo,
-                tipo_arquivo,
+                tipo_mime as tipo_arquivo,
                 tamanho_bytes,
                 contrato_id,
                 created_at::text as created_at
@@ -185,8 +196,8 @@ class ContratoRepository:
             SELECT
                 id,
                 nome_arquivo,
-                path_armazenamento,
-                tipo_arquivo,
+                caminho_arquivo as path_armazenamento,
+                tipo_mime as tipo_arquivo,
                 tamanho_bytes,
                 contrato_id,
                 created_at::text as created_at
@@ -206,3 +217,26 @@ class ContratoRepository:
         """Conta o número total de arquivos de um contrato"""
         query = "SELECT COUNT(*) FROM arquivo WHERE contrato_id = $1"
         return await self.conn.fetchval(query, contrato_id)
+    
+    async def exists_nr_contrato(self, nr_contrato: str, exclude_id: Optional[int] = None) -> bool:
+        """Verifica se um número de contrato já existe (apenas contratos ativos)"""
+        # Garante que nr_contrato seja sempre uma string
+        nr_contrato_str = str(nr_contrato)
+        
+        if exclude_id:
+            query = "SELECT EXISTS(SELECT 1 FROM contrato WHERE nr_contrato = $1 AND ativo = TRUE AND id != $2)"
+            return await self.conn.fetchval(query, nr_contrato_str, exclude_id)
+        else:
+            query = "SELECT EXISTS(SELECT 1 FROM contrato WHERE nr_contrato = $1 AND ativo = TRUE)"
+            return await self.conn.fetchval(query, nr_contrato_str)
+    
+    async def get_next_available_nr_contrato(self) -> str:
+        """Retorna o próximo número de contrato disponível"""
+        query = """
+            SELECT COALESCE(MAX(CAST(nr_contrato AS INTEGER)), 0) + 1
+            FROM contrato 
+            WHERE ativo = TRUE 
+            AND nr_contrato ~ '^[0-9]+$'
+        """
+        next_number = await self.conn.fetchval(query)
+        return str(next_number)
