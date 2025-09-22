@@ -36,7 +36,7 @@ async def get_admin_for_docs(
     if not (
         user
         and secrets.compare_digest(credentials.username, correct_username or "")
-        and verify_password(credentials.password, user['senha'])
+        and verify_password(credentials.password, user['senha_hash'])
     ):
         raise credentials_exception
 

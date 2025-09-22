@@ -81,7 +81,7 @@ class UsuarioRepository:
 
     async def update_user(self, user_id: int, user: UsuarioUpdate) -> Optional[Dict]:
         """Atualiza dados de um usuário"""
-        update_data = user.model_dump(exclude_unset=True, exclude={'senha'})
+        update_data = user.model_dump(exclude_unset=True, exclude={'senha_hash'})
         
         if not update_data:
             return await self.get_user_by_id(user_id)

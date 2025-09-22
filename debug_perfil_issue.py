@@ -52,7 +52,8 @@ async def debug_perfil_issue():
                 ORDER BY p.id
             """, user['id'])
             
-            print(f"      Perfis Disponíveis: {[f\"{p['nome']} (ID: {p['id']})\" for p in perfis_disponiveis]}")
+            perfis_formatados = [f"{p['nome']} (ID: {p['id']})" for p in perfis_disponiveis]
+            print(f"      Perfis Disponíveis: {perfis_formatados}")
             print()
         
         # 2. Verificar contextos de sessão ativos

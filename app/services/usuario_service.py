@@ -103,7 +103,7 @@ class UsuarioService:
             )
 
         # Verifica a senha antiga
-        if not verify_password(password_data.senha_antiga, user_with_password['senha']):
+        if not verify_password(password_data.senha_antiga, user_with_password['senha_hash']):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Senha antiga incorreta"
@@ -131,6 +131,6 @@ class UsuarioService:
         user_data = await self.usuario_repo.get_user_by_email(email)
         if user_data:
             # Remove a senha antes de retornar
-            user_data.pop('senha', None)
+            user_data.pop('senha_hash', None)
             return Usuario.model_validate(user_data)
         return None

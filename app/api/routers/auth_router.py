@@ -69,7 +69,7 @@ async def login_for_access_token(
         )
 
     # Autentica o usuário
-    auth_result = authenticate_user(form_data.password, user['senha'])
+    auth_result = authenticate_user(form_data.password, user['senha_hash'])
     
     if not auth_result['is_valid']:
         raise HTTPException(
@@ -280,7 +280,7 @@ async def login_legacy(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    auth_result = authenticate_user(form_data.password, user['senha'])
+    auth_result = authenticate_user(form_data.password, user['senha_hash'])
     
     if not auth_result['is_valid']:
         raise HTTPException(
