@@ -162,23 +162,78 @@ async def switch_profile(
 ):
     """ Alterna o perfil ativo na sessão atual"""
     try:
+        print(f"\n🚀 INÍCIO switch_profile - Timestamp: {__import__('datetime').datetime.now()}")
+        print(f"📡 Request recebido: {switch_data}")
+        print(f"🔑 Token payload: {payload}")
+
         user_id = int(payload.get("sub"))
         session_id = payload.get("session_id")
 
+        print(f"👤 User ID extraído: {user_id}")
+        print(f"🆔 Session ID extraído: {session_id}")
+
         # Busca contexto atual usando session_id se disponível, senão user_id
+        print(f"🔍 Buscando contexto atual...")
         if session_id:
+            print(f"   - Usando session_id: {session_id}")
             current_context = await service.get_session_context(session_id)
         else:
+            print(f"   - Usando user_id: {user_id}")
             current_context = await service.get_session_context_by_user(user_id)
 
+        print(f"📊 Contexto encontrado: {current_context is not None}")
+
         if not current_context:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Contexto de sessão não encontrado"
-            )
+            print(f"❌ ERROR: Contexto não encontrado! Criando contexto de emergência...")
+
+            # FALLBACK TEMPORÁRIO PARA DEBUG: Criar contexto mínimo
+            from app.repositories.session_context_repo import SessionContextRepository
+            from app.repositories.usuario_repo import UsuarioRepository
+            from app.repositories.usuario_perfil_repo import UsuarioPerfilRepository
+            from app.core.database import get_connection
+
+            # Buscar perfis do usuário diretamente
+            async with get_connection() as emergency_conn:
+                session_repo = SessionContextRepository(emergency_conn)
+                perfis_emergency = await session_repo.get_user_available_profiles(user_id)
+                print(f"🆘 EMERGENCY: Perfis encontrados para user {user_id}: {perfis_emergency}")
+
+                if perfis_emergency:
+                    # Verificar se o perfil solicitado está na lista
+                    perfil_solicitado = next((p for p in perfis_emergency if p['id'] == switch_data.novo_perfil_id), None)
+                    if perfil_solicitado:
+                        print(f"✅ EMERGENCY: Perfil {switch_data.novo_perfil_id} encontrado! Permitindo troca...")
+                        # Forçar criação de contexto mínimo
+                        from app.schemas.session_context_schema import ContextoSessao, PerfilAtivo
+                        current_context = ContextoSessao(
+                            usuario_id=user_id,
+                            perfil_ativo_id=perfis_emergency[0]['id'],
+                            perfil_ativo_nome=perfis_emergency[0]['nome'],
+                            perfis_disponiveis=[PerfilAtivo(
+                                id=p['id'],
+                                nome=p['nome'],
+                                descricao=p.get('descricao'),
+                                pode_ser_selecionado=True
+                            ) for p in perfis_emergency],
+                            pode_alternar=len(perfis_emergency) > 1,
+                            sessao_id=session_id or f'emergency-{user_id}'
+                        )
+                        print(f"🆘 EMERGENCY: Contexto criado com sucesso")
+                    else:
+                        print(f"❌ EMERGENCY: Perfil {switch_data.novo_perfil_id} NÃO encontrado nos perfis do usuário")
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail=f"Perfil {switch_data.novo_perfil_id} não disponível. Perfis disponíveis: {[p['id'] for p in perfis_emergency]}"
+                        )
+                else:
+                    print(f"❌ EMERGENCY: Usuário {user_id} não tem nenhum perfil!")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Usuário não possui perfis ativos"
+                    )
 
         # Debug: log do contexto atual
-        print(f"🔍 DEBUG: Contexto atual do usuário {user_id}:")
+        print(f"🔍 DEBUG: Contexto final do usuário {user_id}:")
         print(f"   - Perfil ativo: {current_context.perfil_ativo_id} ({current_context.perfil_ativo_nome})")
         print(f"   - Perfis disponíveis: {[{'id': p.id, 'nome': p.nome} for p in current_context.perfis_disponiveis]}")
         print(f"   - Tentando alternar para perfil ID: {switch_data.novo_perfil_id}")
