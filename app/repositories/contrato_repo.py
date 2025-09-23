@@ -24,24 +24,25 @@ class ContratoRepository:
             RETURNING id
         """
 
+        # Converter tipos explicitamente para evitar erros de tipo
         new_contrato_id = await self.conn.fetchval(
             query,
-            contrato.nr_contrato,
-            contrato.objeto,
+            str(contrato.nr_contrato),  # Garantir que é string
+            str(contrato.objeto),  # Garantir que é string
             contrato.data_inicio,
             contrato.data_fim,
-            contrato.contratado_id,
-            contrato.modalidade_id,
-            contrato.status_id,
-            contrato.gestor_id,
-            contrato.fiscal_id,
-            contrato.valor_anual,
-            contrato.valor_global,
-            contrato.base_legal,
-            contrato.termos_contratuais,
-            contrato.fiscal_substituto_id,
-            contrato.pae,
-            contrato.doe,
+            int(contrato.contratado_id),  # Garantir que é inteiro
+            int(contrato.modalidade_id),  # Garantir que é inteiro
+            int(contrato.status_id),  # Garantir que é inteiro
+            int(contrato.gestor_id),  # Garantir que é inteiro
+            int(contrato.fiscal_id),  # Garantir que é inteiro
+            float(contrato.valor_anual) if contrato.valor_anual is not None else None,
+            float(contrato.valor_global) if contrato.valor_global is not None else None,
+            str(contrato.base_legal) if contrato.base_legal is not None else None,
+            str(contrato.termos_contratuais) if contrato.termos_contratuais is not None else None,
+            int(contrato.fiscal_substituto_id) if contrato.fiscal_substituto_id is not None else None,
+            str(contrato.pae) if contrato.pae is not None else None,
+            str(contrato.doe) if contrato.doe is not None else None,
             contrato.data_doe
         )
         return await self.find_contrato_by_id(new_contrato_id)
@@ -172,20 +173,39 @@ class ContratoRepository:
         if not update_data:
             return await self.find_contrato_by_id(contrato_id)
 
-        # Construir UPDATE de forma mais segura
+        # Construir UPDATE de forma mais segura com parâmetros explícitos
         set_clauses = []
-        values = [contrato_id]
-        param_index = 2
+        values = []
+        param_index = 1
 
+        # Mapear campos para garantir tipos corretos
         for field, value in update_data.items():
             set_clauses.append(f"{field} = ${param_index}")
-            values.append(value)
+
+            # Conversões explícitas para garantir tipos corretos
+            if field in ['contratado_id', 'modalidade_id', 'status_id', 'gestor_id', 'fiscal_id', 'fiscal_substituto_id']:
+                # Campos ID devem ser inteiros
+                values.append(int(value) if value is not None else None)
+            elif field in ['nr_contrato', 'objeto', 'base_legal', 'termos_contratuais', 'pae', 'doe', 'documento']:
+                # Campos texto devem ser strings
+                values.append(str(value) if value is not None else None)
+            elif field in ['valor_anual', 'valor_global']:
+                # Campos monetários devem ser float
+                values.append(float(value) if value is not None else None)
+            else:
+                # Outros campos mantém o tipo original
+                values.append(value)
+
             param_index += 1
+
+        # Adicionar contrato_id como último parâmetro para o WHERE
+        values.append(contrato_id)
+        where_param = param_index
 
         query = f"""
             UPDATE contrato
             SET {', '.join(set_clauses)}, updated_at = NOW()
-            WHERE id = $1 AND ativo = TRUE
+            WHERE id = ${where_param} AND ativo = TRUE
             RETURNING id
         """
 
