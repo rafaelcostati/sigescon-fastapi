@@ -200,7 +200,7 @@ async def seed_essential_data(conn):
 
         try:
             await conn.execute("""
-                INSERT INTO usuario (nome, email, cpf, senha, ativo, perfil_id)
+                INSERT INTO usuario (nome, email, cpf, senha_hash, ativo, perfil_id)
                 VALUES ($1, $2, $3, $4, true, 1)
             """, "Administrador do Sistema", admin_email, "00000000000", hashed_password)
         except Exception as e:
@@ -208,7 +208,7 @@ async def seed_essential_data(conn):
             try:
                 await conn.execute("""
                     UPDATE usuario SET
-                        senha = $1,
+                        senha_hash = $1,
                         ativo = true,
                         perfil_id = 1
                     WHERE email = $2

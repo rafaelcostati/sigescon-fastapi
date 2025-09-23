@@ -283,10 +283,10 @@ async def seed_basic_data(conn, schema_type):
             # Tenta inserir sem perfil_id (sistema de múltiplos perfis)
             try:
                 await conn.execute(f"""
-                    INSERT INTO {users_table} (nome, email, cpf, senha, ativo)
+                    INSERT INTO {users_table} (nome, email, cpf, senha_hash, ativo)
                     VALUES ($1, $2, $3, $4, true)
                     ON CONFLICT (email) DO UPDATE SET
-                        senha = EXCLUDED.senha,
+                        senha_hash = EXCLUDED.senha_hash,
                         ativo = true
                 """, "Administrador do Sistema", admin_email, "00000000000", hashed_password)
             except Exception as e:
@@ -295,14 +295,14 @@ async def seed_basic_data(conn, schema_type):
                     # Sem ON CONFLICT
                     try:
                         await conn.execute(f"""
-                            INSERT INTO {users_table} (nome, email, cpf, senha, ativo)
+                            INSERT INTO {users_table} (nome, email, cpf, senha_hash, ativo)
                             VALUES ($1, $2, $3, $4, true)
                         """, "Administrador do Sistema", admin_email, "00000000000", hashed_password)
                     except Exception:
                         # Atualiza se já existe
                         await conn.execute(f"""
                             UPDATE {users_table} SET
-                                senha = $1,
+                                senha_hash = $1,
                                 ativo = true
                             WHERE email = $2
                         """, hashed_password, admin_email)

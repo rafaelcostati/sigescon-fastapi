@@ -194,7 +194,7 @@ async def create_example_multi_profile_user(conn: asyncpg.Connection):
         senha_hash = get_password_hash("senha123")
         
         usuario_id = await conn.fetchval("""
-            INSERT INTO usuario (nome, email, cpf, senha, perfil_id)
+            INSERT INTO usuario (nome, email, cpf, senha_hash, perfil_id)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id
         """, "João Multi Perfil", "exemplo.multiperfil@sigescon.com", "11122233344", senha_hash, perfil_gestor)

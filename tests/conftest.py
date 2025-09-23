@@ -111,7 +111,7 @@ async def outro_fiscal_user_id(get_db_connection):
 
     # Cria o segundo fiscal
     fiscal_id = await conn.fetchval(
-        """INSERT INTO usuario (nome, email, cpf, senha, perfil_id)
+        """INSERT INTO usuario (nome, email, cpf, senha_hash, perfil_id)
            VALUES ($1, $2, $3, $4, $5) RETURNING id""",
         "Carlos Fiscal Substituto", "carlos.fiscal@test.com", "98765432100",
         senha_hash, perfil_fiscal['id']

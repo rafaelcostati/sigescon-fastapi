@@ -83,7 +83,7 @@ async def seed_example_data(conn, schema_type):
         for usuario in usuarios_exemplo:
             # Insere usuário (sem perfil_id - sistema de múltiplos perfis)
             user_id = await conn.fetchval(f"""
-                INSERT INTO {users_table} (nome, email, cpf, senha, ativo)
+                INSERT INTO {users_table} (nome, email, cpf, senha_hash, ativo)
                 VALUES ($1, $2, $3, $4, true)
                 RETURNING id
             """, usuario["nome"], usuario["email"], usuario["cpf"], hashed_password)

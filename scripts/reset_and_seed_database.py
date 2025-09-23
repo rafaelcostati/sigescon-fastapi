@@ -302,7 +302,7 @@ async def seed_admin_only(conn: asyncpg.Connection):
         # Insere usuário (sem perfil_id no campo legacy)
         user_id = await conn.fetchval(
             '''
-            INSERT INTO usuario (nome, email, cpf, matricula, senha)
+            INSERT INTO usuario (nome, email, cpf, matricula, senha_hash)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id
             ''',
@@ -350,7 +350,7 @@ async def seed_users(conn: asyncpg.Connection):
             # Insere usuário (sem perfil_id no campo legacy)
             user_id = await conn.fetchval(
                 '''
-                INSERT INTO usuario (nome, email, cpf, matricula, senha)
+                INSERT INTO usuario (nome, email, cpf, matricula, senha_hash)
                 VALUES ($1, $2, $3, $4, $5)
                 RETURNING id
                 ''',

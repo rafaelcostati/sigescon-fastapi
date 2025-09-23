@@ -47,7 +47,7 @@ class UsuarioUpdate(BaseModel):
     cpf: Optional[str] = Field(None, min_length=11, max_length=11)
     matricula: Optional[str] = Field(None, max_length=20)
     perfil_id: Optional[int] = Field(None, gt=0)
-    senha: Optional[str] = Field(None, min_length=6)
+    senha: Optional[str] = Field(None, min_length=6, description="Nova senha do usuário")
 
     @field_validator('cpf')
     @classmethod
