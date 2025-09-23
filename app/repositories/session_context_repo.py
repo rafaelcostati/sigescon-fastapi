@@ -86,12 +86,26 @@ class SessionContextRepository:
         if sessao_id in self._active_profiles:
             context = self._active_profiles[sessao_id].copy()
         else:
-            # Padrão para nova sessão
+            # Extrair usuario_id da sessao_id
+            usuario_id = int(sessao_id.split('-')[-1]) if 'mock-session-' in sessao_id else 1
+
+            # Buscar o primeiro perfil disponível do usuário em vez de assumir Gestor
+            perfis_disponiveis = await self.get_user_available_profiles(usuario_id)
+
+            if perfis_disponiveis:
+                primeiro_perfil = perfis_disponiveis[0]
+                perfil_ativo_id = primeiro_perfil['id']
+                perfil_ativo_nome = primeiro_perfil['nome']
+            else:
+                # Fallback apenas se não houver perfis (não deveria acontecer)
+                perfil_ativo_id = 1  # Administrador como fallback
+                perfil_ativo_nome = 'Administrador'
+
             context = {
                 'sessao_id': sessao_id,
-                'usuario_id': int(sessao_id.split('-')[-1]) if 'mock-session-' in sessao_id else 1,
-                'perfil_ativo_id': 2,  # Gestor por padrão
-                'perfil_ativo_nome': 'Gestor'
+                'usuario_id': usuario_id,
+                'perfil_ativo_id': perfil_ativo_id,
+                'perfil_ativo_nome': perfil_ativo_nome
             }
             self._active_profiles[sessao_id] = context
 
@@ -102,19 +116,38 @@ class SessionContextRepository:
         # Se a sessão não existe, cria uma nova entrada
         if sessao_id not in self._active_profiles:
             usuario_id = int(sessao_id.split('-')[-1]) if 'mock-session-' in sessao_id else 1
+
+            # Buscar o primeiro perfil disponível do usuário em vez de assumir Gestor
+            perfis_disponiveis = await self.get_user_available_profiles(usuario_id)
+
+            if perfis_disponiveis:
+                primeiro_perfil = perfis_disponiveis[0]
+                perfil_ativo_id = primeiro_perfil['id']
+                perfil_ativo_nome = primeiro_perfil['nome']
+            else:
+                # Fallback apenas se não houver perfis
+                perfil_ativo_id = 1
+                perfil_ativo_nome = 'Administrador'
+
             self._active_profiles[sessao_id] = {
                 'sessao_id': sessao_id,
                 'usuario_id': usuario_id,
-                'perfil_ativo_id': 2,  # Gestor por padrão
-                'perfil_ativo_nome': 'Gestor'
+                'perfil_ativo_id': perfil_ativo_id,
+                'perfil_ativo_nome': perfil_ativo_nome
             }
 
-        # Busca nome do perfil
-        nome_perfil = 'Gestor'
-        if novo_perfil_id == 1:
-            nome_perfil = 'Administrador'
-        elif novo_perfil_id == 3:
-            nome_perfil = 'Fiscal'
+        # Busca nome do perfil baseado no ID do banco de dados
+        usuario_id = self._active_profiles[sessao_id]['usuario_id']
+        perfis_disponiveis = await self.get_user_available_profiles(usuario_id)
+
+        # Encontra o perfil pelo ID
+        perfil_encontrado = next((p for p in perfis_disponiveis if p['id'] == novo_perfil_id), None)
+
+        if perfil_encontrado:
+            nome_perfil = perfil_encontrado['nome']
+        else:
+            # Fallback para mapeamento manual se não encontrar no banco
+            nome_perfil = 'Administrador' if novo_perfil_id == 1 else 'Gestor' if novo_perfil_id == 2 else 'Fiscal'
 
         self._active_profiles[sessao_id]['perfil_ativo_id'] = novo_perfil_id
         self._active_profiles[sessao_id]['perfil_ativo_nome'] = nome_perfil
@@ -149,12 +182,24 @@ class SessionContextRepository:
         if sessao_id in self._active_profiles:
             return self._active_profiles[sessao_id]
 
-        # Senão cria uma nova sessão padrão
+        # Buscar o primeiro perfil disponível do usuário em vez de assumir Gestor
+        perfis_disponiveis = await self.get_user_available_profiles(usuario_id)
+
+        if perfis_disponiveis:
+            primeiro_perfil = perfis_disponiveis[0]
+            perfil_ativo_id = primeiro_perfil['id']
+            perfil_ativo_nome = primeiro_perfil['nome']
+        else:
+            # Fallback apenas se não houver perfis
+            perfil_ativo_id = 1
+            perfil_ativo_nome = 'Administrador'
+
+        # Cria uma nova sessão baseada nos perfis reais do usuário
         session_data = {
             'sessao_id': sessao_id,
             'usuario_id': usuario_id,
-            'perfil_ativo_id': 2,
-            'perfil_ativo_nome': 'Gestor'
+            'perfil_ativo_id': perfil_ativo_id,
+            'perfil_ativo_nome': perfil_ativo_nome
         }
         self._active_profiles[sessao_id] = session_data
         return session_data
