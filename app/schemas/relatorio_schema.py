@@ -4,7 +4,6 @@ from typing import Optional
 from datetime import date, datetime
 
 class RelatorioBase(BaseModel):
-    mes_competencia: date
     observacoes_fiscal: Optional[str] = None
     pendencia_id: int
 

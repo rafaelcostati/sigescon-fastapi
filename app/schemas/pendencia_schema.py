@@ -4,7 +4,8 @@ from typing import Optional
 from datetime import date, datetime
 
 class PendenciaBase(BaseModel):
-    descricao: str
+    titulo: Optional[str] = None
+    descricao: Optional[str] = None
     data_prazo: date
     status_pendencia_id: int
     criado_por_usuario_id: int

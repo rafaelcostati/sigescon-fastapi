@@ -802,8 +802,7 @@ class DashboardRepository:
             SELECT
                 rf.id,
                 rf.contrato_id,
-                rf.mes_competencia,
-                rf.observacoes_fiscal as observacoes,
+                rf.observacoes,
                 rf.created_at as data_envio,
                 rf.arquivo_id,
                 rf.pendencia_id,

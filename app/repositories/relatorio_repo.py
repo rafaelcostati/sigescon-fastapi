@@ -14,10 +14,10 @@ class RelatorioRepository:
         data: Dict
     ) -> Dict:
         query = """
-            INSERT INTO relatoriofiscal 
-                (contrato_id, fiscal_usuario_id, arquivo_id, status_id, 
-                 mes_competencia, observacoes_fiscal, pendencia_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO relatoriofiscal
+                (contrato_id, fiscal_usuario_id, arquivo_id, status_id,
+                 observacoes, pendencia_id)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id
         """
         relatorio_id = await self.conn.fetchval(
@@ -26,7 +26,6 @@ class RelatorioRepository:
             data['fiscal_usuario_id'],
             arquivo_id,
             status_id,
-            data['mes_competencia'],
             data.get('observacoes_fiscal'),
             data['pendencia_id']
         )
@@ -67,7 +66,7 @@ class RelatorioRepository:
     async def analise_relatorio(self, relatorio_id: int, data: Dict) -> Dict:
         query = """
             UPDATE relatoriofiscal
-            SET status_id = $1, aprovador_usuario_id = $2, observacoes_aprovador = $3, data_analise = NOW()
+            SET status_id = $1, aprovador_usuario_id = $2, observacoes_analise = $3, data_analise = NOW()
             WHERE id = $4
             RETURNING id
         """
@@ -75,7 +74,7 @@ class RelatorioRepository:
             query,
             data['status_id'],
             data['aprovador_usuario_id'],
-            data.get('observacoes_aprovador'),
+            data.get('observacoes_aprovador'),  # Keep API field name, but map to correct DB column
             relatorio_id
         )
         return await self.get_relatorio_by_id(relatorio_id)
@@ -133,8 +132,7 @@ class RelatorioRepository:
             SELECT
                 rf.id,
                 rf.contrato_id,
-                rf.mes_competencia,
-                rf.observacoes_fiscal,
+                rf.observacoes,
                 rf.created_at as data_envio,
                 rf.arquivo_id,
                 rf.pendencia_id,

@@ -8,14 +8,20 @@ class PendenciaRepository:
         self.conn = conn
 
     async def create_pendencia(self, contrato_id: int, pendencia: PendenciaCreate) -> Dict:
+        # Usar descricao como titulo se titulo não for fornecido (compatibilidade com frontend)
+        titulo = pendencia.titulo or pendencia.descricao
+        if not titulo:
+            raise ValueError("Título ou descrição deve ser fornecido")
+
         query = """
-            INSERT INTO pendenciarelatorio (contrato_id, descricao, data_prazo, status_pendencia_id, criado_por_usuario_id)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO pendenciarelatorio (contrato_id, titulo, descricao, data_prazo, status_pendencia_id, criado_por_usuario_id)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id
         """
         new_pendencia_id = await self.conn.fetchval(
             query,
             contrato_id,
+            titulo,
             pendencia.descricao,
             pendencia.data_prazo,
             pendencia.status_pendencia_id,

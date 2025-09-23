@@ -81,7 +81,7 @@ Um novo relatório foi submetido para análise:
 
 📊 Contrato: {data.get('nr_contrato', 'N/A')} - {data.get('objeto', 'N/A')}
 👤 Fiscal: {data.get('fiscal_nome', 'N/A')}
-📅 Mês de Competência: {data.get('mes_competencia', 'N/A')}
+📅 Data de Envio: {data.get('data_envio', 'N/A')}
 📝 Observações: {data.get('observacoes_fiscal', 'Sem observações')}
 
 Acesse o sistema para analisar e aprovar/rejeitar o relatório.
@@ -97,7 +97,7 @@ Olá, {name},
 Seu relatório foi aprovado! ✅
 
 📊 Contrato: {data.get('nr_contrato', 'N/A')}
-📅 Mês de Competência: {data.get('mes_competencia', 'N/A')}
+📅 Data de Envio: {data.get('data_envio', 'N/A')}
 👤 Aprovado por: {data.get('aprovador_nome', 'N/A')}
 📝 Comentários: {data.get('observacoes_aprovador', 'Sem comentários')}
 
@@ -114,7 +114,7 @@ Olá, {name},
 Seu relatório precisa de correções. 🔄
 
 📊 Contrato: {data.get('nr_contrato', 'N/A')}
-📅 Mês de Competência: {data.get('mes_competencia', 'N/A')}
+📅 Data de Envio: {data.get('data_envio', 'N/A')}
 👤 Analisado por: {data.get('aprovador_nome', 'N/A')}
 
 📝 Motivo da rejeição:
@@ -217,7 +217,7 @@ class NotificationService:
                             'nr_contrato': contrato['nr_contrato'],
                             'objeto': contrato['objeto'],
                             'fiscal_nome': fiscal['nome'],
-                            'mes_competencia': relatorio_data.get('mes_competencia', ''),
+                            'data_envio': relatorio_data.get('data_envio', ''),
                             'observacoes_fiscal': relatorio_data.get('observacoes_fiscal', ''),
                         }
                     )

@@ -99,7 +99,6 @@ async def list_arquivos_relatorios(
                 "tamanho_bytes": arquivo['tamanho_bytes'],
                 "created_at": arquivo['created_at'],
                 "relatorio_id": relatorio['id'] if relatorio else None,
-                "mes_competencia": relatorio['mes_competencia'] if relatorio else None,
                 "status_relatorio": relatorio['status_relatorio'] if relatorio else None,
                 "enviado_por": relatorio['enviado_por'] if relatorio else None,
                 "data_envio": relatorio['created_at'] if relatorio else None

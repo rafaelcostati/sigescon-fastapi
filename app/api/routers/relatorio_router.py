@@ -51,7 +51,6 @@ def get_relatorio_service(conn: asyncpg.Connection = Depends(get_connection)) ->
 async def submit_relatorio(
     contrato_id: int,
     arquivo: UploadFile = File(...),
-    mes_competencia: date = Form(...),
     observacoes_fiscal: str | None = Form(None),
     pendencia_id: int = Form(...),
     service: RelatorioService = Depends(get_relatorio_service),
@@ -59,7 +58,6 @@ async def submit_relatorio(
 ):
     """Submete um novo relatório fiscal para um contrato, respondendo a uma pendência."""
     relatorio_data = RelatorioCreate(
-        mes_competencia=mes_competencia,
         observacoes_fiscal=observacoes_fiscal,
         pendencia_id=pendencia_id,
         fiscal_usuario_id=current_user.id
