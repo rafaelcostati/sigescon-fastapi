@@ -1084,3 +1084,68 @@ class DashboardRepository:
                 },
                 'contratos_proximos_vencimento': []
             }
+
+    async def get_pendencias_pendentes_admin(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Busca todas as pendências pendentes (não vencidas) do sistema para o administrador
+        """
+        try:
+            # Primeiro verifica se as tabelas existem
+            check_query = """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name IN ('pendenciarelatorio', 'contrato', 'usuario', 'statuspendencia')
+            """
+            existing_tables = await self.conn.fetch(check_query)
+            table_names = [row['table_name'] for row in existing_tables]
+
+            required_tables = ['pendenciarelatorio', 'contrato', 'usuario', 'statuspendencia']
+            missing_tables = [table for table in required_tables if table not in table_names]
+
+            if missing_tables:
+                print(f"Tabelas não encontradas: {missing_tables}. Retornando lista vazia.")
+                return []
+
+            query = """
+            SELECT
+                p.id as pendencia_id,
+                p.descricao,
+                p.created_at,
+                p.data_prazo,
+                CASE
+                    WHEN p.data_prazo IS NOT NULL
+                    THEN (p.data_prazo - CURRENT_DATE)::int
+                    ELSE NULL
+                END as dias_restantes,
+
+                -- Informações do contrato
+                c.id as contrato_id,
+                c.nr_contrato as contrato_numero,
+                c.objeto as contrato_objeto,
+
+                -- Responsáveis
+                u_fiscal.nome as fiscal_nome,
+                u_gestor.nome as gestor_nome
+
+            FROM pendenciarelatorio p
+            JOIN contrato c ON p.contrato_id = c.id
+            JOIN usuario u_fiscal ON c.fiscal_id = u_fiscal.id
+            JOIN usuario u_gestor ON c.gestor_id = u_gestor.id
+            JOIN statuspendencia sp ON p.status_pendencia_id = sp.id
+            WHERE
+                c.ativo = true
+                AND sp.nome = 'Pendente'
+                AND (p.data_prazo IS NULL OR p.data_prazo >= CURRENT_DATE)
+            ORDER BY
+                -- Ordena por prazo (mais próximos primeiro)
+                p.data_prazo ASC NULLS LAST,
+                p.created_at DESC
+            LIMIT $1
+            """
+            rows = await self.conn.fetch(query, limit)
+            return [dict(row) for row in rows]
+
+        except Exception as e:
+            print(f"Erro ao buscar pendências pendentes: {e}. Retornando lista vazia.")
+            return []

@@ -166,6 +166,34 @@ async def get_pendencias_vencidas_admin(
     return await service.get_pendencias_vencidas_admin(limit)
 
 
+@router.get("/admin/pendencias-pendentes")
+async def get_pendencias_pendentes_admin(
+    limit: int = Query(50, ge=1, le=200, description="Limite de pendências retornadas"),
+    service: DashboardService = Depends(get_dashboard_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Lista todas as pendências pendentes (não vencidas) do sistema.
+
+    - **limit**: Número máximo de pendências a retornar (padrão: 50, máximo: 200)
+
+    Retorna pendências que estão aguardando resposta do fiscal mas ainda não venceram.
+    Ordenadas por prazo (mais próximos do vencimento primeiro).
+
+    **Informações incluídas:**
+    - Detalhes da pendência (descrição, prazo)
+    - Dias restantes até o vencimento
+    - Dados do contrato (número, objeto)
+    - Responsáveis (fiscal e gestor)
+
+    **Ideal para:**
+    - Acompanhar pendências em andamento
+    - Identificar próximos vencimentos
+    - Gestão proativa de prazos
+    """
+    return await service.get_pendencias_pendentes_admin(limit)
+
+
 # --- Endpoints Para Gestor ---
 
 @router.get("/gestor/pendencias", summary="Pendências dos contratos sob gestão")

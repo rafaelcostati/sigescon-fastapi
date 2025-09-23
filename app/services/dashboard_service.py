@@ -498,3 +498,14 @@ class DashboardService:
             pendencias_proximas_vencimento=metrics['pendencias_proximas_vencimento'],
             relatorios_rejeitados=metrics['relatorios_rejeitados']
         )
+
+    async def get_pendencias_pendentes_admin(self, limit: int = 50) -> Dict[str, Any]:
+        """
+        Busca pendências pendentes (não vencidas) para o administrador
+        """
+        pendencias_data = await self.dashboard_repo.get_pendencias_pendentes_admin(limit)
+        
+        return {
+            "pendencias_pendentes": pendencias_data,
+            "total_pendencias_pendentes": len(pendencias_data)
+        }
