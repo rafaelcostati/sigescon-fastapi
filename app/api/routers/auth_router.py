@@ -177,13 +177,24 @@ async def switch_profile(
                 detail="Contexto de sessão não encontrado"
             )
 
+        # Debug: log do contexto atual
+        print(f"🔍 DEBUG: Contexto atual do usuário {user_id}:")
+        print(f"   - Perfil ativo: {current_context.perfil_ativo_id} ({current_context.perfil_ativo_nome})")
+        print(f"   - Perfis disponíveis: {[{'id': p.id, 'nome': p.nome} for p in current_context.perfis_disponiveis]}")
+        print(f"   - Tentando alternar para perfil ID: {switch_data.novo_perfil_id}")
+
         # Valida se o novo perfil está disponível
         perfil_disponivel = next(
             (p for p in current_context.perfis_disponiveis if p.id == switch_data.novo_perfil_id),
             None
         )
 
+        print(f"🔍 DEBUG: Perfil encontrado na lista? {perfil_disponivel is not None}")
+        if perfil_disponivel:
+            print(f"   - Perfil encontrado: {perfil_disponivel.nome} (ID: {perfil_disponivel.id})")
+
         if not perfil_disponivel:
+            print(f"❌ ERROR: Perfil {switch_data.novo_perfil_id} não encontrado nos perfis disponíveis")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Perfil não disponível para este usuário"

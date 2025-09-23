@@ -444,17 +444,24 @@ class SessionContextService:
         """, usuario_id)
 
     async def get_session_context_by_user(self, usuario_id: int) -> Optional[ContextoSessao]:
-        """✅ NOVO: Busca contexto baseado no ID do usuário (simplificado)"""
+        """Busca contexto de sessão ativo baseado no ID do usuário"""
         try:
-            # Busca perfis disponíveis
+            # Primeiro tenta buscar sessão ativa existente
+            session_data = await self.session_repo.get_active_session_by_user(usuario_id)
+
+            if session_data and session_data.get('sessao_id'):
+                # Se existe sessão ativa, busca o contexto completo
+                return await self.get_session_context(session_data['sessao_id'])
+
+            # Senão, busca perfis disponíveis para criar contexto temporário
             perfis_disponiveis = await self.session_repo.get_user_available_profiles(usuario_id)
-            
+
             if not perfis_disponiveis:
                 return None
-            
-            # Usa o primeiro perfil como ativo (Gestor tem prioridade)
+
+            # Usa o primeiro perfil como ativo (ordenado por prioridade)
             perfil_ativo = perfis_disponiveis[0]
-            
+
             # Converte para schema
             perfis_ativos = [
                 PerfilAtivo(
@@ -464,7 +471,7 @@ class SessionContextService:
                     pode_ser_selecionado=True
                 ) for p in perfis_disponiveis
             ]
-            
+
             return ContextoSessao(
                 usuario_id=usuario_id,
                 perfil_ativo_id=perfil_ativo['id'],
@@ -473,7 +480,7 @@ class SessionContextService:
                 pode_alternar=len(perfis_disponiveis) > 1,
                 sessao_id=f'mock-session-{usuario_id}'
             )
-            
+
         except Exception as e:
             print(f"Erro ao buscar contexto: {e}")
             return None

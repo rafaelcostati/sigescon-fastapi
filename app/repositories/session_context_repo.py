@@ -17,8 +17,8 @@ class SessionContextRepository:
     async def get_user_available_profiles(self, usuario_id: int) -> List[Dict]:
         """Busca todos os perfis disponíveis para o usuário"""
         query = """
-            SELECT p.id, p.nome, 
-                   CASE 
+            SELECT p.id, p.nome,
+                   CASE
                        WHEN p.nome = 'Administrador' THEN 'Acesso total ao sistema'
                        WHEN p.nome = 'Gestor' THEN 'Gestão de contratos e equipes'
                        WHEN p.nome = 'Fiscal' THEN 'Fiscalização e relatórios'
@@ -27,8 +27,8 @@ class SessionContextRepository:
             FROM usuario_perfil up
             JOIN perfil p ON up.perfil_id = p.id
             WHERE up.usuario_id = $1 AND up.ativo = TRUE AND p.ativo = TRUE
-            ORDER BY 
-                CASE p.nome 
+            ORDER BY
+                CASE p.nome
                     WHEN 'Administrador' THEN 1
                     WHEN 'Gestor' THEN 2
                     WHEN 'Fiscal' THEN 3
@@ -37,9 +37,11 @@ class SessionContextRepository:
         """
         try:
             records = await self.conn.fetch(query, usuario_id)
-            return [dict(r) for r in records]
+            result = [dict(r) for r in records]
+            print(f"🔍 DEBUG: Perfis encontrados para usuário {usuario_id}: {result}")
+            return result
         except Exception as e:
-            print(f"Erro ao buscar perfis: {e}")
+            print(f"❌ Erro ao buscar perfis para usuário {usuario_id}: {e}")
             return []
 
     async def validate_profile_for_user(self, usuario_id: int, perfil_id: int) -> bool:
