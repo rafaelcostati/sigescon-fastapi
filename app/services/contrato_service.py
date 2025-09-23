@@ -363,6 +363,26 @@ class ContratoService:
             )
 
         try:
+            # VALIDAÇÃO RESTRITIVA: Verifica se é um arquivo de relatório
+            is_relatorio_arquivo = await self.contrato_repo.is_arquivo_de_relatorio(arquivo_id)
+
+            if is_relatorio_arquivo:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Arquivos de relatórios fiscais não podem ser excluídos pois estão vinculados a pendências. "
+                           "Apenas arquivos contratuais podem ser removidos."
+                )
+
+            # VALIDAÇÃO ADICIONAL: Verifica se arquivo contratual está sendo usado por relatórios
+            relatorios_vinculados = await self.contrato_repo.check_arquivo_used_in_relatorios(arquivo_id)
+
+            if relatorios_vinculados:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Este arquivo contratual não pode ser excluído porque está sendo usado por {len(relatorios_vinculados)} relatório(s) fiscal(is). "
+                           f"Para excluir este arquivo, primeiro remova ou substitua os relatórios que o utilizam."
+                )
+
             # Remove o arquivo do banco de dados
             deleted = await self.contrato_repo.delete_arquivo(arquivo_id, contrato_id)
 
@@ -372,6 +392,9 @@ class ContratoService:
 
             return deleted
 
+        except HTTPException:
+            # Re-propaga HTTPExceptions (incluindo a nossa validação acima)
+            raise
         except Exception as e:
             logging.error(f"Erro ao deletar arquivo {arquivo_id} do contrato {contrato_id}: {e}")
             raise HTTPException(

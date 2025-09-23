@@ -289,6 +289,36 @@ class ContratoRepository:
         row = await self.conn.fetchrow(query, arquivo_id, contrato_id)
         return dict(row) if row else None
 
+    async def is_arquivo_de_relatorio(self, arquivo_id: int) -> bool:
+        """Verifica se um arquivo é de relatório fiscal (está na tabela relatoriofiscal)"""
+        query = """
+            SELECT 1 FROM relatoriofiscal
+            WHERE arquivo_id = $1
+            LIMIT 1
+        """
+        try:
+            result = await self.conn.fetchval(query, arquivo_id)
+            return bool(result)
+        except Exception as e:
+            print(f"Erro ao verificar se arquivo {arquivo_id} é de relatório: {e}")
+            return False
+
+    async def check_arquivo_used_in_relatorios(self, arquivo_id: int) -> List[Dict]:
+        """Verifica se um arquivo está sendo usado por relatórios fiscais"""
+        query = """
+            SELECT rf.id, rf.mes_competencia, rf.observacoes_fiscal,
+                   rf.contrato_id, c.nr_contrato
+            FROM relatoriofiscal rf
+            JOIN contrato c ON rf.contrato_id = c.id
+            WHERE rf.arquivo_id = $1
+        """
+        try:
+            rows = await self.conn.fetch(query, arquivo_id)
+            return [dict(row) for row in rows]
+        except Exception as e:
+            print(f"Erro ao verificar relatórios vinculados ao arquivo {arquivo_id}: {e}")
+            return []
+
     async def delete_arquivo(self, arquivo_id: int, contrato_id: int) -> bool:
         """Remove um arquivo específico de um contrato"""
         query = "DELETE FROM arquivo WHERE id = $1 AND contrato_id = $2"
