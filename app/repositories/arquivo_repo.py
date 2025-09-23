@@ -17,7 +17,7 @@ class ArquivoRepository:
         query = """
             INSERT INTO arquivo (nome_arquivo, caminho_arquivo, tipo_mime, tamanho_bytes, contrato_id)
             VALUES ($1, $2, $3, $4, $5)
-            RETURNING *
+            RETURNING id, nome_arquivo, caminho_arquivo as path_armazenamento, tipo_mime as tipo_arquivo, tamanho_bytes, contrato_id, ativo, created_at, updated_at
         """
         new_arquivo = await self.conn.fetchrow(
             query, nome_arquivo, path_armazenamento, tipo_arquivo, tamanho_bytes, contrato_id
@@ -31,6 +31,11 @@ class ArquivoRepository:
         
     async def find_arquivo_by_id(self, arquivo_id: int) -> Optional[Dict]:
         """Busca um arquivo pelo seu ID."""
-        query = "SELECT * FROM arquivo WHERE id = $1"
+        query = """
+            SELECT id, nome_arquivo, caminho_arquivo as path_armazenamento,
+                   tipo_mime as tipo_arquivo, tamanho_bytes, contrato_id,
+                   ativo, created_at, updated_at
+            FROM arquivo WHERE id = $1 AND ativo = TRUE
+        """
         record = await self.conn.fetchrow(query, arquivo_id)
         return dict(record) if record else None

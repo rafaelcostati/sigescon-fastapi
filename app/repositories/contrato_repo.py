@@ -12,18 +12,38 @@ class ContratoRepository:
         self.conn = conn
 
     async def create_contrato(self, contrato: ContratoCreate) -> Dict:
-        contrato_data = contrato.model_dump()
-        
-        fields = ", ".join(contrato_data.keys())
-        placeholders = ", ".join([f"${i+1}" for i in range(len(contrato_data))])
-        
-        query = f"""
-            INSERT INTO contrato ({fields})
-            VALUES ({placeholders})
+        # Usar campos específicos para evitar problemas de tipo
+        query = """
+            INSERT INTO contrato (
+                nr_contrato, objeto, data_inicio, data_fim, contratado_id,
+                modalidade_id, status_id, gestor_id, fiscal_id,
+                valor_anual, valor_global, base_legal, termos_contratuais,
+                fiscal_substituto_id, pae, doe, data_doe
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING id
         """
-        
-        new_contrato_id = await self.conn.fetchval(query, *contrato_data.values())
+
+        new_contrato_id = await self.conn.fetchval(
+            query,
+            contrato.nr_contrato,
+            contrato.objeto,
+            contrato.data_inicio,
+            contrato.data_fim,
+            contrato.contratado_id,
+            contrato.modalidade_id,
+            contrato.status_id,
+            contrato.gestor_id,
+            contrato.fiscal_id,
+            contrato.valor_anual,
+            contrato.valor_global,
+            contrato.base_legal,
+            contrato.termos_contratuais,
+            contrato.fiscal_substituto_id,
+            contrato.pae,
+            contrato.doe,
+            contrato.data_doe
+        )
         return await self.find_contrato_by_id(new_contrato_id)
 
 
@@ -151,9 +171,25 @@ class ContratoRepository:
         update_data = contrato.model_dump(exclude_unset=True)
         if not update_data:
             return await self.find_contrato_by_id(contrato_id)
-        fields = ", ".join([f"{key} = ${i+2}" for i, key in enumerate(update_data.keys())])
-        query = f"UPDATE contrato SET {fields}, updated_at = NOW() WHERE id = $1 RETURNING id"
-        updated_id = await self.conn.fetchval(query, contrato_id, *update_data.values())
+
+        # Construir UPDATE de forma mais segura
+        set_clauses = []
+        values = [contrato_id]
+        param_index = 2
+
+        for field, value in update_data.items():
+            set_clauses.append(f"{field} = ${param_index}")
+            values.append(value)
+            param_index += 1
+
+        query = f"""
+            UPDATE contrato
+            SET {', '.join(set_clauses)}, updated_at = NOW()
+            WHERE id = $1 AND ativo = TRUE
+            RETURNING id
+        """
+
+        updated_id = await self.conn.fetchval(query, *values)
         if updated_id:
             return await self.find_contrato_by_id(updated_id)
         return None
