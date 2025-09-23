@@ -27,7 +27,8 @@ class ArquivoRepository:
     async def link_arquivo_to_contrato(self, arquivo_id: int, contrato_id: int):
         """Define o arquivo como o documento principal do contrato."""
         query = "UPDATE contrato SET documento = $1 WHERE id = $2"
-        await self.conn.execute(query, arquivo_id, contrato_id)
+        # Converter arquivo_id para string, pois a coluna documento é VARCHAR
+        await self.conn.execute(query, str(arquivo_id), contrato_id)
         
     async def find_arquivo_by_id(self, arquivo_id: int) -> Optional[Dict]:
         """Busca um arquivo pelo seu ID."""

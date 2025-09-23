@@ -205,6 +205,21 @@ async def update_contrato(
     **ATENÇÃO**: Alterar o número do contrato pode impactar relatórios e histórico.
     """
     
+    # Debug detalhado dos dados recebidos
+    print(f"\n=== DEBUG ROUTER PATCH /contratos/{contrato_id} ===")
+    print(f"nr_contrato: {nr_contrato} (tipo: {type(nr_contrato).__name__})")
+    print(f"objeto: {objeto} (tipo: {type(objeto).__name__})")
+    print(f"data_inicio: {data_inicio} (tipo: {type(data_inicio).__name__})")
+    print(f"data_fim: {data_fim} (tipo: {type(data_fim).__name__})")
+    print(f"contratado_id: {contratado_id} (tipo: {type(contratado_id).__name__})")
+    print(f"modalidade_id: {modalidade_id} (tipo: {type(modalidade_id).__name__})")
+    print(f"status_id: {status_id} (tipo: {type(status_id).__name__})")
+    print(f"gestor_id: {gestor_id} (tipo: {type(gestor_id).__name__})")
+    print(f"fiscal_id: {fiscal_id} (tipo: {type(fiscal_id).__name__})")
+    print(f"valor_anual: {valor_anual} (tipo: {type(valor_anual).__name__})")
+    print(f"valor_global: {valor_global} (tipo: {type(valor_global).__name__})")
+    print(f"documento_contrato: {len(documento_contrato) if documento_contrato else 0} arquivos")
+    
     # Constrói objeto ContratoUpdate apenas com campos fornecidos
     update_data = {}
     
@@ -234,8 +249,17 @@ async def update_contrato(
         if value is not None:
             update_data[field] = value
     
+    print(f"Dados para update: {update_data}")
+    print(f"Tipos dos dados: {[(k, type(v).__name__) for k, v in update_data.items()]}")
+    
     # Cria o schema de update
-    contrato_update = ContratoUpdate(**update_data)
+    try:
+        contrato_update = ContratoUpdate(**update_data)
+        print(f"ContratoUpdate criado com sucesso: {contrato_update}")
+    except Exception as e:
+        print(f"ERRO ao criar ContratoUpdate: {e}")
+        raise
+    print(f"=== FIM DEBUG ROUTER ===\n")
     
     # Chama o service passando o arquivo se fornecido
     updated_contrato = await service.update_contrato(

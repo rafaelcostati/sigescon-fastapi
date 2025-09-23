@@ -169,50 +169,76 @@ class ContratoRepository:
 
 
     async def update_contrato(self, contrato_id: int, contrato: ContratoUpdate) -> Optional[Dict]:
-        update_data = contrato.model_dump(exclude_unset=True)
-        if not update_data:
-            return await self.find_contrato_by_id(contrato_id)
+        try:
+            # Debug inicial
+            print(f"\n=== DEBUG CONTRATO UPDATE ===")
+            print(f"Contrato ID: {contrato_id} (tipo: {type(contrato_id)})")
+            print(f"Objeto ContratoUpdate: {contrato}")
+            
+            # Usar abordagem simples - deixar Pydantic e asyncpg lidarem com os tipos
+            update_data = contrato.model_dump(exclude_unset=True)
+            print(f"Model dump result: {update_data}")
+            print(f"Model dump types: {[(k, type(v).__name__) for k, v in update_data.items()]}")
+            
+            if not update_data:
+                print("Nenhum dado para atualizar - retornando contrato existente")
+                return await self.find_contrato_by_id(contrato_id)
 
-        # Construir UPDATE de forma mais segura com parâmetros explícitos
-        set_clauses = []
-        values = []
-        param_index = 1
+            # Construir UPDATE de forma simples
+            set_clauses = []
+            values = []
+            param_index = 1
 
-        # Mapear campos para garantir tipos corretos
-        for field, value in update_data.items():
-            set_clauses.append(f"{field} = ${param_index}")
-
-            # Conversões explícitas para garantir tipos corretos
-            if field in ['contratado_id', 'modalidade_id', 'status_id', 'gestor_id', 'fiscal_id', 'fiscal_substituto_id']:
-                # Campos ID devem ser inteiros
-                values.append(int(value) if value is not None else None)
-            elif field in ['nr_contrato', 'objeto', 'base_legal', 'termos_contratuais', 'pae', 'doe', 'documento']:
-                # Campos texto devem ser strings
-                values.append(str(value) if value is not None else None)
-            elif field in ['valor_anual', 'valor_global']:
-                # Campos monetários devem ser float
-                values.append(float(value) if value is not None else None)
-            else:
-                # Outros campos mantém o tipo original
+            print(f"Construindo query...")
+            for field, value in update_data.items():
+                print(f"  Campo {field}: {value} (tipo: {type(value).__name__})")
+                set_clauses.append(f"{field} = ${param_index}")
                 values.append(value)
+                param_index += 1
 
-            param_index += 1
+            # Adicionar contrato_id para WHERE
+            values.append(contrato_id)
+            where_param = param_index
+            print(f"Adicionado contrato_id para WHERE: {contrato_id} (tipo: {type(contrato_id).__name__})")
 
-        # Adicionar contrato_id como último parâmetro para o WHERE
-        values.append(contrato_id)
-        where_param = param_index
+            query = f"""
+                UPDATE contrato
+                SET {', '.join(set_clauses)}, updated_at = NOW()
+                WHERE id = ${where_param} AND ativo = TRUE
+                RETURNING id
+            """
 
-        query = f"""
-            UPDATE contrato
-            SET {', '.join(set_clauses)}, updated_at = NOW()
-            WHERE id = ${where_param} AND ativo = TRUE
-            RETURNING id
-        """
-
-        updated_id = await self.conn.fetchval(query, *values)
-        if updated_id:
-            return await self.find_contrato_by_id(updated_id)
-        return None
+            print(f"Query final: {query}")
+            print(f"Valores finais: {values}")
+            print(f"Tipos finais: {[type(v).__name__ for v in values]}")
+            print(f"=== FIM DEBUG ===\n")
+            
+            # Executar query
+            updated_id = await self.conn.fetchval(query, *values)
+            
+            if updated_id:
+                logger.info(f"Contrato {contrato_id} atualizado com sucesso")
+                return await self.find_contrato_by_id(updated_id)
+            else:
+                logger.warning(f"Contrato {contrato_id} não encontrado para atualização")
+                return None
+                
+        except Exception as e:
+            print(f"\n=== ERRO CRÍTICO ===")
+            print(f"Erro: {e}")
+            print(f"Tipo do erro: {type(e).__name__}")
+            print(f"Contrato ID: {contrato_id}")
+            if 'update_data' in locals():
+                print(f"Update data: {update_data}")
+            if 'query' in locals():
+                print(f"Query: {query}")
+            if 'values' in locals():
+                print(f"Values: {values}")
+                print(f"Types: {[type(v).__name__ for v in values]}")
+            print(f"=== FIM ERRO ===\n")
+            
+            logger.error(f"ERRO CRÍTICO - Contrato {contrato_id}: {e}")
+            raise
 
 
     async def delete_contrato(self, contrato_id: int) -> bool:
@@ -276,15 +302,34 @@ class ContratoRepository:
     
     async def exists_nr_contrato(self, nr_contrato: str, exclude_id: Optional[int] = None) -> bool:
         """Verifica se um número de contrato já existe (apenas contratos ativos)"""
+        print(f"\n=== DEBUG exists_nr_contrato ===")
+        print(f"nr_contrato: {nr_contrato} (tipo: {type(nr_contrato).__name__})")
+        print(f"exclude_id: {exclude_id} (tipo: {type(exclude_id).__name__})")
+        
         # Garante que nr_contrato seja sempre uma string
         nr_contrato_str = str(nr_contrato)
+        print(f"nr_contrato_str: {nr_contrato_str} (tipo: {type(nr_contrato_str).__name__})")
         
-        if exclude_id:
-            query = "SELECT EXISTS(SELECT 1 FROM contrato WHERE nr_contrato = $1 AND ativo = TRUE AND id != $2)"
-            return await self.conn.fetchval(query, nr_contrato_str, exclude_id)
-        else:
-            query = "SELECT EXISTS(SELECT 1 FROM contrato WHERE nr_contrato = $1 AND ativo = TRUE)"
-            return await self.conn.fetchval(query, nr_contrato_str)
+        try:
+            if exclude_id:
+                query = "SELECT EXISTS(SELECT 1 FROM contrato WHERE nr_contrato = $1 AND ativo = TRUE AND id != $2)"
+                print(f"Query: {query}")
+                print(f"Parâmetros: [{nr_contrato_str}, {exclude_id}]")
+                print(f"Tipos: [{type(nr_contrato_str).__name__}, {type(exclude_id).__name__}]")
+                result = await self.conn.fetchval(query, nr_contrato_str, exclude_id)
+                print(f"Resultado: {result}")
+                return result
+            else:
+                query = "SELECT EXISTS(SELECT 1 FROM contrato WHERE nr_contrato = $1 AND ativo = TRUE)"
+                print(f"Query: {query}")
+                print(f"Parâmetros: [{nr_contrato_str}]")
+                result = await self.conn.fetchval(query, nr_contrato_str)
+                print(f"Resultado: {result}")
+                return result
+        except Exception as e:
+            print(f"ERRO em exists_nr_contrato: {e}")
+            print(f"=== FIM DEBUG exists_nr_contrato ===\n")
+            raise
     
     async def get_next_available_nr_contrato(self) -> str:
         """Retorna o próximo número de contrato disponível"""

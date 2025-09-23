@@ -42,29 +42,39 @@ class ContratoService:
 
     async def _validate_foreign_keys(self, contrato: ContratoCreate | ContratoUpdate):
         """Valida se todas as chaves estrangeiras existem"""
+        print(f"Validando foreign keys para: {contrato}")
+        
         if hasattr(contrato, 'contratado_id') and contrato.contratado_id:
+            print(f"Validando contratado_id: {contrato.contratado_id}")
             if not await self.contratado_repo.get_contratado_by_id(contrato.contratado_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contratado não encontrado")
         
         if hasattr(contrato, 'modalidade_id') and contrato.modalidade_id:
+            print(f"Validando modalidade_id: {contrato.modalidade_id}")
             if not await self.modalidade_repo.get_modalidade_by_id(contrato.modalidade_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Modalidade não encontrada")
         
         if hasattr(contrato, 'status_id') and contrato.status_id:
+            print(f"Validando status_id: {contrato.status_id}")
             if not await self.status_repo.get_status_by_id(contrato.status_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status não encontrado")
         
         if hasattr(contrato, 'gestor_id') and contrato.gestor_id:
+            print(f"Validando gestor_id: {contrato.gestor_id}")
             if not await self.usuario_repo.get_user_by_id(contrato.gestor_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gestor não encontrado")
         
         if hasattr(contrato, 'fiscal_id') and contrato.fiscal_id:
+            print(f"Validando fiscal_id: {contrato.fiscal_id}")
             if not await self.usuario_repo.get_user_by_id(contrato.fiscal_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fiscal não encontrado")
         
         if hasattr(contrato, 'fiscal_substituto_id') and contrato.fiscal_substituto_id:
+            print(f"Validando fiscal_substituto_id: {contrato.fiscal_substituto_id}")
             if not await self.usuario_repo.get_user_by_id(contrato.fiscal_substituto_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fiscal Substituto não encontrado")
+        
+        print("Todas as validações de foreign key passaram")
 
     async def _send_contract_assignment_email(self, contrato_data: Dict, fiscal_id: int, gestor_id: int, is_update: bool = False, old_fiscal_id: Optional[int] = None):
         """Envia emails de notificação para fiscal e gestor quando um contrato é criado ou atualizado"""
@@ -214,26 +224,49 @@ class ContratoService:
             if not existing_contrato:
                 return None
             
+            # Valida chaves estrangeiras antes da atualização
+            print(f"\n=== DEBUG - Iniciando validação foreign keys ===")
+            await self._validate_foreign_keys(contrato_update)
+            print(f"=== DEBUG - Validação foreign keys concluída ===\n")
+            
             # Se está atualizando o número do contrato, verifica se já existe
+            print(f"\n=== DEBUG SERVICE - Verificação nr_contrato ===")
+            print(f"hasattr(contrato_update, 'nr_contrato'): {hasattr(contrato_update, 'nr_contrato')}")
+            print(f"contrato_update.nr_contrato: {contrato_update.nr_contrato}")
+            print(f"Condição completa: {hasattr(contrato_update, 'nr_contrato') and contrato_update.nr_contrato}")
+            
             if hasattr(contrato_update, 'nr_contrato') and contrato_update.nr_contrato:
+                print("Executando validação de nr_contrato duplicado...")
                 if await self.contrato_repo.exists_nr_contrato(contrato_update.nr_contrato, exclude_id=contrato_id):
                     next_available = await self.contrato_repo.get_next_available_nr_contrato()
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST, 
                         detail=f"Já existe um contrato ativo com o número '{contrato_update.nr_contrato}'. Sugestão: use o número '{next_available}'."
                     )
+            else:
+                print("Validação de nr_contrato pulada - campo é None ou vazio")
+            print(f"=== FIM DEBUG SERVICE ===\n")
 
             # Processa arquivos se fornecidos
+            print(f"\n=== DEBUG - Processamento de arquivos ===")
+            print(f"documento_contrato: {documento_contrato}")
+            print(f"Tem arquivos: {documento_contrato and any(file.filename for file in documento_contrato if file)}")
+            
             if documento_contrato and any(file.filename for file in documento_contrato if file):
+                print("Iniciando processamento de arquivos...")
                 # Filtra apenas arquivos válidos
                 valid_files = [file for file in documento_contrato if file and file.filename and file.filename.strip()]
+                print(f"Arquivos válidos: {len(valid_files)}")
 
                 if valid_files:
+                    print("Salvando arquivos...")
                     # Salva os novos arquivos
                     saved_files = await self.file_service.save_multiple_upload_files(contrato_id, valid_files)
+                    print(f"Arquivos salvos: {len(saved_files)}")
 
                     # Salva cada arquivo no banco de dados
-                    for file_info in saved_files:
+                    for i, file_info in enumerate(saved_files):
+                        print(f"Salvando arquivo {i+1} no banco: {file_info['original_filename']}")
                         arquivo_data = await self.arquivo_repo.create_arquivo(
                             nome_arquivo=file_info['original_filename'],
                             path_armazenamento=file_info['file_path'],
@@ -241,11 +274,22 @@ class ContratoService:
                             tamanho_bytes=file_info['file_size'],
                             contrato_id=contrato_id
                         )
+                        print(f"Arquivo criado no banco: {arquivo_data}")
                         # Vincula o ID do arquivo ao contrato
+                        print(f"Vinculando arquivo {arquivo_data['id']} ao contrato {contrato_id}")
                         await self.arquivo_repo.link_arquivo_to_contrato(arquivo_data['id'], contrato_id)
+                        print(f"Arquivo {i+1} processado com sucesso")
+            else:
+                print("Nenhum arquivo para processar")
+            print(f"=== FIM DEBUG - Processamento de arquivos ===\n")
 
             # Executa a atualização no banco (método correto)
+            print(f"\n=== DEBUG - Chamando repositório update_contrato ===")
+            print(f"contrato_id: {contrato_id} (tipo: {type(contrato_id).__name__})")
+            print(f"contrato_update: {contrato_update}")
             updated_contrato = await self.contrato_repo.update_contrato(contrato_id, contrato_update)
+            print(f"Resultado do repositório: {updated_contrato}")
+            print(f"=== FIM DEBUG - Repositório ===\n")
 
             return updated_contrato
             
