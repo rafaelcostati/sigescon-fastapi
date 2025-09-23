@@ -176,12 +176,10 @@ class SessionContextService:
                                    user_agent: Optional[str] = None) -> ContextoSessao:
         """Método específico para alternância de perfil via endpoint"""
 
-        # Valida se o usuário pode usar este perfil
-        if not await self.session_repo.validate_profile_for_user(usuario_id, novo_perfil_id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Usuário não tem permissão para usar este perfil"
-            )
+        print(f"🔧 DEBUG: switch_profile_context chamado - usuário {usuario_id}, perfil {novo_perfil_id}")
+
+        # REMOVIDA a validação duplicada - já foi feita no switch_profile
+        # A validação já aconteceu na verificação dos perfis disponíveis
 
         # Atualiza no banco
         success = await self.session_repo.update_active_profile(

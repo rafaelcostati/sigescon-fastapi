@@ -51,10 +51,12 @@ class SessionContextRepository:
             WHERE up.usuario_id = $1 AND up.perfil_id = $2 AND up.ativo = TRUE
         """
         try:
+            print(f"🔍 DEBUG: Validando perfil {perfil_id} para usuário {usuario_id}")
             result = await self.conn.fetchval(query, usuario_id, perfil_id)
+            print(f"🔍 DEBUG: Resultado da validação: {bool(result)}")
             return bool(result)
         except Exception as e:
-            print(f"Erro ao validar perfil: {e}")
+            print(f"❌ Erro ao validar perfil {perfil_id} para usuário {usuario_id}: {e}")
             return False
 
     async def create_session_context(self, usuario_id: int, sessao_id: str,
@@ -115,9 +117,12 @@ class SessionContextRepository:
 
     async def update_active_profile(self, sessao_id: str, novo_perfil_id: int, **kwargs) -> bool:
         """Atualiza perfil ativo com persistência simulada"""
+        print(f"🔧 DEBUG: update_active_profile - sessao {sessao_id}, novo perfil {novo_perfil_id}")
+
         # Se a sessão não existe, cria uma nova entrada
         if sessao_id not in self._active_profiles:
             usuario_id = int(sessao_id.split('-')[-1]) if 'mock-session-' in sessao_id else 1
+            print(f"🔧 DEBUG: Sessão não existe, criando para usuário {usuario_id}")
 
             # Buscar o primeiro perfil disponível do usuário em vez de assumir Gestor
             perfis_disponiveis = await self.get_user_available_profiles(usuario_id)
@@ -140,6 +145,7 @@ class SessionContextRepository:
 
         # Busca nome do perfil baseado no ID do banco de dados
         usuario_id = self._active_profiles[sessao_id]['usuario_id']
+        print(f"🔧 DEBUG: Buscando perfis atualizados para usuário {usuario_id}")
         perfis_disponiveis = await self.get_user_available_profiles(usuario_id)
 
         # Encontra o perfil pelo ID
@@ -147,12 +153,16 @@ class SessionContextRepository:
 
         if perfil_encontrado:
             nome_perfil = perfil_encontrado['nome']
+            print(f"🔧 DEBUG: Perfil encontrado no banco: {nome_perfil} (ID: {novo_perfil_id})")
         else:
+            print(f"❌ ERROR: Perfil {novo_perfil_id} não encontrado nos perfis disponíveis: {perfis_disponiveis}")
             # Fallback para mapeamento manual se não encontrar no banco
             nome_perfil = 'Administrador' if novo_perfil_id == 1 else 'Gestor' if novo_perfil_id == 2 else 'Fiscal'
+            print(f"🔧 DEBUG: Usando fallback: {nome_perfil}")
 
         self._active_profiles[sessao_id]['perfil_ativo_id'] = novo_perfil_id
         self._active_profiles[sessao_id]['perfil_ativo_nome'] = nome_perfil
+        print(f"✅ DEBUG: Perfil atualizado na sessão {sessao_id}: {nome_perfil} (ID: {novo_perfil_id})")
         return True
 
     async def update_last_activity(self, sessao_id: str) -> bool:
