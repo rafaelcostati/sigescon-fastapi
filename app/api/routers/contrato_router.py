@@ -126,12 +126,20 @@ async def list_contratos(
     status_id: Optional[int] = Query(None),
     pae: Optional[str] = Query(None),
     ano: Optional[int] = Query(None),
+    vencimento_dias: Optional[str] = Query(None, description="Filtro por dias até vencimento (30,60,90)"),
     service: ContratoService = Depends(get_contrato_service),
     user_context: tuple = Depends(get_current_user_with_context)
 ):
     current_user, context = user_context
-    filters = {'gestor_id': gestor_id, 'fiscal_id': fiscal_id, 'objeto': objeto, 'nr_contrato': nr_contrato, 'status_id': status_id, 'pae': pae, 'ano': ano}
+    filters = {'gestor_id': gestor_id, 'fiscal_id': fiscal_id, 'objeto': objeto, 'nr_contrato': nr_contrato, 'status_id': status_id, 'pae': pae, 'ano': ano, 'vencimento_dias': vencimento_dias}
     active_filters = {k: v for k, v in filters.items() if v is not None}
+    
+    # Debug dos filtros recebidos
+    if vencimento_dias:
+        print(f"🔍 BACKEND: Filtro vencimento_dias recebido: {vencimento_dias}")
+    else:
+        print(f"🔍 BACKEND: Nenhum filtro de vencimento recebido")
+    print(f"📡 BACKEND: Filtros ativos: {active_filters}")
 
     # Criar contexto do usuário para isolamento de dados
     user_ctx = {

@@ -194,6 +194,101 @@ async def get_pendencias_pendentes_admin(
     return await service.get_pendencias_pendentes_admin(limit)
 
 
+@router.get("/admin/contratos-proximos-vencimento")
+async def get_contratos_proximos_vencimento_admin(
+    dias_antecedencia: int = Query(90, ge=30, le=365, description="Dias de antecedência para considerar próximo ao vencimento"),
+    service: DashboardService = Depends(get_dashboard_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Lista contratos que estão próximos ao vencimento (dentro do prazo especificado).
+
+    - **dias_antecedencia**: Dias de antecedência para considerar próximo ao vencimento (padrão: 90, mínimo: 30, máximo: 365)
+
+    Retorna contratos ativos que vencem dentro do prazo especificado, ordenados por urgência:
+    - **CRÍTICO** (≤30 dias): Contratos que vencem em até 30 dias
+    - **ALTO** (31-60 dias): Contratos que vencem entre 31 e 60 dias  
+    - **MÉDIO** (61-90 dias): Contratos que vencem entre 61 e 90 dias
+
+    **Informações incluídas:**
+    - Detalhes do contrato (número, objeto, datas)
+    - Dias restantes para vencimento
+    - Classificação de urgência
+    - Dados do contratado (nome, CNPJ)
+    - Responsáveis (fiscal e gestor com emails)
+    - Valor do contrato para priorização
+    - Estatísticas por nível de urgência
+
+    **Ideal para:**
+    - Planejamento de renovações contratuais
+    - Alertas preventivos de vencimento
+    - Gestão proativa de contratos
+    - Relatórios executivos de vencimentos
+
+    **Sistema de Alertas:**
+    - 90 dias: Primeiro alerta por email
+    - 60 dias: Segundo alerta por email
+    - 30 dias: Alerta crítico por email
+    """
+    return await service.get_contratos_proximos_vencimento_admin(dias_antecedencia)
+
+
+@router.post("/admin/test-contract-alerts")
+async def test_contract_alerts(
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Testa o sistema de alertas de contratos próximos ao vencimento.
+    
+    Executa manualmente a verificação de contratos próximos ao vencimento
+    e envia alertas por email para todos os administradores.
+    
+    **Funcionalidade:**
+    - Busca contratos que vencem em 90, 60 ou 30 dias
+    - Envia emails de alerta para todos os usuários com perfil Administrador
+    - Retorna relatório detalhado do processo
+    
+    **Ideal para:**
+    - Testar configuração de email
+    - Verificar funcionamento dos alertas
+    - Executar alertas manualmente quando necessário
+    """
+    from app.services.contract_alert_service import ContractAlertService
+    
+    try:
+        # Executar processo de alertas
+        await ContractAlertService.send_daily_alerts()
+        
+        # Buscar estatísticas para retorno
+        contratos_90 = await ContractAlertService.check_contracts_by_days(90)
+        contratos_60 = await ContractAlertService.check_contracts_by_days(60) 
+        contratos_30 = await ContractAlertService.check_contracts_by_days(30)
+        admin_emails = await ContractAlertService.get_admin_emails()
+        
+        return {
+            "message": "Processo de alertas executado com sucesso",
+            "estatisticas": {
+                "contratos_90_dias": len(contratos_90),
+                "contratos_60_dias": len(contratos_60),
+                "contratos_30_dias": len(contratos_30),
+                "total_contratos_alertados": len(contratos_90) + len(contratos_60) + len(contratos_30),
+                "administradores_notificados": len(admin_emails),
+                "emails_administradores": admin_emails
+            },
+            "contratos_alertados": {
+                "90_dias": [c['contrato_numero'] for c in contratos_90],
+                "60_dias": [c['contrato_numero'] for c in contratos_60],
+                "30_dias": [c['contrato_numero'] for c in contratos_30]
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "error": f"Erro ao executar alertas: {str(e)}",
+            "message": "Falha no processo de alertas"
+        }
+
+
 # --- Endpoints Para Gestor ---
 
 @router.get("/gestor/pendencias", summary="Pendências dos contratos sob gestão")

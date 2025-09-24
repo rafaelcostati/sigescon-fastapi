@@ -510,3 +510,17 @@ class DashboardService:
             "pendencias_pendentes": pendencias_data,
             "total_pendencias_pendentes": len(pendencias_data)
         }
+
+    async def get_contratos_proximos_vencimento_admin(self, dias_antecedencia: int = 90) -> Dict[str, Any]:
+        """
+        Busca contratos próximos ao vencimento para o dashboard do administrador
+        """
+        contratos_data = await self.dashboard_repo.get_contratos_proximos_vencimento_admin(dias_antecedencia)
+        estatisticas = await self.dashboard_repo.get_estatisticas_contratos_vencimento()
+        
+        return {
+            "contratos_proximos_vencimento": contratos_data,
+            "estatisticas": estatisticas,
+            "total_contratos": len(contratos_data),
+            "dias_antecedencia_configurados": dias_antecedencia
+        }

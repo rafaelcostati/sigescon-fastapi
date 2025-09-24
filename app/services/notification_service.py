@@ -339,6 +339,15 @@ class NotificationScheduler:
         except Exception as e:
             logger.error(f"Erro ao verificar prazos: {e}")
     
+    async def check_contract_expiration_alerts(self):
+        """Task para verificar contratos próximos ao vencimento"""
+        try:
+            from app.services.contract_alert_service import ContractAlertService
+            await ContractAlertService.send_daily_alerts()
+            logger.info("Verificação de contratos próximos ao vencimento concluída.")
+        except Exception as e:
+            logger.error(f"Erro ao verificar contratos próximos ao vencimento: {e}")
+    
     def start_scheduler(self):
         """Inicia o agendador de tarefas"""
         # Processa fila de emails a cada 5 minutos
@@ -360,8 +369,18 @@ class NotificationScheduler:
             max_instances=1
         )
         
+        # Verifica contratos próximos ao vencimento todos os dias às 9h
+        self.scheduler.add_job(
+            self.check_contract_expiration_alerts,
+            'cron',
+            hour=9,
+            minute=0,
+            id='check_contract_expiration',
+            max_instances=1
+        )
+        
         self.scheduler.start()
-        logger.info("Scheduler de notificações iniciado")
+        logger.info("Scheduler de notificações iniciado (incluindo alertas de contratos)")
     
     def stop_scheduler(self):
         """Para o agendador"""

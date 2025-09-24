@@ -147,3 +147,45 @@ class EmailService:
                 result["errors"].append(f"{config['name']}: {str(e)}")
 
         return result
+
+    @staticmethod
+    async def send_contract_expiration_alert(
+        admin_emails: list[str], 
+        contract_data: dict, 
+        days_remaining: int
+    ) -> bool:
+        """
+        Envia alerta de vencimento de contrato para administradores
+        """
+        urgency = "CRÍTICO" if days_remaining <= 30 else "ALTO" if days_remaining <= 60 else "MÉDIO"
+        
+        subject = f"🚨 ALERTA {urgency}: Contrato {contract_data['contrato_numero']} vence em {days_remaining} dias"
+        
+        body = f"""
+ALERTA DE VENCIMENTO DE CONTRATO
+
+Contrato: {contract_data['contrato_numero']}
+Objeto: {contract_data['contrato_objeto']}
+Contratado: {contract_data['contratado_nome']}
+Data de Vencimento: {contract_data['data_fim']}
+Dias Restantes: {days_remaining}
+Nível de Urgência: {urgency}
+
+Responsáveis:
+- Gestor: {contract_data['gestor_nome']} ({contract_data['gestor_email']})
+- Fiscal: {contract_data['fiscal_nome']} ({contract_data['fiscal_email']})
+
+Valor do Contrato: R$ {contract_data.get('valor_global', 'N/I')}
+
+AÇÃO NECESSÁRIA:
+Por favor, entre em contato com os responsáveis para iniciar o processo de renovação ou finalização do contrato.
+
+Sistema de Gestão de Contratos - SIGESCON
+        """
+        
+        success_count = 0
+        for email in admin_emails:
+            if await EmailService.send_email(email, subject, body):
+                success_count += 1
+        
+        return success_count > 0

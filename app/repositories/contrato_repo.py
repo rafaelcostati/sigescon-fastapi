@@ -145,6 +145,20 @@ class ContratoRepository:
                     where_clauses.append(f"c.{key} ILIKE ${param_idx}")
                     params.append(f"%{value}%")
                     param_idx += 1
+                elif key == 'vencimento_dias':
+                    # Filtro por proximidade de vencimento (cumulativo - "ou menos")
+                    # Considera apenas contratos com status "Ativo"
+                    print(f"🔍 REPO: Processando filtro vencimento_dias: {value}")
+                    dias_list = [int(d.strip()) for d in value.split(',') if d.strip().isdigit()]
+                    print(f"🔍 REPO: Dias extraídos: {dias_list}")
+                    if dias_list:
+                        # Pegar o maior valor para filtro cumulativo
+                        max_dias = max(dias_list)
+                        print(f"🔍 REPO: Aplicando filtro para {max_dias} dias ou menos (apenas contratos ativos)")
+                        where_clauses.append(f"c.data_fim IS NOT NULL")
+                        where_clauses.append(f"c.data_fim > CURRENT_DATE")
+                        where_clauses.append(f"(c.data_fim - CURRENT_DATE) <= {max_dias}")
+                        where_clauses.append(f"s.nome = 'Ativo'")
         where_sql = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
         count_query = f"SELECT COUNT(c.id) AS total {base_query}{where_sql}"
         total_items = await self.conn.fetchval(count_query, *params)

@@ -262,9 +262,9 @@ class DashboardRepository:
                 result = await self.conn.fetchval(query)
                 contadores['contratos_ativos'] = result or 0
 
-            # Total de contratações (todos os status)
+            # Total de contratações (apenas contratos ativos - não excluídos)
             if 'contrato' in table_names:
-                query = "SELECT COUNT(*) FROM contrato"
+                query = "SELECT COUNT(*) FROM contrato WHERE ativo = true"
                 result = await self.conn.fetchval(query)
                 contadores['total_contratacoes'] = result or 0
 
@@ -1172,3 +1172,149 @@ class DashboardRepository:
         except Exception as e:
             print(f"Erro ao buscar pendências pendentes: {e}. Retornando lista vazia.")
             return []
+
+    async def get_contratos_proximos_vencimento_admin(self, dias_antecedencia: int = 90) -> List[Dict[str, Any]]:
+        """
+        Busca contratos que estão próximos ao vencimento (dentro do prazo especificado)
+        Para o dashboard do administrador
+        """
+        try:
+            # Primeiro verifica se as tabelas existem
+            check_query = """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name IN ('contrato', 'contratado', 'usuario', 'status')
+            """
+            existing_tables = await self.conn.fetch(check_query)
+            table_names = [row['table_name'] for row in existing_tables]
+
+            required_tables = ['contrato', 'contratado', 'usuario', 'status']
+            missing_tables = [table for table in required_tables if table not in table_names]
+
+            if missing_tables:
+                print(f"Tabelas não encontradas: {missing_tables}. Retornando lista vazia.")
+                return []
+
+            query = """
+            SELECT
+                c.id as contrato_id,
+                c.nr_contrato as contrato_numero,
+                c.objeto as contrato_objeto,
+                c.data_inicio,
+                c.data_fim,
+                (c.data_fim - CURRENT_DATE)::int as dias_para_vencer,
+                
+                -- Informações do contratado
+                ct.nome as contratado_nome,
+                ct.cnpj as contratado_cnpj,
+                
+                -- Responsáveis
+                u_fiscal.nome as fiscal_nome,
+                u_fiscal.email as fiscal_email,
+                u_gestor.nome as gestor_nome,
+                u_gestor.email as gestor_email,
+                
+                -- Status do contrato
+                s.nome as status_nome,
+                
+                -- Classificação de urgência baseada nos dias restantes
+                CASE
+                    WHEN (c.data_fim - CURRENT_DATE) <= 30 THEN 'CRÍTICO'
+                    WHEN (c.data_fim - CURRENT_DATE) <= 60 THEN 'ALTO'
+                    WHEN (c.data_fim - CURRENT_DATE) <= 90 THEN 'MÉDIO'
+                    ELSE 'BAIXO'
+                END as nivel_urgencia,
+                
+                -- Valor do contrato para priorização
+                c.valor_global,
+                c.valor_anual
+
+            FROM contrato c
+            JOIN contratado ct ON c.contratado_id = ct.id
+            JOIN usuario u_fiscal ON c.fiscal_id = u_fiscal.id
+            JOIN usuario u_gestor ON c.gestor_id = u_gestor.id
+            JOIN status s ON c.status_id = s.id
+            WHERE
+                c.ativo = true
+                AND s.nome = 'Ativo'  -- Apenas contratos ativos
+                AND c.data_fim IS NOT NULL
+                AND c.data_fim > CURRENT_DATE  -- Ainda não venceu
+                AND c.data_fim <= (CURRENT_DATE + INTERVAL '%s days')  -- Dentro do prazo de antecedência
+            ORDER BY
+                -- Ordena por urgência (mais próximos primeiro) e depois por valor (maiores primeiro)
+                CASE
+                    WHEN (c.data_fim - CURRENT_DATE) <= 30 THEN 1
+                    WHEN (c.data_fim - CURRENT_DATE) <= 60 THEN 2
+                    WHEN (c.data_fim - CURRENT_DATE) <= 90 THEN 3
+                    ELSE 4
+                END,
+                c.data_fim ASC,
+                COALESCE(c.valor_global, c.valor_anual, 0) DESC
+            """ % dias_antecedencia
+            
+            rows = await self.conn.fetch(query)
+            return [dict(row) for row in rows]
+
+        except Exception as e:
+            print(f"Erro ao buscar contratos próximos ao vencimento: {e}. Retornando lista vazia.")
+            return []
+
+    async def get_estatisticas_contratos_vencimento(self) -> Dict[str, int]:
+        """
+        Busca estatísticas dos contratos próximos ao vencimento para o dashboard do administrador
+        """
+        try:
+            # Primeiro verifica se as tabelas existem
+            check_query = """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name IN ('contrato', 'status')
+            """
+            existing_tables = await self.conn.fetch(check_query)
+            table_names = [row['table_name'] for row in existing_tables]
+
+            required_tables = ['contrato', 'status']
+            missing_tables = [table for table in required_tables if table not in table_names]
+
+            if missing_tables:
+                print(f"Tabelas não encontradas: {missing_tables}. Retornando estatísticas zeradas.")
+                return {
+                    'total_proximos_vencimento': 0,
+                    'criticos_30_dias': 0,
+                    'altos_60_dias': 0,
+                    'medios_90_dias': 0
+                }
+
+            query = """
+            SELECT
+                COALESCE(COUNT(*), 0) as total_proximos_vencimento,
+                COALESCE(COUNT(*) FILTER (WHERE (c.data_fim - CURRENT_DATE) <= 30), 0) as criticos_30_dias,
+                COALESCE(COUNT(*) FILTER (WHERE (c.data_fim - CURRENT_DATE) BETWEEN 31 AND 60), 0) as altos_60_dias,
+                COALESCE(COUNT(*) FILTER (WHERE (c.data_fim - CURRENT_DATE) BETWEEN 61 AND 90), 0) as medios_90_dias
+            FROM contrato c
+            JOIN status s ON c.status_id = s.id
+            WHERE
+                c.ativo = true
+                AND s.nome = 'Ativo'
+                AND c.data_fim IS NOT NULL
+                AND c.data_fim > CURRENT_DATE
+                AND c.data_fim <= (CURRENT_DATE + INTERVAL '90 days')
+            """
+            result = await self.conn.fetchrow(query)
+            return dict(result) if result else {
+                'total_proximos_vencimento': 0,
+                'criticos_30_dias': 0,
+                'altos_60_dias': 0,
+                'medios_90_dias': 0
+            }
+
+        except Exception as e:
+            print(f"Erro ao buscar estatísticas de contratos próximos ao vencimento: {e}. Retornando estatísticas zeradas.")
+            return {
+                'total_proximos_vencimento': 0,
+                'criticos_30_dias': 0,
+                'altos_60_dias': 0,
+                'medios_90_dias': 0
+            }
