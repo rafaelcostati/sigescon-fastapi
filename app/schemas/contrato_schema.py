@@ -1,5 +1,5 @@
 # app/schemas/contrato_schema.py
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List
 from datetime import date
 
@@ -23,6 +23,20 @@ class ContratoBase(BaseModel):
     doe: Optional[str] = Field(None, max_length=50)
     data_doe: Optional[date] = None
 
+    @field_validator('valor_anual')
+    @classmethod
+    def validate_valor_anual(cls, v):
+        if v is not None and v < 0:
+            raise ValueError('Valor anual não pode ser negativo')
+        return v
+
+    @field_validator('valor_global')
+    @classmethod
+    def validate_valor_global(cls, v):
+        if v is not None and v < 0:
+            raise ValueError('Valor global não pode ser negativo')
+        return v
+
 # Schema para a resposta da API (leitura de um contrato)
 # Inclui campos de tabelas relacionadas (JOINs)
 class Contrato(ContratoBase):
@@ -41,7 +55,7 @@ class Contrato(ContratoBase):
 class ContratoCreate(ContratoBase):
     pass
 
-# Schema para atualização 
+# Schema para atualização
 class ContratoUpdate(BaseModel):
     nr_contrato: Optional[str] = Field(None, max_length=50)
     objeto: Optional[str] = None
@@ -60,6 +74,20 @@ class ContratoUpdate(BaseModel):
     pae: Optional[str] = Field(None, max_length=50)
     doe: Optional[str] = Field(None, max_length=50)
     data_doe: Optional[date] = None
+
+    @field_validator('valor_anual')
+    @classmethod
+    def validate_valor_anual(cls, v):
+        if v is not None and v < 0:
+            raise ValueError('Valor anual não pode ser negativo')
+        return v
+
+    @field_validator('valor_global')
+    @classmethod
+    def validate_valor_global(cls, v):
+        if v is not None and v < 0:
+            raise ValueError('Valor global não pode ser negativo')
+        return v
 
 # Schema para a resposta da listagem
 class ContratoList(BaseModel):
