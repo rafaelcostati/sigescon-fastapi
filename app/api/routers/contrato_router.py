@@ -66,6 +66,7 @@ async def create_contrato(
     pae: Optional[str] = Form(None),
     doe: Optional[str] = Form(None),
     data_doe: Optional[date] = Form(None),
+    garantia: Optional[date] = Form(None),
     documento_contrato: List[UploadFile] = File(None),
     service: ContratoService = Depends(get_contrato_service),
     admin_user: Usuario = Depends(admin_required)
@@ -97,7 +98,8 @@ async def create_contrato(
         fiscal_substituto_id=fiscal_substituto_id,
         pae=pae,
         doe=doe,
-        data_doe=data_doe
+        data_doe=data_doe,
+        garantia=garantia
     )
 
     return await service.create_contrato(contrato_create, documento_contrato)
@@ -190,6 +192,7 @@ async def update_contrato(
     pae: Optional[str] = Form(None),
     doe: Optional[str] = Form(None),
     data_doe: Optional[date] = Form(None),
+    garantia: Optional[date] = Form(None),
     # Arquivos opcionais para upload
     documento_contrato: List[UploadFile] = File(None),
     service: ContratoService = Depends(get_contrato_service),
@@ -226,6 +229,7 @@ async def update_contrato(
     print(f"fiscal_id: {fiscal_id} (tipo: {type(fiscal_id).__name__})")
     print(f"valor_anual: {valor_anual} (tipo: {type(valor_anual).__name__})")
     print(f"valor_global: {valor_global} (tipo: {type(valor_global).__name__})")
+    print(f"garantia: {garantia} (tipo: {type(garantia).__name__})")
     print(f"documento_contrato: {len(documento_contrato) if documento_contrato else 0} arquivos")
     
     # Constrói objeto ContratoUpdate apenas com campos fornecidos
@@ -249,7 +253,8 @@ async def update_contrato(
         'fiscal_substituto_id': fiscal_substituto_id,
         'pae': pae,
         'doe': doe,
-        'data_doe': data_doe
+        'data_doe': data_doe,
+        'garantia': garantia
     }
     
     # Inclui apenas campos não None no update

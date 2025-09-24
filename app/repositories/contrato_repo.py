@@ -18,9 +18,9 @@ class ContratoRepository:
                 nr_contrato, objeto, data_inicio, data_fim, contratado_id,
                 modalidade_id, status_id, gestor_id, fiscal_id,
                 valor_anual, valor_global, base_legal, termos_contratuais,
-                fiscal_substituto_id, pae, doe, data_doe
+                fiscal_substituto_id, pae, doe, data_doe, garantia
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             RETURNING id
         """
 
@@ -43,7 +43,8 @@ class ContratoRepository:
             int(contrato.fiscal_substituto_id) if contrato.fiscal_substituto_id is not None else None,
             str(contrato.pae) if contrato.pae is not None else None,
             str(contrato.doe) if contrato.doe is not None else None,
-            contrato.data_doe
+            contrato.data_doe,
+            contrato.garantia
         )
         return await self.find_contrato_by_id(new_contrato_id)
 

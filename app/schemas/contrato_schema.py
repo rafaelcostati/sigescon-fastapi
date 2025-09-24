@@ -22,6 +22,7 @@ class ContratoBase(BaseModel):
     pae: Optional[str] = Field(None, max_length=50)
     doe: Optional[str] = Field(None, max_length=50)
     data_doe: Optional[date] = None
+    garantia: Optional[date] = None
 
     @field_validator('valor_anual')
     @classmethod
@@ -74,6 +75,7 @@ class ContratoUpdate(BaseModel):
     pae: Optional[str] = Field(None, max_length=50)
     doe: Optional[str] = Field(None, max_length=50)
     data_doe: Optional[date] = None
+    garantia: Optional[date] = None
 
     @field_validator('valor_anual')
     @classmethod
