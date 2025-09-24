@@ -541,18 +541,30 @@ class DashboardRepository:
 
             contadores = {
                 'contratos_sob_gestao': 0,
+                'contratos_ativos_sob_gestao': 0,
                 'relatorios_equipe_pendentes': 0
             }
 
-            # Contratos sob gestão
+            # Contratos sob gestão (todos os contratos ativos, independente do status)
             if 'contrato' in table_names:
-                query = """
+                # Total de contratos do gestor
+                query_total = """
                     SELECT COUNT(*)
                     FROM contrato c
                     WHERE c.gestor_id = $1 AND c.ativo = true
                 """
-                result = await self.conn.fetchval(query, gestor_id)
-                contadores['contratos_sob_gestao'] = result or 0
+                result_total = await self.conn.fetchval(query_total, gestor_id)
+                contadores['contratos_sob_gestao'] = result_total or 0
+
+                # Contratos com status "Ativo" do gestor
+                query_ativos = """
+                    SELECT COUNT(*)
+                    FROM contrato c
+                    JOIN status s ON c.status_id = s.id
+                    WHERE c.gestor_id = $1 AND c.ativo = true AND s.nome = 'Ativo'
+                """
+                result_ativos = await self.conn.fetchval(query_ativos, gestor_id)
+                contadores['contratos_ativos_sob_gestao'] = result_ativos or 0
 
             # Relatórios da equipe pendentes
             if all(table in table_names for table in ['relatoriofiscal', 'contrato', 'statusrelatorio']):
@@ -959,6 +971,7 @@ class DashboardRepository:
 
             metrics = {
                 'contratos_sob_gestao': 0,
+                'contratos_ativos_sob_gestao': 0,
                 'equipe_pendencias_atraso': 0,
                 'relatorios_equipe_aguardando': 0,
                 'performance_equipe': {
@@ -970,16 +983,26 @@ class DashboardRepository:
                 'contratos_proximos_vencimento': []
             }
 
-            # 1. Contratos sob gestão (apenas status "Ativo")
+            # 1. Contratos sob gestão (todos os contratos ativos, independente do status)
             if 'contrato' in table_names:
-                query = """
+                # Total de contratos do gestor
+                query_total = """
+                    SELECT COUNT(*)
+                    FROM contrato c
+                    WHERE c.gestor_id = $1 AND c.ativo = true
+                """
+                result_total = await self.conn.fetchval(query_total, gestor_id)
+                metrics['contratos_sob_gestao'] = result_total or 0
+
+                # Contratos com status "Ativo" do gestor
+                query_ativos = """
                     SELECT COUNT(*)
                     FROM contrato c
                     JOIN status s ON c.status_id = s.id
                     WHERE c.gestor_id = $1 AND c.ativo = true AND s.nome = 'Ativo'
                 """
-                result = await self.conn.fetchval(query, gestor_id)
-                metrics['contratos_sob_gestao'] = result or 0
+                result_ativos = await self.conn.fetchval(query_ativos, gestor_id)
+                metrics['contratos_ativos_sob_gestao'] = result_ativos or 0
 
             # 2. Equipe com pendências em atraso
             if all(table in table_names for table in ['contrato', 'pendenciarelatorio', 'statuspendencia']):

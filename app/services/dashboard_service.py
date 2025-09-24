@@ -341,6 +341,7 @@ class DashboardService:
             pendencias_em_atraso=0,
             relatorios_enviados_mes=0,
             contratos_sob_gestao=gestor_contadores['contratos_sob_gestao'],
+            contratos_ativos_sob_gestao=gestor_contadores.get('contratos_ativos_sob_gestao', 0),
             relatorios_equipe_pendentes=gestor_contadores['relatorios_equipe_pendentes'],
             contratados_com_pendencias_vencidas=0,
             total_contratacoes=0

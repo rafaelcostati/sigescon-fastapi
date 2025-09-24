@@ -84,6 +84,7 @@ class ContadoresDashboard(BaseModel):
 
     # Para Gestor
     contratos_sob_gestao: int
+    contratos_ativos_sob_gestao: int = 0
     relatorios_equipe_pendentes: int
 
 
