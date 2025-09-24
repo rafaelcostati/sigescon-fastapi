@@ -36,6 +36,22 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
+def create_refresh_token(data: dict) -> str:
+    """Cria um refresh token JWT com validade estendida."""
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(days=30)  # Refresh token dura 30 dias
+    to_encode.update({"exp": expire, "type": "refresh"})
+    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
+
+def verify_token(token: str) -> dict:
+    """Verifica e decodifica um token JWT."""
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
 # Função auxiliar para migrar senhas antigas do Flask para o novo formato
 def migrate_password_if_needed(plain_password: str, stored_hash: str) -> tuple[bool, Optional[str]]:
     """

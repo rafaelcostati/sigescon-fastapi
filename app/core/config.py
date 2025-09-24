@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # Configuração de Autenticação JWT
     JWT_SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 720
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1400
 
     # Credenciais do Admin 
     ADMIN_EMAIL: Optional[str] = None

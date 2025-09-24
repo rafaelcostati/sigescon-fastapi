@@ -14,11 +14,12 @@ from app.services.session_context_service import SessionContextService
 from app.schemas.token_schema import Token
 from app.schemas.session_context_schema import (
     LoginResponse, LoginComPerfilRequest, AlternarPerfilRequest,
-    ContextoSessao, DashboardData, PermissaoContextual
+    ContextoSessao, DashboardData, PermissaoContextual,
+    RefreshTokenRequest, RefreshTokenResponse
 )
 from app.schemas.usuario_schema import Usuario
 from app.api.dependencies import get_current_user, get_current_context, get_token_payload
-from app.core.security import authenticate_user, create_access_token
+from app.core.security import authenticate_user, create_access_token, create_refresh_token, verify_token
 from app.core.config import settings
 
 router = APIRouter(
@@ -107,6 +108,12 @@ async def login_for_access_token(
         "session_id": contexto.sessao_id
     })
 
+    # Cria refresh token
+    refresh_token = create_refresh_token(data={
+        "sub": str(user['id']),
+        "session_id": contexto.sessao_id
+    })
+
     # Verifica se precisa de seleção manual de perfil
     requer_selecao = len(contexto.perfis_disponiveis) > 1 and perfil_inicial_id is None
     
@@ -121,7 +128,8 @@ async def login_for_access_token(
         token_type="bearer",
         contexto_sessao=contexto,
         requer_selecao_perfil=requer_selecao,
-        mensagem=mensagem
+        mensagem=mensagem,
+        refresh_token=refresh_token  # Adicionar refresh token na resposta
     )
 
 @router.post("/login-com-perfil", response_model=LoginResponse, summary="Login com perfil específico")
@@ -276,17 +284,132 @@ async def get_contextual_permissions(
             detail=f"Erro ao buscar permissões: {str(e)}"
         )
 
-@router.post("/logout")
+@router.post("/logout", summary="Logout do usuário")
 async def logout(
+    request: Request,
     service: SessionContextService = Depends(get_session_context_service),
-    current_user: Usuario = Depends(get_current_user)
+    conn: asyncpg.Connection = Depends(get_connection)
 ):
-    
+    """
+    Realiza logout do usuário, desativando sessões ativas.
+    Funciona mesmo com tokens expirados ou inválidos.
+    """
+    try:
+        # Tenta extrair informações do token, mesmo se expirado
+        authorization = request.headers.get("Authorization", "")
+        if authorization.startswith("Bearer "):
+            token = authorization.replace("Bearer ", "")
+
+            try:
+                # Decodifica token mesmo se expirado (sem verificação de expiração)
+                from jose import jwt
+                payload = jwt.decode(
+                    token,
+                    settings.JWT_SECRET_KEY,
+                    algorithms=[settings.ALGORITHM],
+                    options={"verify_exp": False}  # Ignora expiração
+                )
+
+                user_id = payload.get("sub")
+                session_id = payload.get("session_id")
+
+                sessoes_encerradas = 0
+
+                if session_id:
+                    # Desativa sessão específica
+                    success = await service.session_repo.deactivate_session(session_id)
+                    if success:
+                        sessoes_encerradas += 1
+                elif user_id:
+                    # Se não tem session_id, desativa todas as sessões do usuário
+                    await conn.execute("""
+                        UPDATE session_context
+                        SET ativo = FALSE
+                        WHERE usuario_id = $1 AND ativo = TRUE
+                    """, int(user_id))
+                    sessoes_encerradas = 1  # Estima 1 sessão encerrada
+
+            except Exception as decode_error:
+                print(f"⚠️ Não foi possível decodificar token no logout: {decode_error}")
+                # Token inválido, mas logout continua
+
+        return {
+            "success": True,
+            "message": "Logout realizado com sucesso",
+            "sessoes_encerradas": sessoes_encerradas if 'sessoes_encerradas' in locals() else 0
+        }
+
+    except Exception as e:
+        print(f"⚠️ Erro no logout: {e}")
+        # Mesmo com erro, retorna sucesso para o cliente
+        return {
+            "success": True,
+            "message": "Logout realizado com sucesso",
+            "sessoes_encerradas": 0
+        }
+
+@router.post("/logout-anon", summary="Logout anônimo (sem autenticação)")
+async def logout_anonymous():
+    """
+    Endpoint de logout que não requer autenticação.
+    Usado como fallback quando o token está completamente inválido.
+    """
     return {
+        "success": True,
         "message": "Logout realizado com sucesso",
-        "sessoes_encerradas": 1
+        "note": "Sessão local limpa. Se havia sessões ativas no servidor, elas permanecerão até limpeza automática."
     }
 
+@router.post("/refresh", response_model=RefreshTokenResponse, summary="Renovar token de acesso")
+async def refresh_token(
+    refresh_request: RefreshTokenRequest,
+    service: SessionContextService = Depends(get_session_context_service)
+):
+    """Renova o token de acesso usando um refresh token válido"""
+    try:
+        # Verifica o refresh token
+        payload = verify_token(refresh_request.refresh_token)
+        if not payload or payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token inválido ou expirado"
+            )
+
+        user_id = int(payload.get("sub"))
+        session_id = payload.get("session_id")
+
+        # Verifica se a sessão ainda está ativa
+        current_context = await service.get_session_context(session_id)
+        if not current_context:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Sessão expirada. Faça login novamente."
+            )
+
+        # Cria novo access token
+        new_access_token = create_access_token(data={
+            "sub": str(user_id),
+            "session_id": session_id
+        })
+
+        # Opcionalmente, cria novo refresh token
+        new_refresh_token = create_refresh_token(data={
+            "sub": str(user_id),
+            "session_id": session_id
+        })
+
+        return RefreshTokenResponse(
+            access_token=new_access_token,
+            refresh_token=new_refresh_token
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao renovar token: {str(e)}"
+        )
 
 @router.post("/login-legacy", response_model=Token)
 async def login_legacy(
@@ -305,7 +428,7 @@ async def login_legacy(
         )
 
     auth_result = authenticate_user(form_data.password, user['senha_hash'])
-    
+
     if not auth_result['is_valid']:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

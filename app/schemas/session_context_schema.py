@@ -33,6 +33,16 @@ class LoginComPerfilRequest(BaseModel):
     senha: str
     perfil_inicial_id: Optional[int] = Field(None, description="Perfil para iniciar sessão")
 
+class RefreshTokenRequest(BaseModel):
+    """Requisição para renovar token de acesso"""
+    refresh_token: str
+
+class RefreshTokenResponse(BaseModel):
+    """Resposta da renovação de token"""
+    access_token: str
+    token_type: str = "bearer"
+    refresh_token: Optional[str] = None
+
 class LoginResponse(BaseModel):
     """Resposta do login com informações de contexto"""
     access_token: str
@@ -40,6 +50,7 @@ class LoginResponse(BaseModel):
     contexto_sessao: ContextoSessao
     requer_selecao_perfil: bool = False
     mensagem: Optional[str] = None
+    refresh_token: Optional[str] = None
 
 class PerfilSwitchHistoryItem(BaseModel):
     """Item do histórico de alternância de perfis"""

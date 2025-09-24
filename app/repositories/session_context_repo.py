@@ -62,7 +62,7 @@ class SessionContextRepository:
         print(f"🔧 DEBUG: create_session_context - usuario {usuario_id}, sessao {sessao_id}, perfil {perfil_ativo_id}")
 
         perfil_ativo_nome = next((p['nome'] for p in perfis_disponiveis if p['id'] == perfil_ativo_id), 'Administrador')
-        data_expiracao = datetime.now() + timedelta(hours=24)  # Sessão expira em 24 horas
+        data_expiracao = datetime.now() + timedelta(days=30)  # Sessão expira em 30 dias
 
         # Primeiro, desativa sessões antigas do usuário
         await self.conn.execute("""
