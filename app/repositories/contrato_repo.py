@@ -160,6 +160,27 @@ class ContratoRepository:
                         where_clauses.append(f"c.data_fim > CURRENT_DATE")
                         where_clauses.append(f"(c.data_fim - CURRENT_DATE) <= {max_dias}")
                         where_clauses.append(f"s.nome = 'Ativo'")
+                elif key == 'tem_garantia':
+                    # Filtro para contratos que possuem garantia
+                    print(f"🛡️ REPO: Processando filtro tem_garantia: {value}")
+                    if value is True:
+                        print(f"🛡️ REPO: Aplicando filtro para contratos COM garantia")
+                        where_clauses.append(f"c.garantia IS NOT NULL")
+                    elif value is False:
+                        print(f"🛡️ REPO: Aplicando filtro para contratos SEM garantia")
+                        where_clauses.append(f"c.garantia IS NULL")
+                elif key == 'garantia_prazo_dias':
+                    # Filtro por prazo de vencimento da garantia (apenas se tem_garantia=True)
+                    print(f"🛡️ REPO: Processando filtro garantia_prazo_dias: {value}")
+                    if value and value.strip().isdigit():
+                        dias = int(value.strip())
+                        print(f"🛡️ REPO: Aplicando filtro para garantias que vencem em até {dias} dias")
+                        where_clauses.append(f"c.garantia IS NOT NULL")
+                        where_clauses.append(f"c.garantia > CURRENT_DATE")
+                        where_clauses.append(f"(c.garantia - CURRENT_DATE) <= {dias}")
+                    elif value and value.strip():
+                        # Se não for um número válido, ignorar o filtro mas logar
+                        print(f"🛡️ REPO: AVISO - Valor inválido para garantia_prazo_dias: {value}")
         where_sql = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
         count_query = f"SELECT COUNT(c.id) AS total {base_query}{where_sql}"
         total_items = await self.conn.fetchval(count_query, *params)

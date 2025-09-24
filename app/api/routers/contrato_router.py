@@ -129,18 +129,39 @@ async def list_contratos(
     pae: Optional[str] = Query(None),
     ano: Optional[int] = Query(None),
     vencimento_dias: Optional[str] = Query(None, description="Filtro por dias até vencimento (30,60,90)"),
+    tem_garantia: Optional[bool] = Query(None, description="Filtrar contratos que possuem garantia"),
+    garantia_prazo_dias: Optional[str] = Query(None, description="Filtro por prazo da garantia (30,60,90)"),
     service: ContratoService = Depends(get_contrato_service),
     user_context: tuple = Depends(get_current_user_with_context)
 ):
     current_user, context = user_context
-    filters = {'gestor_id': gestor_id, 'fiscal_id': fiscal_id, 'objeto': objeto, 'nr_contrato': nr_contrato, 'status_id': status_id, 'pae': pae, 'ano': ano, 'vencimento_dias': vencimento_dias}
+    filters = {
+        'gestor_id': gestor_id,
+        'fiscal_id': fiscal_id,
+        'objeto': objeto,
+        'nr_contrato': nr_contrato,
+        'status_id': status_id,
+        'pae': pae,
+        'ano': ano,
+        'vencimento_dias': vencimento_dias,
+        'tem_garantia': tem_garantia,
+        'garantia_prazo_dias': garantia_prazo_dias
+    }
     active_filters = {k: v for k, v in filters.items() if v is not None}
-    
+
     # Debug dos filtros recebidos
     if vencimento_dias:
         print(f"🔍 BACKEND: Filtro vencimento_dias recebido: {vencimento_dias}")
     else:
         print(f"🔍 BACKEND: Nenhum filtro de vencimento recebido")
+
+    if tem_garantia:
+        print(f"🛡️ BACKEND: Filtro tem_garantia recebido: {tem_garantia}")
+        if garantia_prazo_dias:
+            print(f"🛡️ BACKEND: Filtro garantia_prazo_dias recebido: {garantia_prazo_dias}")
+    else:
+        print(f"🛡️ BACKEND: Nenhum filtro de garantia recebido")
+
     print(f"📡 BACKEND: Filtros ativos: {active_filters}")
 
     # Criar contexto do usuário para isolamento de dados
