@@ -1,4 +1,4 @@
-# app/api/routers/auth_router.py 
+# app/api/routers/auth_router.py
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
@@ -11,11 +11,17 @@ from app.repositories.usuario_perfil_repo import UsuarioPerfilRepository
 from app.repositories.session_context_repo import SessionContextRepository
 from app.repositories.contrato_repo import ContratoRepository
 from app.services.session_context_service import SessionContextService
+from app.services.password_reset_service import PasswordResetService
 from app.schemas.token_schema import Token
 from app.schemas.session_context_schema import (
     LoginResponse, LoginComPerfilRequest, AlternarPerfilRequest,
     ContextoSessao, DashboardData, PermissaoContextual,
     RefreshTokenRequest, RefreshTokenResponse
+)
+from app.schemas.password_reset_schema import (
+    ForgotPasswordRequest, ForgotPasswordResponse,
+    ResetPasswordRequest, ResetPasswordResponse,
+    ValidateTokenRequest, ValidateTokenResponse
 )
 from app.schemas.usuario_schema import Usuario
 from app.api.dependencies import get_current_user, get_current_context, get_token_payload
@@ -34,6 +40,9 @@ def get_session_context_service(conn: asyncpg.Connection = Depends(get_connectio
         usuario_perfil_repo=UsuarioPerfilRepository(conn),
         contrato_repo=ContratoRepository(conn)
     )
+
+def get_password_reset_service(conn: asyncpg.Connection = Depends(get_connection)) -> PasswordResetService:
+    return PasswordResetService(conn)
 
 def get_client_info(request: Request) -> tuple[Optional[str], Optional[str]]:
     """Extrai informações do cliente (IP e User-Agent)"""
@@ -442,4 +451,77 @@ async def login_legacy(
     access_token = create_access_token(data={"sub": str(user['id'])})
 
     return {"access_token": access_token, "token_type": "bearer"}
+
+# =====================================================
+# ENDPOINTS DE RESET DE SENHA
+# =====================================================
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse, summary="Solicitar reset de senha")
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    service: PasswordResetService = Depends(get_password_reset_service)
+):
+    """
+    Solicita reset de senha via email
+
+    - Valida se o email existe no sistema
+    - Gera token de reset válido por 24 horas
+    - Envia email com instruções de reset
+    - Por segurança, sempre retorna sucesso (não revela se email existe)
+    """
+    try:
+        result = await service.request_password_reset(request.email)
+        return ForgotPasswordResponse(**result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno do servidor. Tente novamente mais tarde."
+        )
+
+@router.post("/validate-reset-token", response_model=ValidateTokenResponse, summary="Validar token de reset")
+async def validate_reset_token(
+    request: ValidateTokenRequest,
+    service: PasswordResetService = Depends(get_password_reset_service)
+):
+    """
+    Valida se um token de reset de senha é válido
+
+    - Verifica se token existe e não expirou
+    - Verifica se token não foi usado
+    - Retorna informações do usuário se válido
+    """
+    try:
+        result = await service.validate_reset_token(request.token)
+        return ValidateTokenResponse(**result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno do servidor. Tente novamente mais tarde."
+        )
+
+@router.post("/reset-password", response_model=ResetPasswordResponse, summary="Redefinir senha")
+async def reset_password(
+    request: ResetPasswordRequest,
+    service: PasswordResetService = Depends(get_password_reset_service)
+):
+    """
+    Redefine a senha do usuário usando token válido
+
+    - Valida token de reset
+    - Atualiza senha no banco de dados
+    - Marca token como usado
+    - Envia email de confirmação
+    """
+    try:
+        result = await service.reset_password(request.token, request.new_password)
+        return ResetPasswordResponse(**result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno do servidor. Tente novamente mais tarde."
+        )
 
