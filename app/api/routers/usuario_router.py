@@ -55,6 +55,7 @@ async def list_users(
     
     return await service.get_all_paginated(page=page, per_page=per_page, filters=filters)
 
+# Rota com barra final (original)
 @router.post("/", response_model=Usuario, status_code=status.HTTP_201_CREATED, summary="Criar novo usuário")
 async def create_user(
     user: UsuarioCreate,
@@ -69,6 +70,29 @@ async def create_user(
     **IMPORTANTE:** O usuário é criado sem perfil. Para conceder perfis, use:
     `POST /api/v1/usuarios/{user_id}/perfis/conceder`
     
+    Validações:
+    - Email deve ser único
+    - CPF deve ter 11 dígitos
+    - Senha deve ter no mínimo 6 caracteres
+    - perfil_id é ignorado (sempre NULL)
+    """
+    return await service.create_user(user)
+
+# Rota sem barra final (para evitar redirects do frontend)
+@router.post("", response_model=Usuario, status_code=status.HTTP_201_CREATED, summary="Criar novo usuário")
+async def create_user_without_slash(
+    user: UsuarioCreate,
+    service: UsuarioService = Depends(get_usuario_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Cria um novo usuário no sistema SEM PERFIL.
+
+    **Requer permissão de administrador.**
+
+    **IMPORTANTE:** O usuário é criado sem perfil. Para conceder perfis, use:
+    `POST /api/v1/usuarios/{user_id}/perfis/conceder`
+
     Validações:
     - Email deve ser único
     - CPF deve ter 11 dígitos
