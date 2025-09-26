@@ -148,7 +148,7 @@ class PasswordResetService:
             bool: True se email foi enviado
         """
         # Constrói URL de reset (assumindo que o frontend irá lidar com isso)
-        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}" if hasattr(settings, 'FRONTEND_URL') else f"http://sigescon.pge.pa.gov.br/reset-password?token={token}"
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}" if hasattr(settings, 'FRONTEND_URL') else f"https://sigescon.pge.pa.gov.br/reset-password?token={token}"
 
         subject = "🔒 Solicitação de Reset de Senha - SIGESCON"
 
