@@ -188,7 +188,14 @@ class PendenciaService:
         return pendencias_fiscal
 
     async def cancelar_pendencia(self, contrato_id: int, pendencia_id: int, admin_usuario_id: int) -> Pendencia:
-        """Cancela uma pendência e notifica o fiscal por email"""
+        """
+        Cancela uma pendência e notifica o fiscal por email.
+
+        Regras de negócio:
+        - Só pode cancelar se a pendência estiver com status 'Pendente' (sem relatório enviado)
+        - Não pode cancelar se já há relatório 'Pendente de Análise'
+        - Só pode cancelar após rejeição se o relatório foi rejeitado
+        """
         # Verifica se o contrato existe
         contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
         if not contrato:
@@ -198,6 +205,50 @@ class PendenciaService:
         pendencia = await self.pendencia_repo.get_pendencia_by_id(pendencia_id)
         if not pendencia or pendencia['contrato_id'] != contrato_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pendência não encontrada para este contrato")
+
+        # === VALIDAÇÕES DAS REGRAS DE NEGÓCIO ===
+
+        # Verifica se há relatório vinculado a esta pendência que esteja sob análise
+        from app.repositories.relatorio_repo import RelatorioRepository
+        relatorio_repo = RelatorioRepository(self.pendencia_repo.conn)
+
+        # Busca relatórios desta pendência
+        relatorios_pendencia = await relatorio_repo.get_relatorios_by_pendencia_id(pendencia_id)
+
+        # Verifica se há relatório 'Pendente de Análise'
+        relatorio_sob_analise = next(
+            (r for r in relatorios_pendencia if r.get('status_nome') == 'Pendente de Análise'),
+            None
+        )
+
+        if relatorio_sob_analise:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Não é possível cancelar pendência com relatório sob análise. Analise o relatório primeiro (aprovar/rejeitar)."
+            )
+
+        # Verifica se a pendência está em status que permite cancelamento
+        status_atual = pendencia.get('status_nome', '')
+
+        # Pode cancelar se:
+        # 1. Status é 'Pendente' (fiscal ainda não enviou relatório)
+        # 2. Status é 'Pendente' após uma rejeição (fiscal pode reenviar, mas admin pode cancelar)
+        if status_atual not in ['Pendente']:
+            if status_atual == 'Concluída':
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Não é possível cancelar pendência já concluída."
+                )
+            elif status_atual == 'Cancelada':
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Esta pendência já foi cancelada."
+                )
+            elif status_atual == 'Aguardando Análise':
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Não é possível cancelar pendência com relatório aguardando análise. Analise o relatório primeiro."
+                )
 
         # Busca o status 'Cancelada'
         all_status = await self.status_pendencia_repo.get_all()
