@@ -152,35 +152,168 @@ class PasswordResetService:
 
         subject = "🔒 Solicitação de Reset de Senha - SIGESCON"
 
+        # Email HTML com link clicável
         body = f"""
-Olá {user['nome']},
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset de Senha - SIGESCON</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }}
+        .container {{
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }}
+        .logo {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 10px;
+        }}
+        .subtitle {{
+            color: #6c757d;
+            font-size: 14px;
+        }}
+        .greeting {{
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #495057;
+        }}
+        .reset-button {{
+            display: inline-block;
+            background-color: #007bff;
+            color: white !important;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 20px 0;
+            font-size: 16px;
+            text-align: center;
+        }}
+        .reset-button:hover {{
+            background-color: #0056b3;
+        }}
+        .button-container {{
+            text-align: center;
+            margin: 30px 0;
+        }}
+        .warning {{
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }}
+        .warning-title {{
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 10px;
+        }}
+        .warning-item {{
+            margin: 8px 0;
+            color: #856404;
+        }}
+        .security-tips {{
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }}
+        .security-title {{
+            font-weight: bold;
+            color: #0c5460;
+            margin-bottom: 10px;
+        }}
+        .security-item {{
+            margin: 8px 0;
+            color: #0c5460;
+        }}
+        .footer {{
+            border-top: 2px solid #e9ecef;
+            padding-top: 20px;
+            margin-top: 30px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 12px;
+        }}
+        .url-fallback {{
+            font-size: 12px;
+            color: #6c757d;
+            word-break: break-all;
+            margin-top: 10px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🔒 SIGESCON</div>
+            <div class="subtitle">Sistema de Gestão de Contratos</div>
+        </div>
 
-Você solicitou a alteração de sua senha no Sistema de Gestão de Contratos (SIGESCON).
+        <div class="greeting">
+            Olá <strong>{user['nome']}</strong>,
+        </div>
 
-Para criar uma nova senha, clique no link abaixo:
-{reset_url}
+        <p>Você solicitou a alteração de sua senha no Sistema de Gestão de Contratos (SIGESCON).</p>
 
-OU use o código diretamente no sistema:
-{token}
+        <div class="button-container">
+            <a href="{reset_url}" class="reset-button">
+                🔗 Criar Nova Senha
+            </a>
+        </div>
 
-⚠️ IMPORTANTE:
-- Este link é válido por 24 horas
-- Por segurança, use o link apenas uma vez
-- Se você não solicitou esta alteração, ignore este email
+        <p class="url-fallback">
+            Se o botão não funcionar, copie e cole este link no seu navegador:<br>
+            <strong>{reset_url}</strong>
+        </p>
 
-Para sua segurança:
-- Crie uma senha forte com pelo menos 6 caracteres
-- Não compartilhe sua senha com ninguém
-- Faça logout ao usar computadores compartilhados
+        <div class="warning">
+            <div class="warning-title">⚠️ IMPORTANTE:</div>
+            <div class="warning-item">• Este link é válido por <strong>24 horas</strong></div>
+            <div class="warning-item">• Por segurança, use o link apenas <strong>uma vez</strong></div>
+            <div class="warning-item">• Se você não solicitou esta alteração, <strong>ignore este email</strong></div>
+        </div>
 
-Em caso de dúvidas, entre em contato com o administrador do sistema.
+        <div class="security-tips">
+            <div class="security-title">🛡️ Para sua segurança:</div>
+            <div class="security-item">• Crie uma senha forte com pelo menos 6 caracteres</div>
+            <div class="security-item">• Não compartilhe sua senha com ninguém</div>
+            <div class="security-item">• Faça logout ao usar computadores compartilhados</div>
+        </div>
 
----
-Sistema de Gestão de Contratos - SIGESCON
-Este é um email automático, não responda.
+        <p>Em caso de dúvidas, entre em contato com o administrador do sistema.</p>
+
+        <div class="footer">
+            <strong>Sistema de Gestão de Contratos - SIGESCON</strong><br>
+            Este é um email automático, não responda.
+        </div>
+    </div>
+</body>
+</html>
         """
 
-        return await EmailService.send_email(user['email'], subject, body)
+        return await EmailService.send_email(user['email'], subject, body, is_html=True)
 
     async def _send_password_changed_email(self, token_info: Dict[str, Any]) -> bool:
         """
@@ -194,24 +327,145 @@ Este é um email automático, não responda.
         """
         subject = "✅ Senha Alterada com Sucesso - SIGESCON"
 
+        # Email HTML de confirmação
         body = f"""
-Olá {token_info['nome']},
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Senha Alterada - SIGESCON</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }}
+        .container {{
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }}
+        .logo {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 10px;
+        }}
+        .subtitle {{
+            color: #6c757d;
+            font-size: 14px;
+        }}
+        .success-badge {{
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }}
+        .success-title {{
+            font-size: 20px;
+            font-weight: bold;
+            color: #155724;
+            margin-bottom: 10px;
+        }}
+        .info-box {{
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }}
+        .info-item {{
+            margin: 8px 0;
+            color: #0c5460;
+        }}
+        .alert-box {{
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }}
+        .alert-text {{
+            color: #721c24;
+            font-weight: bold;
+        }}
+        .security-tips {{
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }}
+        .security-title {{
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 10px;
+        }}
+        .security-item {{
+            margin: 8px 0;
+            color: #856404;
+        }}
+        .footer {{
+            border-top: 2px solid #e9ecef;
+            padding-top: 20px;
+            margin-top: 30px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 12px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">✅ SIGESCON</div>
+            <div class="subtitle">Sistema de Gestão de Contratos</div>
+        </div>
 
-Sua senha foi alterada com sucesso no Sistema de Gestão de Contratos (SIGESCON).
+        <div class="success-badge">
+            <div class="success-title">🎉 Senha Alterada com Sucesso!</div>
+            <p>Olá <strong>{token_info['nome']}</strong>, sua senha foi alterada com sucesso.</p>
+        </div>
 
-✅ Alteração realizada em: {token_info.get('used_at', 'agora')}
-📧 Email da conta: {token_info['email']}
+        <div class="info-box">
+            <div class="info-item"><strong>⏰ Alteração realizada em:</strong> {token_info.get('used_at', 'agora')}</div>
+            <div class="info-item"><strong>📧 Email da conta:</strong> {token_info['email']}</div>
+        </div>
 
-Se você não realizou esta alteração, entre em contato IMEDIATAMENTE com o administrador do sistema.
+        <div class="alert-box">
+            <div class="alert-text">
+                🚨 Se você não realizou esta alteração, entre em contato IMEDIATAMENTE com o administrador do sistema.
+            </div>
+        </div>
 
-Para sua segurança:
-- Faça login com sua nova senha
-- Verifique se não há sessões ativas indevidas
-- Mantenha suas credenciais sempre seguras
+        <div class="security-tips">
+            <div class="security-title">🛡️ Para sua segurança:</div>
+            <div class="security-item">• Faça login com sua nova senha</div>
+            <div class="security-item">• Verifique se não há sessões ativas indevidas</div>
+            <div class="security-item">• Mantenha suas credenciais sempre seguras</div>
+        </div>
 
----
-Sistema de Gestão de Contratos - SIGESCON
-Este é um email automático, não responda.
+        <div class="footer">
+            <strong>Sistema de Gestão de Contratos - SIGESCON</strong><br>
+            Este é um email automático, não responda.
+        </div>
+    </div>
+</body>
+</html>
         """
 
-        return await EmailService.send_email(token_info['email'], subject, body)
+        return await EmailService.send_email(token_info['email'], subject, body, is_html=True)

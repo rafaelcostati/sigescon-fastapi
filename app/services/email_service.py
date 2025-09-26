@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class EmailService:
     @staticmethod
-    async def send_email(to_email: str, subject: str, body: str, test_mode: bool = False):
+    async def send_email(to_email: str, subject: str, body: str, test_mode: bool = False, is_html: bool = False):
         """
         Envia email com logs detalhados e diferentes configurações SMTP
 
@@ -20,6 +20,7 @@ class EmailService:
             subject: Assunto do email
             body: Corpo do email
             test_mode: Se True, tenta configurações alternativas em caso de falha
+            is_html: Se True, envia o email como HTML
         """
         if not all([settings.SMTP_SERVER, settings.SENDER_EMAIL, settings.SENDER_PASSWORD]):
             logger.warning("AVISO: Variáveis de ambiente SMTP não configuradas. O e-mail não será enviado.")
@@ -30,7 +31,10 @@ class EmailService:
         message["From"] = settings.SENDER_EMAIL
         message["To"] = to_email
         message["Subject"] = subject
-        message.attach(MIMEText(body, "plain"))
+
+        # Define o tipo de conteúdo baseado no parâmetro is_html
+        content_type = "html" if is_html else "plain"
+        message.attach(MIMEText(body, content_type))
 
         # Configurações para tentar em ordem de prioridade
         smtp_configs = [
