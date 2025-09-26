@@ -373,8 +373,26 @@ async def delete_contrato(contrato_id: int, service: ContratoService = Depends(g
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 # Rotas para gerenciamento de arquivos do contrato
+# Rota sem barra final (original)
 @router.get("/{contrato_id}/arquivos", response_model=ArquivoContratoList, summary="Listar arquivos do contrato")
 async def listar_arquivos_contrato(
+    contrato_id: int,
+    service: ContratoService = Depends(get_contrato_service),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Lista todos os arquivos de um contrato específico.
+
+    - **contrato_id**: ID do contrato
+
+    Retorna uma lista com todos os arquivos associados ao contrato,
+    incluindo informações como nome, tipo, tamanho e data de criação.
+    """
+    return await service.get_arquivos_contrato(contrato_id)
+
+# Rota com barra final (para evitar redirects do frontend)
+@router.get("/{contrato_id}/arquivos/", response_model=ArquivoContratoList, summary="Listar arquivos do contrato")
+async def listar_arquivos_contrato_with_slash(
     contrato_id: int,
     service: ContratoService = Depends(get_contrato_service),
     current_user: Usuario = Depends(get_current_user)

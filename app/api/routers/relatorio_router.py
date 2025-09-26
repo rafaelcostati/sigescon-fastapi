@@ -65,8 +65,26 @@ async def submit_relatorio(
     return await service.submit_relatorio(contrato_id, relatorio_data, arquivo, current_user)
 
 
+# Rota com barra final (original)
 @router.get("/", response_model=List[Relatorio])
 async def list_relatorios(
+    contrato_id: int,
+    service: RelatorioService = Depends(get_relatorio_service),
+    current_user: Usuario = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_connection)
+):
+    checker = PermissionChecker(conn)
+    if not await checker.can_access_contract(current_user, contrato_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para acessar este contrato"
+        )
+    """Lista todos os relatórios de um contrato específico."""
+    return await service.get_relatorios_by_contrato_id(contrato_id)
+
+# Rota sem barra final (para evitar redirects do frontend)
+@router.get("", response_model=List[Relatorio])
+async def list_relatorios_without_slash(
     contrato_id: int,
     service: RelatorioService = Depends(get_relatorio_service),
     current_user: Usuario = Depends(get_current_user),
