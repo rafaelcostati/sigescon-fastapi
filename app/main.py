@@ -111,6 +111,13 @@ app = FastAPI(
     openapi_url=None
 )
 
+# === CONFIGURAÇÃO CRUCIAL PARA RESOLVER REDIRECTS 307 ===
+# Desabilita redirects automáticos para URLs com/sem barra final
+# Isso resolve o problema de https://sigescon.pge.pa.gov.br/api/v1/modalidades
+# fazer redirect 307 para https://127.0.0.1:8000/api/v1/modalidades/
+app.router.redirect_slashes = False
+print("🔧 Redirects automáticos desabilitados - URLs com e sem barra final funcionam igualmente")
+
 # === MIDDLEWARE ===
 
 # 1. Middleware de CORS

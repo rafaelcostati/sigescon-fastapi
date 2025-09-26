@@ -34,8 +34,17 @@ async def create_modalidade(
             detail="Uma modalidade com este nome já existe"
         )
 
+# Rota com barra final (original)
 @router.get("/", response_model=List[Modalidade])
-async def get_all_modalidades(
+async def get_all_modalidades_with_slash(
+    service: ModalidadeService = Depends(get_modalidade_service),
+    current_user: Usuario = Depends(get_current_user)
+):
+    return await service.get_all()
+
+# Rota sem barra final (para evitar redirects do frontend)
+@router.get("", response_model=List[Modalidade])
+async def get_all_modalidades_without_slash(
     service: ModalidadeService = Depends(get_modalidade_service),
     current_user: Usuario = Depends(get_current_user)
 ):

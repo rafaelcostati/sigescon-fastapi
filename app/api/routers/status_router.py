@@ -34,8 +34,17 @@ async def create_status(
             detail="Um status com este nome já existe"
         )
 
+# Rota com barra final (original)
 @router.get("/", response_model=List[Status])
-async def get_all_status(
+async def get_all_status_with_slash(
+    service: StatusService = Depends(get_status_service),
+    current_user: Usuario = Depends(get_current_user)
+):
+    return await service.get_all()
+
+# Rota sem barra final (para evitar redirects do frontend)
+@router.get("", response_model=List[Status])
+async def get_all_status_without_slash(
     service: StatusService = Depends(get_status_service),
     current_user: Usuario = Depends(get_current_user)
 ):
