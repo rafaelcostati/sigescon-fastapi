@@ -20,8 +20,18 @@ def get_contratado_service(conn: asyncpg.Connection = Depends(get_connection)):
     repo = ContratadoRepository(conn)
     return ContratadoService(repo)
 
+# Rota com barra final (original)
 @router.post("/", response_model=Contratado, status_code=status.HTTP_201_CREATED)
 async def create_contratado(
+    contratado: ContratadoCreate,
+    service: ContratadoService = Depends(get_contratado_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    return await service.create(contratado)
+
+# Rota sem barra final (para evitar redirects do frontend)
+@router.post("", response_model=Contratado, status_code=status.HTTP_201_CREATED)
+async def create_contratado_without_slash(
     contratado: ContratadoCreate,
     service: ContratadoService = Depends(get_contratado_service),
     admin_user: Usuario = Depends(admin_required)

@@ -20,8 +20,24 @@ def get_modalidade_service(conn: asyncpg.Connection = Depends(get_connection)):
     repo = ModalidadeRepository(conn)
     return ModalidadeService(repo)
 
+# Rota com barra final (original)
 @router.post("/", response_model=Modalidade, status_code=status.HTTP_201_CREATED)
 async def create_modalidade(
+    modalidade: ModalidadeCreate,
+    service: ModalidadeService = Depends(get_modalidade_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    try:
+        return await service.create(modalidade)
+    except asyncpg.UniqueViolationError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Uma modalidade com este nome já existe"
+        )
+
+# Rota sem barra final (para evitar redirects do frontend)
+@router.post("", response_model=Modalidade, status_code=status.HTTP_201_CREATED)
+async def create_modalidade_without_slash(
     modalidade: ModalidadeCreate,
     service: ModalidadeService = Depends(get_modalidade_service),
     admin_user: Usuario = Depends(admin_required)
