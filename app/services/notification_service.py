@@ -166,7 +166,7 @@ class NotificationService:
             
             # Para notificações urgentes, envia imediatamente
             if context.priority == "urgent":
-                await EmailService.send_email(context.recipient_email, subject, body)
+                await EmailService.send_email(context.recipient_email, subject, body, is_html=True)
                 logger.info(f"Notificação urgente enviada para {context.recipient_email}")
             else:
                 # Adiciona à fila para processamento em lote
@@ -238,7 +238,7 @@ class NotificationService:
         # Envia emails em paralelo
         if emails_to_send:
             tasks = [
-                EmailService.send_email(email, subject, body)
+                EmailService.send_email(email, subject, body, is_html=True)
                 for email, subject, body in emails_to_send
             ]
             results = await asyncio.gather(*tasks, return_exceptions=True)

@@ -57,7 +57,7 @@ class PendenciaService:
                         contrato_data=contrato,
                         pendencia_data=new_pendencia_data
                     )
-                    await EmailService.send_email(fiscal['email'], subject, body)
+                    await EmailService.send_email(fiscal['email'], subject, body, is_html=True)
                     
                     print(f"✅ Email de pendência enviado para {fiscal['email']}")
         except Exception as e:
@@ -224,7 +224,7 @@ class PendenciaService:
                         contrato_data=contrato,
                         pendencia_data=pendencia
                     )
-                    await EmailService.send_email(fiscal['email'], subject, body)
+                    await EmailService.send_email(fiscal['email'], subject, body, is_html=True)
 
                     print(f"✅ Email de cancelamento de pendência enviado para {fiscal['email']}")
         except Exception as e:

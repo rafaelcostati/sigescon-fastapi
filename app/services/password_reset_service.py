@@ -128,6 +128,10 @@ class PasswordResetService:
         # Marca token como usado
         await self.reset_repo.mark_token_as_used(token)
 
+        # Atualiza token_info com timestamp atual para o email
+        from datetime import datetime
+        token_info['used_at'] = datetime.now().strftime('%d/%m/%Y às %H:%M')
+
         # Envia email de confirmação
         await self._send_password_changed_email(token_info)
 

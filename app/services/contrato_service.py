@@ -89,7 +89,7 @@ class ContratoService:
                     contrato_data=contrato_data,
                     is_new=not is_update
                 )
-                await EmailService.send_email(fiscal['email'], subject, body)
+                await EmailService.send_email(fiscal['email'], subject, body, is_html=True)
 
         # Email para o gestor
         if gestor_id:
@@ -108,7 +108,7 @@ class ContratoService:
                     fiscal_data=fiscal_data,
                     is_new=not is_update
                 )
-                await EmailService.send_email(gestor['email'], subject, body)
+                await EmailService.send_email(gestor['email'], subject, body, is_html=True)
 
         # Se houve mudança de fiscal, notifica o fiscal anterior
         if is_update and old_fiscal_id and old_fiscal_id != fiscal_id:
@@ -126,7 +126,7 @@ class ContratoService:
                     contrato_data=contrato_data,
                     novo_fiscal_nome=novo_fiscal_nome
                 )
-                await EmailService.send_email(old_fiscal['email'], subject, body)
+                await EmailService.send_email(old_fiscal['email'], subject, body, is_html=True)
 
     async def create_contrato(self, contrato_create: ContratoCreate, files: Optional[List[UploadFile]] = None) -> Contrato:
         """Cria um novo contrato e, opcionalmente, anexa múltiplos arquivos"""

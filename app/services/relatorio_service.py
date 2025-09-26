@@ -151,7 +151,7 @@ class RelatorioService:
                 )
 
                 from app.services.email_service import EmailService
-                await EmailService.send_email(admin['email'], subject, body)
+                await EmailService.send_email(admin['email'], subject, body, is_html=True)
 
                 print(f"✅ Email de notificação enviado para admin {admin['email']}")
         except Exception as e:
@@ -206,7 +206,7 @@ class RelatorioService:
             )
 
             from app.services.email_service import EmailService
-            await EmailService.send_email(fiscal['email'], subject, body)
+            await EmailService.send_email(fiscal['email'], subject, body, is_html=True)
 
             print(f"✅ Relatório aprovado e email enviado para {fiscal['email']}")
         except Exception as e:
@@ -229,7 +229,7 @@ class RelatorioService:
             )
 
             from app.services.email_service import EmailService
-            await EmailService.send_email(fiscal['email'], subject, body)
+            await EmailService.send_email(fiscal['email'], subject, body, is_html=True)
 
             print(f"✅ Relatório rejeitado e email enviado para {fiscal['email']}")
         except Exception as e:

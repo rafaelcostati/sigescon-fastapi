@@ -49,7 +49,7 @@ Este é um lembrete automático sobre uma pendência de relatório para o contra
 
 Por favor, não se esqueça de submeter o relatório a tempo.
                     """
-                    await EmailService.send_email(p['fiscal_email'], subject, body)
+                    await EmailService.send_email(p['fiscal_email'], subject, body, is_html=True)
                     
     except Exception as e:
         print(f"ERRO ao executar a verificação de prazos: {e}")
