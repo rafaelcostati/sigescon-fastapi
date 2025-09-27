@@ -31,32 +31,62 @@ class UsuarioRepository:
     ) -> Tuple[List[Dict], int]:
         """Lista usuários ativos com filtros e paginação, retornando os dados e o total."""
         
-        base_query = """
-            FROM usuario u
-        """
+        # Determina se precisa fazer JOIN com perfis
+        need_perfil_join = filters and filters.get('perfil')
+        
+        if need_perfil_join:
+            base_query = """
+                FROM usuario u
+                INNER JOIN usuario_perfil up ON u.id = up.usuario_id
+                INNER JOIN perfil p ON up.perfil_id = p.id
+            """
+        else:
+            base_query = """
+                FROM usuario u
+            """
+        
         where_clauses = ["u.ativo = TRUE"]
         params = []
         param_idx = 1
         
         if filters and filters.get('nome'):
-            where_clauses.append("u.nome ILIKE $1")
+            where_clauses.append(f"u.nome ILIKE ${param_idx}")
             params.append(f"%{filters['nome']}%")
+            param_idx += 1
+        
+        if filters and filters.get('perfil'):
+            where_clauses.append(f"p.nome = ${param_idx}")
+            params.append(filters['perfil'])
             param_idx += 1
         
         where_sql = " WHERE " + " AND ".join(where_clauses)
 
         # Query para contar o total de itens
-        count_query = f"SELECT COUNT(u.id) AS total {base_query}{where_sql}"
+        if need_perfil_join:
+            count_query = f"SELECT COUNT(DISTINCT u.id) AS total {base_query}{where_sql}"
+        else:
+            count_query = f"SELECT COUNT(u.id) AS total {base_query}{where_sql}"
+        
         total_items = await self.conn.fetchval(count_query, *params)
         
         # Query para buscar os dados paginados
-        data_query = f"""
-            SELECT u.id, u.nome, u.email, u.matricula
-            {base_query}
-            {where_sql}
-            ORDER BY u.nome
-            LIMIT ${param_idx} OFFSET ${param_idx + 1}
-        """
+        if need_perfil_join:
+            data_query = f"""
+                SELECT DISTINCT u.id, u.nome, u.email, u.matricula
+                {base_query}
+                {where_sql}
+                ORDER BY u.nome
+                LIMIT ${param_idx} OFFSET ${param_idx + 1}
+            """
+        else:
+            data_query = f"""
+                SELECT u.id, u.nome, u.email, u.matricula
+                {base_query}
+                {where_sql}
+                ORDER BY u.nome
+                LIMIT ${param_idx} OFFSET ${param_idx + 1}
+            """
+        
         paginated_params = params + [limit, offset]
         users = await self.conn.fetch(data_query, *paginated_params)
             

@@ -34,29 +34,54 @@ async def read_users_me(current_user: Usuario = Depends(get_current_user)):
     """
     return current_user
 
-@router.get("/", response_model=UsuarioPaginated, summary="Listar todos os usuários")
+@router.get("/test")
+async def test_usuarios():
+    """Rota de teste para verificar se o router está funcionando"""
+    print("🔍 TESTE - Rota /usuarios/test chamada com sucesso!")
+    return {"message": "Router de usuários funcionando!", "timestamp": "2025-09-27"}
+
+@router.get("", response_model=UsuarioPaginated, summary="Listar todos os usuários")
 async def list_users(
     page: int = Query(1, ge=1, description="Número da página"),
     per_page: int = Query(10, ge=1, le=100, description="Itens por página"),
     nome: Optional[str] = Query(None, description="Filtrar por nome (busca parcial)"),
+    perfil: Optional[str] = Query(None, description="Filtrar por perfil (Administrador, Gestor, Fiscal)"),
     service: UsuarioService = Depends(get_usuario_service),
-    current_user: Usuario = Depends(require_any_profile)
+    current_user: Usuario = Depends(get_current_user)
 ):
     """
     Lista todos os usuários ativos do sistema com paginação.
 
-    Permite filtrar por nome (busca parcial).
+    Permite filtrar por nome (busca parcial) e por perfil.
 
     **Requer usuário com perfil ativo (Administrador, Gestor ou Fiscal).**
     """
+    print(f"🔍 USUARIOS - GET / chamado com page={page}, per_page={per_page}")
+    print(f"🔍 USUARIOS - Filtros: nome={nome}, perfil={perfil}")
+    print(f"🔍 USUARIOS - Usuário: {current_user.nome} (ID: {current_user.id})")
+    
     filters = {}
     if nome:
         filters['nome'] = nome
+    if perfil:
+        filters['perfil'] = perfil
     
-    return await service.get_all_paginated(page=page, per_page=per_page, filters=filters)
+    result = await service.get_all_paginated(page=page, per_page=per_page, filters=filters)
+    print(f"🔍 USUARIOS - Retornando {len(result.data)} itens de {result.total_items} total")
+    return result
 
-# Rota com barra final (original)
+# Rota POST com barra final
 @router.post("/", response_model=Usuario, status_code=status.HTTP_201_CREATED, summary="Criar novo usuário")
+async def create_user_with_slash(
+    user: UsuarioCreate,
+    service: UsuarioService = Depends(get_usuario_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """Cria um novo usuário no sistema SEM PERFIL (rota com barra final)"""
+    return await service.create_user(user)
+
+# Rota POST sem barra final
+@router.post("", response_model=Usuario, status_code=status.HTTP_201_CREATED, summary="Criar novo usuário")
 async def create_user(
     user: UsuarioCreate,
     service: UsuarioService = Depends(get_usuario_service),

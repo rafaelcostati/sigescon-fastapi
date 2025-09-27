@@ -20,8 +20,17 @@ def get_contratado_service(conn: asyncpg.Connection = Depends(get_connection)):
     repo = ContratadoRepository(conn)
     return ContratadoService(repo)
 
-# Rota com barra final (original)
+# Rota POST com barra final
 @router.post("/", response_model=Contratado, status_code=status.HTTP_201_CREATED)
+async def create_contratado_with_slash(
+    contratado: ContratadoCreate,
+    service: ContratadoService = Depends(get_contratado_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    return await service.create(contratado)
+
+# Rota POST sem barra final
+@router.post("", response_model=Contratado, status_code=status.HTTP_201_CREATED)
 async def create_contratado(
     contratado: ContratadoCreate,
     service: ContratadoService = Depends(get_contratado_service),
@@ -29,16 +38,13 @@ async def create_contratado(
 ):
     return await service.create(contratado)
 
-# Rota sem barra final (para evitar redirects do frontend)
-@router.post("", response_model=Contratado, status_code=status.HTTP_201_CREATED)
-async def create_contratado_without_slash(
-    contratado: ContratadoCreate,
-    service: ContratadoService = Depends(get_contratado_service),
-    admin_user: Usuario = Depends(admin_required)
-):
-    return await service.create(contratado)
+@router.get("/test")
+async def test_contratados():
+    """Rota de teste para verificar se o router está funcionando"""
+    print("🔍 TESTE - Rota /contratados/test chamada com sucesso!")
+    return {"message": "Router de contratados funcionando!", "timestamp": "2025-09-27"}
 
-@router.get("/", response_model=ContratadoPaginated)
+@router.get("", response_model=ContratadoPaginated)
 async def get_all_contratados(
     page: int = Query(1, ge=1, description="Número da página"),
     per_page: int = Query(10, ge=1, le=100, description="Itens por página"),
@@ -48,6 +54,10 @@ async def get_all_contratados(
     service: ContratadoService = Depends(get_contratado_service),
     current_user: Usuario = Depends(get_current_user)
 ):
+    print(f"🔍 CONTRATADOS - GET / chamado com page={page}, per_page={per_page}")
+    print(f"🔍 CONTRATADOS - Filtros: nome={nome}, cnpj={cnpj}, cpf={cpf}")
+    print(f"🔍 CONTRATADOS - Usuário: {current_user.nome} (ID: {current_user.id})")
+    
     filters = {
         'nome': nome,
         'cnpj': cnpj,
@@ -55,11 +65,14 @@ async def get_all_contratados(
     }
     active_filters = {k: v for k, v in filters.items() if v is not None}
     
-    return await service.get_all_paginated(
+    result = await service.get_all_paginated(
         page=page, 
         per_page=per_page, 
         filters=active_filters
     )
+    
+    print(f"🔍 CONTRATADOS - Retornando {len(result.data)} itens de {result.total_items} total")
+    return result
 
 @router.get("/{contratado_id}", response_model=Contratado)
 async def get_contratado_by_id(

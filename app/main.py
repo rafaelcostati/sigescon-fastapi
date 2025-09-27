@@ -60,6 +60,14 @@ async def lifespan(app: FastAPI):
         
         print("✅ Aplicação iniciada com sucesso!")
         
+        # Debug: Listar todas as rotas registradas
+        print("\n🔍 DEBUG: Rotas registradas no FastAPI:")
+        for route in app.routes:
+            if hasattr(route, 'methods') and hasattr(route, 'path'):
+                methods = ', '.join(route.methods) if route.methods else 'N/A'
+                print(f"  {methods:<10} {route.path}")
+        print("🔍 DEBUG: Fim da lista de rotas\n")
+        
         yield  # Aplicação está rodando
         
     except Exception as e:
@@ -167,13 +175,38 @@ app.include_router(usuario_perfil_router.router)
 # Routers principais com prefixo /api/v1
 API_PREFIX = "/api/v1"
 
-app.include_router(usuario_router.router, prefix=API_PREFIX)
-app.include_router(contratado_router.router, prefix=API_PREFIX)
+print("🔧 Registrando routers principais...")
+
+try:
+    app.include_router(usuario_router.router, prefix=API_PREFIX)
+    print(f"✅ Router de usuários registrado: {API_PREFIX}/usuarios")
+except Exception as e:
+    print(f"❌ Erro ao registrar router de usuários: {e}")
+
+try:
+    print(f"🔍 DEBUG: contratado_router.router = {contratado_router.router}")
+    print(f"🔍 DEBUG: Rotas no contratado_router: {[route.path for route in contratado_router.router.routes]}")
+    app.include_router(contratado_router.router, prefix=API_PREFIX)
+    print(f"✅ Router de contratados registrado: {API_PREFIX}/contratados")
+except Exception as e:
+    print(f"❌ Erro ao registrar router de contratados: {e}")
+    import traceback
+    traceback.print_exc()
+
 app.include_router(contrato_router.router, prefix=API_PREFIX)
+print(f"✅ Router de contratos registrado: {API_PREFIX}/contratos")
+
 app.include_router(pendencia_router.router, prefix=API_PREFIX)
+print(f"✅ Router de pendências registrado: {API_PREFIX}/pendencias")
+
 app.include_router(relatorio_router.router, prefix=API_PREFIX)
+print(f"✅ Router de relatórios registrado: {API_PREFIX}/relatorios")
+
 app.include_router(arquivo_router.router, prefix=API_PREFIX)
+print(f"✅ Router de arquivos registrado: {API_PREFIX}/arquivos")
+
 app.include_router(dashboard_router.router, prefix=API_PREFIX)
+print(f"✅ Router de dashboard registrado: {API_PREFIX}/dashboard")
 
 
 # Routers de tabelas auxiliares

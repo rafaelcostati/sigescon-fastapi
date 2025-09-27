@@ -44,11 +44,57 @@ def get_contrato_service(conn: asyncpg.Connection = Depends(get_connection)) -> 
         file_service=FileService()
     )
 
+# --- Função auxiliar para criação de contrato ---
+async def _create_contrato_logic(
+    nr_contrato: str,
+    objeto: str,
+    data_inicio: date,
+    data_fim: date,
+    contratado_id: int,
+    modalidade_id: int,
+    status_id: int,
+    gestor_id: int,
+    fiscal_id: int,
+    valor_anual: Optional[float],
+    valor_global: Optional[float],
+    base_legal: Optional[str],
+    termos_contratuais: Optional[str],
+    fiscal_substituto_id: Optional[int],
+    pae: Optional[str],
+    doe: Optional[str],
+    data_doe: Optional[date],
+    garantia: Optional[date],
+    documento_contrato: List[UploadFile],
+    service: ContratoService
+):
+    """Lógica comum para criação de contrato"""
+    contrato_create = ContratoCreate(
+        nr_contrato=nr_contrato,
+        objeto=objeto,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        contratado_id=contratado_id,
+        modalidade_id=modalidade_id,
+        status_id=status_id,
+        gestor_id=gestor_id,
+        fiscal_id=fiscal_id,
+        valor_anual=valor_anual,
+        valor_global=valor_global,
+        base_legal=base_legal,
+        termos_contratuais=termos_contratuais,
+        fiscal_substituto_id=fiscal_substituto_id,
+        pae=pae,
+        doe=doe,
+        data_doe=data_doe,
+        garantia=garantia
+    )
+    return await service.create_contrato(contrato_create, documento_contrato)
+
 # --- Endpoints ---
 
+# Rota POST com barra final
 @router.post("/", response_model=Contrato, status_code=status.HTTP_201_CREATED)
-async def create_contrato(
-    # Declara cada campo do formulário explicitamente
+async def create_contrato_with_slash(
     nr_contrato: str = Form(...),
     objeto: str = Form(...),
     data_inicio: date = Form(...),
@@ -71,38 +117,46 @@ async def create_contrato(
     service: ContratoService = Depends(get_contrato_service),
     admin_user: Usuario = Depends(admin_required)
 ):
-    """
-    Cria um novo contrato. Aceita dados de formulário e múltiplos ficheiros opcionais.
-    Requer permissão de administrador.
-
-    Limites de upload:
-    - Máximo 10 arquivos por upload
-    - 100MB por arquivo individual
-    - 250MB total
-    """
-    # Constrói manualmente o objeto Pydantic a partir dos campos do formulário
-    contrato_create = ContratoCreate(
-        nr_contrato=nr_contrato,
-        objeto=objeto,
-        data_inicio=data_inicio,
-        data_fim=data_fim,
-        contratado_id=contratado_id,
-        modalidade_id=modalidade_id,
-        status_id=status_id,
-        gestor_id=gestor_id,
-        fiscal_id=fiscal_id,
-        valor_anual=valor_anual,
-        valor_global=valor_global,
-        base_legal=base_legal,
-        termos_contratuais=termos_contratuais,
-        fiscal_substituto_id=fiscal_substituto_id,
-        pae=pae,
-        doe=doe,
-        data_doe=data_doe,
-        garantia=garantia
+    """Cria um novo contrato (rota com barra final)"""
+    return await _create_contrato_logic(
+        nr_contrato, objeto, data_inicio, data_fim, contratado_id,
+        modalidade_id, status_id, gestor_id, fiscal_id, valor_anual,
+        valor_global, base_legal, termos_contratuais, fiscal_substituto_id,
+        pae, doe, data_doe, garantia, documento_contrato, service
     )
 
-    return await service.create_contrato(contrato_create, documento_contrato)
+# Rota POST sem barra final
+@router.post("", response_model=Contrato, status_code=status.HTTP_201_CREATED)
+async def create_contrato(
+    nr_contrato: str = Form(...),
+    objeto: str = Form(...),
+    data_inicio: date = Form(...),
+    data_fim: date = Form(...),
+    contratado_id: int = Form(...),
+    modalidade_id: int = Form(...),
+    status_id: int = Form(...),
+    gestor_id: int = Form(...),
+    fiscal_id: int = Form(...),
+    valor_anual: Optional[float] = Form(None),
+    valor_global: Optional[float] = Form(None),
+    base_legal: Optional[str] = Form(None),
+    termos_contratuais: Optional[str] = Form(None),
+    fiscal_substituto_id: Optional[int] = Form(None),
+    pae: Optional[str] = Form(None),
+    doe: Optional[str] = Form(None),
+    data_doe: Optional[date] = Form(None),
+    garantia: Optional[date] = Form(None),
+    documento_contrato: List[UploadFile] = File(None),
+    service: ContratoService = Depends(get_contrato_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """Cria um novo contrato (rota sem barra final)"""
+    return await _create_contrato_logic(
+        nr_contrato, objeto, data_inicio, data_fim, contratado_id,
+        modalidade_id, status_id, gestor_id, fiscal_id, valor_anual,
+        valor_global, base_legal, termos_contratuais, fiscal_substituto_id,
+        pae, doe, data_doe, garantia, documento_contrato, service
+    )
 
 
 @router.get("/next-number", response_model=dict)
@@ -117,8 +171,38 @@ async def get_next_contract_number(
     next_number = await service.contrato_repo.get_next_available_nr_contrato()
     return {"next_number": next_number}
 
-# Rota com barra final (original)
+# Rota GET com barra final
 @router.get("/", response_model=ContratoPaginated)
+async def list_contratos_with_slash(
+    page: int = Query(1, ge=1, description="Número da página"),
+    per_page: int = Query(10, ge=1, le=100, description="Itens por página"),
+    nome: Optional[str] = Query(None, description="Filtrar por nome do contratado"),
+    numero: Optional[str] = Query(None, description="Filtrar por número do contrato"),
+    objeto: Optional[str] = Query(None, description="Filtrar por objeto do contrato"),
+    status_id: Optional[int] = Query(None, description="Filtrar por status"),
+    modalidade_id: Optional[int] = Query(None, description="Filtrar por modalidade"),
+    contratado_id: Optional[int] = Query(None, description="Filtrar por contratado"),
+    gestor_id: Optional[int] = Query(None, description="Filtrar por gestor"),
+    fiscal_id: Optional[int] = Query(None, description="Filtrar por fiscal"),
+    data_inicio: Optional[date] = Query(None, description="Data de início mínima"),
+    data_fim: Optional[date] = Query(None, description="Data de fim máxima"),
+    vencimento_30_dias: Optional[bool] = Query(None, description="Contratos vencendo em 30 dias"),
+    vencimento_60_dias: Optional[bool] = Query(None, description="Contratos vencendo em 60 dias"),
+    vencimento_90_dias: Optional[bool] = Query(None, description="Contratos vencendo em 90 dias"),
+    tem_garantia: Optional[bool] = Query(None, description="Filtrar contratos com garantia"),
+    garantia_prazo_dias: Optional[str] = Query(None, description="Filtrar por prazo de garantia"),
+    service: ContratoService = Depends(get_contrato_service),
+    current_user: Usuario = Depends(get_current_user)
+):
+    return await _list_contratos_logic(
+        page, per_page, nome, numero, objeto, status_id, modalidade_id,
+        contratado_id, gestor_id, fiscal_id, data_inicio, data_fim,
+        vencimento_30_dias, vencimento_60_dias, vencimento_90_dias,
+        tem_garantia, garantia_prazo_dias, service, current_user
+    )
+
+# Rota GET sem barra final
+@router.get("", response_model=ContratoPaginated)
 async def list_contratos(
     page: int = Query(1, ge=1, description="Número da página"),
     per_page: int = Query(10, ge=1, le=100, description="Itens por página"),
