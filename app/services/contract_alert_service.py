@@ -22,26 +22,24 @@ class ContractAlertService:
         Busca emails de todos os usuários com perfil de Administrador
         """
         try:
-            async with get_connection() as conn:
-                usuario_repo = UsuarioRepository(conn)
-                
+            async for conn in get_connection():
                 # Query para buscar emails de administradores
                 query = """
                 SELECT DISTINCT u.email
                 FROM usuario u
                 JOIN usuario_perfil up ON u.id = up.usuario_id
                 JOIN perfil p ON up.perfil_id = p.id
-                WHERE p.nome = 'Administrador' 
-                AND u.ativo = true 
+                WHERE p.nome = 'Administrador'
+                AND u.ativo = true
                 AND u.email IS NOT NULL
                 """
-                
+
                 rows = await conn.fetch(query)
                 emails = [row['email'] for row in rows if row['email']]
-                
+
                 logger.info(f"Encontrados {len(emails)} emails de administradores")
                 return emails
-                
+
         except Exception as e:
             logger.error(f"Erro ao buscar emails de administradores: {e}")
             return []
@@ -54,7 +52,7 @@ class ContractAlertService:
         try:
             logger.info("🔍 Iniciando verificação de contratos próximos ao vencimento...")
             
-            async with get_connection() as conn:
+            async for conn in get_connection():
                 dashboard_repo = DashboardRepository(conn)
                 
                 # Buscar contratos que vencem em 90, 60 ou 30 dias
@@ -104,7 +102,7 @@ class ContractAlertService:
         Busca contratos que vencem exatamente em X dias
         """
         try:
-            async with get_connection() as conn:
+            async for conn in get_connection():
                 dashboard_repo = DashboardRepository(conn)
                 
                 # Buscar todos os contratos próximos ao vencimento

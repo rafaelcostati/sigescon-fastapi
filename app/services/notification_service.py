@@ -250,14 +250,16 @@ class NotificationService:
     async def check_deadline_reminders(self) -> List[Dict]:
         """Verifica pendências próximas do vencimento"""
         from app.repositories.pendencia_repo import PendenciaRepository
-        
+        from app.core.database import get_connection
+
         # Esta função seria chamada pelo scheduler
         # Retorna lista de pendências que precisam de lembrete
         reminders = []
-        
+
         try:
-            pendencia_repo = PendenciaRepository(self.usuario_repo.conn)
-            pendencias_vencendo = await pendencia_repo.get_due_pendencias()
+            async for conn in get_connection():
+                pendencia_repo = PendenciaRepository(conn)
+                pendencias_vencendo = await pendencia_repo.get_due_pendencias()
             
             today = date.today()
             
@@ -289,8 +291,8 @@ class NotificationService:
                     
                     await self.send_notification(context)
                     reminders.append(pendencia)
-            
-            return reminders
+
+                return reminders
         
         except Exception as e:
             logger.error(f"Erro ao verificar lembretes de prazo: {e}")
@@ -316,11 +318,9 @@ class NotificationScheduler:
     
     async def setup_services(self):
         """Inicializa os serviços necessários"""
-        pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            usuario_repo = UsuarioRepository(conn)
-            contrato_repo = ContratoRepository(conn)
-            self.notification_service = NotificationService(usuario_repo, contrato_repo)
+        # Os repositórios serão criados nas funções individuais com conexões próprias
+        # para evitar problemas de pool
+        pass
     
     async def process_notification_queue(self):
         """Task para processar fila de notificações"""
@@ -332,12 +332,20 @@ class NotificationScheduler:
     
     async def check_deadlines(self):
         """Task para verificar prazos vencendo"""
+        from app.core.database import get_connection
+        from app.repositories.usuario_repo import UsuarioRepository
+        from app.repositories.contrato_repo import ContratoRepository
+
         try:
-            if self.notification_service:
-                reminders_sent = await self.notification_service.check_deadline_reminders()
+            async for conn in get_connection():
+                usuario_repo = UsuarioRepository(conn)
+                contrato_repo = ContratoRepository(conn)
+                notification_service = NotificationService(usuario_repo, contrato_repo)
+
+                reminders_sent = await notification_service.check_deadline_reminders()
                 logger.info(f"Verificação de prazos concluída. {len(reminders_sent)} lembretes enviados.")
         except Exception as e:
-            logger.error(f"Erro ao verificar prazos: {e}")
+            logger.error(f"Erro ao verificar lembretes de prazo: {e}")
     
     async def check_contract_expiration_alerts(self):
         """Task para verificar contratos próximos ao vencimento"""
