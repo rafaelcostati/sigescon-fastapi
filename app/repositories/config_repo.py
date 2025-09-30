@@ -68,3 +68,97 @@ class ConfigRepository:
             except (ValueError, TypeError):
                 return 5  # Valor padrão: a cada 5 dias
         return 5  # Valor padrão
+
+    # ==================== Modelo de Relatório ====================
+    
+    async def get_modelo_relatorio_info(self) -> Optional[Dict]:
+        """
+        Busca as informações do modelo de relatório ativo
+        Retorna dict com arquivo_id, nome_original e ativo, ou None se não houver modelo
+        """
+        configs = await self.conn.fetch("""
+            SELECT chave, valor
+            FROM configuracao_sistema
+            WHERE chave IN ('modelo_relatorio_arquivo_id', 
+                          'modelo_relatorio_nome_original',
+                          'modelo_relatorio_ativo')
+        """)
+        
+        if not configs:
+            return None
+        
+        config_dict = {c['chave']: c['valor'] for c in configs}
+        
+        # Verifica se está ativo e tem arquivo_id
+        ativo = config_dict.get('modelo_relatorio_ativo', 'false').lower() == 'true'
+        arquivo_id = config_dict.get('modelo_relatorio_arquivo_id')
+        
+        if not ativo or not arquivo_id:
+            return None
+        
+        try:
+            return {
+                'arquivo_id': int(arquivo_id),
+                'nome_original': config_dict.get('modelo_relatorio_nome_original', 'modelo_relatorio.pdf'),
+                'ativo': True
+            }
+        except (ValueError, TypeError):
+            return None
+    
+    async def set_modelo_relatorio(self, arquivo_id: int, nome_original: str) -> None:
+        """
+        Configura um novo modelo de relatório
+        """
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = $1, updated_at = NOW()
+            WHERE chave = 'modelo_relatorio_arquivo_id'
+        """, str(arquivo_id))
+        
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = $1, updated_at = NOW()
+            WHERE chave = 'modelo_relatorio_nome_original'
+        """, nome_original)
+        
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = 'true', updated_at = NOW()
+            WHERE chave = 'modelo_relatorio_ativo'
+        """)
+    
+    async def remove_modelo_relatorio(self) -> Optional[int]:
+        """
+        Remove o modelo de relatório ativo
+        Retorna o arquivo_id do modelo anterior para deleção física
+        """
+        # Buscar o arquivo_id atual antes de remover
+        config = await self.get_config('modelo_relatorio_arquivo_id')
+        arquivo_id = None
+        
+        if config and config['valor']:
+            try:
+                arquivo_id = int(config['valor'])
+            except (ValueError, TypeError):
+                pass
+        
+        # Desativar o modelo
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = 'false', updated_at = NOW()
+            WHERE chave = 'modelo_relatorio_ativo'
+        """)
+        
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = NULL, updated_at = NOW()
+            WHERE chave = 'modelo_relatorio_arquivo_id'
+        """)
+        
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = NULL, updated_at = NOW()
+            WHERE chave = 'modelo_relatorio_nome_original'
+        """)
+        
+        return arquivo_id

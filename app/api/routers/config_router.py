@@ -1,14 +1,17 @@
 # app/api/routers/config_router.py
 import asyncpg
-from fastapi import APIRouter, Depends, status
-from typing import List
+from fastapi import APIRouter, Depends, status, File, UploadFile
+from fastapi.responses import FileResponse
+from typing import List, Optional
 
 from app.core.database import get_connection
 from app.schemas.usuario_schema import Usuario
-from app.api.permissions import admin_required
+from app.api.permissions import admin_required, get_current_user
 from app.repositories.config_repo import ConfigRepository
+from app.repositories.arquivo_repo import ArquivoRepository
 from app.services.config_service import ConfigService
-from app.schemas.config_schema import Config, ConfigUpdate, PendenciasIntervaloDiasUpdate, LembretesConfigUpdate
+from app.services.file_service import FileService
+from app.schemas.config_schema import Config, ConfigUpdate, PendenciasIntervaloDiasUpdate, LembretesConfigUpdate, ModeloRelatorioInfo, ModeloRelatorioResponse
 
 router = APIRouter(
     prefix="/config",
@@ -125,4 +128,104 @@ async def update_lembretes_config(
     return await service.update_lembretes_config(
         update_data.dias_antes_vencimento_inicio,
         update_data.intervalo_dias_lembrete
+    )
+
+
+# ==================== Modelo de Relatório ====================
+
+@router.get("/modelo-relatorio/info", response_model=Optional[ModeloRelatorioInfo], summary="Obter informações do modelo de relatório")
+async def get_modelo_relatorio_info(
+    service: ConfigService = Depends(get_config_service),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Retorna informações sobre o modelo de relatório ativo.
+    Disponível para todos os usuários autenticados.
+    
+    Retorna:
+    - **arquivo_id**: ID do arquivo no sistema
+    - **nome_original**: Nome original do arquivo
+    - **ativo**: Se o modelo está ativo
+    
+    Retorna None se não houver modelo configurado.
+    """
+    return await service.get_modelo_relatorio_info()
+
+
+@router.post("/modelo-relatorio/upload", response_model=ModeloRelatorioResponse, summary="Fazer upload do modelo de relatório")
+async def upload_modelo_relatorio(
+    file: UploadFile = File(...),
+    conn: asyncpg.Connection = Depends(get_connection),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Faz upload de um novo modelo de relatório.
+    Se já existir um modelo, substitui o anterior.
+    Requer permissão de administrador.
+    
+    - **file**: Arquivo do modelo (PDF, DOC, DOCX, ODT)
+    
+    O modelo de relatório será disponibilizado para download em todos os contratos.
+    """
+    config_service = ConfigService(config_repo=ConfigRepository(conn))
+    arquivo_repo = ArquivoRepository(conn)
+    file_service = FileService()
+    
+    return await config_service.upload_modelo_relatorio(file, arquivo_repo, file_service)
+
+
+@router.delete("/modelo-relatorio", response_model=ModeloRelatorioResponse, summary="Remover modelo de relatório")
+async def remove_modelo_relatorio(
+    conn: asyncpg.Connection = Depends(get_connection),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Remove o modelo de relatório ativo.
+    Requer permissão de administrador.
+    
+    O arquivo será deletado do sistema de arquivos e do banco de dados.
+    """
+    config_service = ConfigService(config_repo=ConfigRepository(conn))
+    arquivo_repo = ArquivoRepository(conn)
+    
+    return await config_service.remove_modelo_relatorio(arquivo_repo)
+
+
+@router.get("/modelo-relatorio/download", summary="Fazer download do modelo de relatório")
+async def download_modelo_relatorio(
+    conn: asyncpg.Connection = Depends(get_connection),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Faz download do modelo de relatório ativo.
+    Disponível para todos os usuários autenticados.
+    
+    Retorna o arquivo para download.
+    """
+    config_repo = ConfigRepository(conn)
+    arquivo_repo = ArquivoRepository(conn)
+    
+    # Busca informações do modelo
+    modelo_info = await config_repo.get_modelo_relatorio_info()
+    if not modelo_info:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nenhum modelo de relatório configurado"
+        )
+    
+    # Busca informações do arquivo
+    arquivo = await arquivo_repo.get_arquivo_by_id(modelo_info['arquivo_id'])
+    if not arquivo:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Arquivo do modelo não encontrado"
+        )
+    
+    # Retorna o arquivo
+    return FileResponse(
+        path=arquivo['caminho'],
+        filename=arquivo['nome_original'],
+        media_type='application/octet-stream'
     )

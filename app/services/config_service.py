@@ -1,8 +1,11 @@
 # app/services/config_service.py
 from typing import List, Optional
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 from app.repositories.config_repo import ConfigRepository
-from app.schemas.config_schema import Config, ConfigUpdate, ConfigCreate
+from app.repositories.arquivo_repo import ArquivoRepository
+from app.services.file_service import FileService
+from app.schemas.config_schema import Config, ConfigUpdate, ConfigCreate, ModeloRelatorioInfo, ModeloRelatorioResponse
+import os
 
 class ConfigService:
     def __init__(self, config_repo: ConfigRepository):
@@ -106,3 +109,130 @@ class ConfigService:
             "dias_antes_vencimento_inicio": dias_antes_inicio,
             "intervalo_dias_lembrete": intervalo_dias
         }
+
+    # ==================== Modelo de Relatório ====================
+    
+    async def get_modelo_relatorio_info(self) -> Optional[ModeloRelatorioInfo]:
+        """Retorna informações sobre o modelo de relatório ativo"""
+        modelo_info = await self.config_repo.get_modelo_relatorio_info()
+        if not modelo_info:
+            return None
+        return ModeloRelatorioInfo(**modelo_info)
+    
+    async def upload_modelo_relatorio(
+        self, 
+        file: UploadFile, 
+        arquivo_repo: ArquivoRepository,
+        file_service: FileService
+    ) -> ModeloRelatorioResponse:
+        """
+        Faz upload de um novo modelo de relatório
+        Remove o modelo anterior se existir
+        """
+        # Valida o tipo de arquivo
+        if not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Arquivo inválido"
+            )
+        
+        # Valida extensão
+        allowed_extensions = {'pdf', 'doc', 'docx', 'odt'}
+        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        if ext not in allowed_extensions:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tipo de arquivo não permitido. Use: {', '.join(allowed_extensions)}"
+            )
+        
+        try:
+            # Remove o modelo anterior se existir
+            modelo_anterior = await self.config_repo.get_modelo_relatorio_info()
+            if modelo_anterior:
+                arquivo_id_anterior = modelo_anterior['arquivo_id']
+                # Busca info do arquivo anterior para deletar fisicamente
+                arquivo_anterior = await arquivo_repo.get_arquivo_by_id(arquivo_id_anterior)
+                if arquivo_anterior:
+                    # Deleta arquivo físico
+                    if os.path.exists(arquivo_anterior['caminho']):
+                        os.remove(arquivo_anterior['caminho'])
+                    # Deleta registro do banco
+                    await arquivo_repo.delete_arquivo(arquivo_id_anterior)
+            
+            # Salva o novo arquivo (usa contrato_id = 0 para indicar que é um arquivo global)
+            original_filename, file_path, file_size = await file_service.save_upload_file(0, file)
+            
+            # Registra no banco de dados na tabela arquivo
+            arquivo_data = {
+                'nome_original': original_filename,
+                'caminho': file_path,
+                'tamanho': file_size,
+                'tipo_arquivo': ext,
+                'e_contratual': False  # Não é um arquivo contratual
+            }
+            
+            arquivo = await arquivo_repo.create_arquivo(arquivo_data)
+            arquivo_id = arquivo['id']
+            
+            # Atualiza as configurações
+            await self.config_repo.set_modelo_relatorio(arquivo_id, original_filename)
+            
+            return ModeloRelatorioResponse(
+                success=True,
+                message="Modelo de relatório atualizado com sucesso",
+                modelo=ModeloRelatorioInfo(
+                    arquivo_id=arquivo_id,
+                    nome_original=original_filename,
+                    ativo=True
+                )
+            )
+        
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erro ao fazer upload do modelo: {str(e)}"
+            )
+    
+    async def remove_modelo_relatorio(
+        self, 
+        arquivo_repo: ArquivoRepository
+    ) -> ModeloRelatorioResponse:
+        """Remove o modelo de relatório ativo"""
+        modelo_info = await self.config_repo.get_modelo_relatorio_info()
+        
+        if not modelo_info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Nenhum modelo de relatório ativo"
+            )
+        
+        try:
+            arquivo_id = modelo_info['arquivo_id']
+            
+            # Busca info do arquivo para deletar fisicamente
+            arquivo = await arquivo_repo.get_arquivo_by_id(arquivo_id)
+            if arquivo:
+                # Deleta arquivo físico
+                if os.path.exists(arquivo['caminho']):
+                    os.remove(arquivo['caminho'])
+                # Deleta registro do banco
+                await arquivo_repo.delete_arquivo(arquivo_id)
+            
+            # Remove as configurações
+            await self.config_repo.remove_modelo_relatorio()
+            
+            return ModeloRelatorioResponse(
+                success=True,
+                message="Modelo de relatório removido com sucesso",
+                modelo=None
+            )
+        
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erro ao remover modelo: {str(e)}"
+            )
