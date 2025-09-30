@@ -162,16 +162,23 @@ class ConfigService:
             # Salva o novo arquivo (usa contrato_id = 0 para indicar que é um arquivo global)
             original_filename, file_path, file_size = await file_service.save_upload_file(0, file)
             
-            # Registra no banco de dados na tabela arquivo
-            arquivo_data = {
-                'nome_original': original_filename,
-                'caminho': file_path,
-                'tamanho': file_size,
-                'tipo_arquivo': ext,
-                'e_contratual': False  # Não é um arquivo contratual
+            # Determina o tipo MIME
+            mime_types = {
+                'pdf': 'application/pdf',
+                'doc': 'application/msword',
+                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'odt': 'application/vnd.oasis.opendocument.text'
             }
+            tipo_mime = mime_types.get(ext, 'application/octet-stream')
             
-            arquivo = await arquivo_repo.create_arquivo(arquivo_data)
+            # Registra no banco de dados na tabela arquivo
+            arquivo = await arquivo_repo.create_arquivo(
+                nome_arquivo=original_filename,
+                path_armazenamento=file_path,
+                tipo_arquivo=tipo_mime,
+                tamanho_bytes=file_size,
+                contrato_id=0  # 0 indica arquivo global do sistema
+            )
             arquivo_id = arquivo['id']
             
             # Atualiza as configurações

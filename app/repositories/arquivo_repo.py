@@ -40,3 +40,23 @@ class ArquivoRepository:
         """
         record = await self.conn.fetchrow(query, arquivo_id)
         return dict(record) if record else None
+    
+    async def get_arquivo_by_id(self, arquivo_id: int) -> Optional[Dict]:
+        """Busca um arquivo pelo seu ID (alias para compatibilidade)."""
+        arquivo = await self.find_arquivo_by_id(arquivo_id)
+        if arquivo:
+            # Retorna no formato esperado pelo config_service
+            return {
+                'id': arquivo['id'],
+                'nome_original': arquivo['nome_arquivo'],
+                'caminho': arquivo['path_armazenamento'],
+                'tamanho': arquivo['tamanho_bytes'],
+                'tipo_arquivo': arquivo['tipo_arquivo']
+            }
+        return None
+    
+    async def delete_arquivo(self, arquivo_id: int) -> bool:
+        """Remove um arquivo do banco de dados (soft delete)."""
+        query = "UPDATE arquivo SET ativo = FALSE, updated_at = NOW() WHERE id = $1"
+        await self.conn.execute(query, arquivo_id)
+        return True
