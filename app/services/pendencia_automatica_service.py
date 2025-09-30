@@ -175,7 +175,7 @@ class PendenciaAutomaticaService:
                             <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
                                 <p><strong>Contrato:</strong> {contrato['nr_contrato']}</p>
                                 <p><strong>Objeto:</strong> {contrato.get('objeto', 'N/A')}</p>
-                                <p><strong>Período:</strong> {date.fromisoformat(contrato['data_inicio']).strftime('%d/%m/%Y')} até {date.fromisoformat(contrato['data_fim']).strftime('%d/%m/%Y')}</p>
+                                <p><strong>Período:</strong> {contrato['data_inicio'].strftime('%d/%m/%Y') if isinstance(contrato['data_inicio'], date) else date.fromisoformat(contrato['data_inicio']).strftime('%d/%m/%Y')} até {contrato['data_fim'].strftime('%d/%m/%Y') if isinstance(contrato['data_fim'], date) else date.fromisoformat(contrato['data_fim']).strftime('%d/%m/%Y')}</p>
                             </div>
 
                             <h3 style="color: #2563eb;">Pendências Criadas:</h3>
@@ -217,7 +217,7 @@ class PendenciaAutomaticaService:
                             <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
                                 <p><strong>Contrato:</strong> {contrato['nr_contrato']}</p>
                                 <p><strong>Objeto:</strong> {contrato.get('objeto', 'N/A')}</p>
-                                <p><strong>Período:</strong> {date.fromisoformat(contrato['data_inicio']).strftime('%d/%m/%Y')} até {date.fromisoformat(contrato['data_fim']).strftime('%d/%m/%Y')}</p>
+                                <p><strong>Período:</strong> {contrato['data_inicio'].strftime('%d/%m/%Y') if isinstance(contrato['data_inicio'], date) else date.fromisoformat(contrato['data_inicio']).strftime('%d/%m/%Y')} até {contrato['data_fim'].strftime('%d/%m/%Y') if isinstance(contrato['data_fim'], date) else date.fromisoformat(contrato['data_fim']).strftime('%d/%m/%Y')}</p>
                             </div>
 
                             <h3 style="color: #2563eb;">Pendências Criadas:</h3>
