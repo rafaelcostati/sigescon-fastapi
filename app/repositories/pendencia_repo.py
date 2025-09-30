@@ -38,7 +38,7 @@ class PendenciaRepository:
             FROM pendenciarelatorio p
             LEFT JOIN statuspendencia s ON p.status_pendencia_id = s.id
             LEFT JOIN usuario u ON p.criado_por_usuario_id = u.id
-            WHERE p.contrato_id = $1
+            WHERE p.contrato_id = $1 AND p.ativo = TRUE
             ORDER BY p.data_prazo DESC
         """
         pendencias = await self.conn.fetch(query, contrato_id)
@@ -54,7 +54,7 @@ class PendenciaRepository:
             FROM pendenciarelatorio p
             LEFT JOIN statuspendencia s ON p.status_pendencia_id = s.id
             LEFT JOIN usuario u ON p.criado_por_usuario_id = u.id
-            WHERE p.id = $1
+            WHERE p.id = $1 AND p.ativo = TRUE
         """
         pendencia = await self.conn.fetchrow(query, pendencia_id)
         return dict(pendencia) if pendencia else None

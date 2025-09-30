@@ -278,9 +278,33 @@ class ContratoRepository:
 
 
     async def delete_contrato(self, contrato_id: int) -> bool:
-        query = "UPDATE contrato SET ativo = FALSE, updated_at = NOW() WHERE id = $1 AND ativo = TRUE"
-        status = await self.conn.execute(query, contrato_id)
-        return status.endswith('1')
+        """
+        Soft delete do contrato e de todos os relacionamentos em cascata:
+        - Marca o contrato como ativo = FALSE
+        - Marca todas as pendências do contrato como ativo = FALSE
+        - Marca todos os relatórios fiscais do contrato como ativo = FALSE
+        """
+        try:
+            # 1. Soft delete das pendências relacionadas ao contrato
+            await self.conn.execute(
+                "UPDATE pendenciarelatorio SET ativo = FALSE, updated_at = NOW() WHERE contrato_id = $1 AND ativo = TRUE",
+                contrato_id
+            )
+
+            # 2. Soft delete dos relatórios fiscais relacionados ao contrato
+            await self.conn.execute(
+                "UPDATE relatoriofiscal SET ativo = FALSE, updated_at = NOW() WHERE contrato_id = $1 AND ativo = TRUE",
+                contrato_id
+            )
+
+            # 3. Soft delete do contrato
+            query = "UPDATE contrato SET ativo = FALSE, updated_at = NOW() WHERE id = $1 AND ativo = TRUE"
+            status = await self.conn.execute(query, contrato_id)
+
+            return status.endswith('1')
+        except Exception as e:
+            logger.error(f"Erro ao fazer soft delete do contrato {contrato_id}: {e}")
+            raise
     
     async def get_by_id(self, contrato_id: int) -> Optional[Dict]:
         """Alias para find_contrato_by_id para manter consistência com outros repositories"""

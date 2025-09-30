@@ -262,7 +262,7 @@ class DashboardRepository:
                 result = await self.conn.fetchval(query)
                 contadores['contratos_ativos'] = result or 0
 
-            # Total de contratações (apenas contratos ativos - não excluídos)
+            # Total de contratações (todos os contratos não excluídos, independente do status)
             if 'contrato' in table_names:
                 query = "SELECT COUNT(*) FROM contrato WHERE ativo = true"
                 result = await self.conn.fetchval(query)
@@ -735,9 +735,9 @@ class DashboardRepository:
                 result = await self.conn.fetchval(query)
                 metrics['relatorios_para_analise'] = result or 0
 
-            # 4. Total de contratações (todos os status)
+            # 4. Total de contratações (todos os contratos não excluídos)
             if 'contrato' in table_names:
-                query = "SELECT COUNT(*) FROM contrato"
+                query = "SELECT COUNT(*) FROM contrato WHERE ativo = true"
                 result = await self.conn.fetchval(query)
                 metrics['total_contratacoes'] = result or 0
 
@@ -834,7 +834,7 @@ class DashboardRepository:
             JOIN statusrelatorio s ON rf.status_id = s.id
             LEFT JOIN arquivo a ON rf.arquivo_id = a.id
             LEFT JOIN pendenciarelatorio p ON rf.pendencia_id = p.id
-            WHERE s.nome = 'Pendente de Análise'
+            WHERE c.ativo = true AND s.nome = 'Pendente de Análise'
             ORDER BY rf.created_at ASC
             """
             records = await self.conn.fetch(query)

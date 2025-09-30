@@ -38,32 +38,45 @@ class PendenciaService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status de pendência não encontrado")
 
     async def create_pendencia(self, contrato_id: int, pendencia_create: PendenciaCreate) -> Pendencia:
-        """Cria uma nova pendência e envia notificação por email para o fiscal"""
+        """Cria uma nova pendência e envia notificação por email para o fiscal e fiscal substituto"""
         await self._validate_foreign_keys(pendencia_create, contrato_id)
-        
+
         # Cria a pendência no banco de dados
         new_pendencia_data = await self.pendencia_repo.create_pendencia(contrato_id, pendencia_create)
-        
+
         # === NOTIFICAÇÃO POR EMAIL COM TEMPLATES ===
         try:
             contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
-            if contrato and contrato.get('fiscal_id'):
-                fiscal = await self.usuario_repo.get_user_by_id(contrato['fiscal_id'])
-                if fiscal:
-                    from app.services.email_templates import EmailTemplates
-                    
-                    subject, body = EmailTemplates.pending_report_notification(
-                        fiscal_nome=fiscal['nome'],
-                        contrato_data=contrato,
-                        pendencia_data=new_pendencia_data
-                    )
-                    await EmailService.send_email(fiscal['email'], subject, body, is_html=True)
-                    
-                    print(f"✅ Email de pendência enviado para {fiscal['email']}")
+            if contrato:
+                from app.services.email_templates import EmailTemplates
+
+                # Enviar email para o fiscal principal
+                if contrato.get('fiscal_id'):
+                    fiscal = await self.usuario_repo.get_user_by_id(contrato['fiscal_id'])
+                    if fiscal:
+                        subject, body = EmailTemplates.pending_report_notification(
+                            fiscal_nome=fiscal['nome'],
+                            contrato_data=contrato,
+                            pendencia_data=new_pendencia_data
+                        )
+                        await EmailService.send_email(fiscal['email'], subject, body, is_html=True)
+                        print(f"✅ Email de pendência enviado para o fiscal principal: {fiscal['email']}")
+
+                # Enviar email para o fiscal substituto (se houver)
+                if contrato.get('fiscal_substituto_id'):
+                    fiscal_substituto = await self.usuario_repo.get_user_by_id(contrato['fiscal_substituto_id'])
+                    if fiscal_substituto:
+                        subject, body = EmailTemplates.pending_report_notification(
+                            fiscal_nome=fiscal_substituto['nome'],
+                            contrato_data=contrato,
+                            pendencia_data=new_pendencia_data
+                        )
+                        await EmailService.send_email(fiscal_substituto['email'], subject, body, is_html=True)
+                        print(f"✅ Email de pendência enviado para o fiscal substituto: {fiscal_substituto['email']}")
         except Exception as e:
             # Log do erro, mas não falha a criação da pendência
             print(f"❌ Erro ao enviar email de notificação da pendência {new_pendencia_data['id']}: {e}")
-        
+
         return Pendencia.model_validate(new_pendencia_data)
 
     async def get_pendencias_by_contrato_id(self, contrato_id: int) -> List[Pendencia]:
@@ -142,21 +155,37 @@ class PendenciaService:
                     try:
                         # Busca dados completos do contrato para o template
                         contrato = await self.contrato_repo.find_contrato_by_id(pendencia_data['contrato_id'])
-                        
+
                         if contrato:
                             from app.services.email_templates import EmailTemplates
-                            
+
+                            # Enviar lembrete para o fiscal principal
                             subject, body = EmailTemplates.pending_report_notification(
                                 fiscal_nome=pendencia_data['fiscal_nome'],
                                 contrato_data=contrato,
                                 pendencia_data=pendencia_data
                             )
-                            
+
                             await EmailService.send_email(pendencia_data['fiscal_email'], subject, body)
                             emails_enviados += 1
-                            
-                            print(f"✅ Lembrete enviado para {pendencia_data['fiscal_nome']} - {dias_restantes} dias restantes")
-                    
+
+                            print(f"✅ Lembrete enviado para o fiscal principal {pendencia_data['fiscal_nome']} - {dias_restantes} dias restantes")
+
+                            # Enviar lembrete para o fiscal substituto (se houver)
+                            if contrato.get('fiscal_substituto_id'):
+                                fiscal_substituto = await self.usuario_repo.get_user_by_id(contrato['fiscal_substituto_id'])
+                                if fiscal_substituto:
+                                    subject_sub, body_sub = EmailTemplates.pending_report_notification(
+                                        fiscal_nome=fiscal_substituto['nome'],
+                                        contrato_data=contrato,
+                                        pendencia_data=pendencia_data
+                                    )
+
+                                    await EmailService.send_email(fiscal_substituto['email'], subject_sub, body_sub)
+                                    emails_enviados += 1
+
+                                    print(f"✅ Lembrete enviado para o fiscal substituto {fiscal_substituto['nome']} - {dias_restantes} dias restantes")
+
                     except Exception as e:
                         print(f"❌ Erro ao enviar lembrete para pendência {pendencia_data['id']}: {e}")
             
@@ -265,19 +294,31 @@ class PendenciaService:
 
         # === NOTIFICAÇÃO POR EMAIL DE CANCELAMENTO ===
         try:
+            from app.services.email_templates import EmailTemplates
+
+            # Enviar email para o fiscal principal
             if contrato.get('fiscal_id'):
                 fiscal = await self.usuario_repo.get_user_by_id(contrato['fiscal_id'])
                 if fiscal:
-                    from app.services.email_templates import EmailTemplates
-
                     subject, body = EmailTemplates.pending_cancellation_notification(
                         fiscal_nome=fiscal['nome'],
                         contrato_data=contrato,
                         pendencia_data=pendencia
                     )
                     await EmailService.send_email(fiscal['email'], subject, body, is_html=True)
+                    print(f"✅ Email de cancelamento de pendência enviado para o fiscal principal: {fiscal['email']}")
 
-                    print(f"✅ Email de cancelamento de pendência enviado para {fiscal['email']}")
+            # Enviar email para o fiscal substituto (se houver)
+            if contrato.get('fiscal_substituto_id'):
+                fiscal_substituto = await self.usuario_repo.get_user_by_id(contrato['fiscal_substituto_id'])
+                if fiscal_substituto:
+                    subject, body = EmailTemplates.pending_cancellation_notification(
+                        fiscal_nome=fiscal_substituto['nome'],
+                        contrato_data=contrato,
+                        pendencia_data=pendencia
+                    )
+                    await EmailService.send_email(fiscal_substituto['email'], subject, body, is_html=True)
+                    print(f"✅ Email de cancelamento de pendência enviado para o fiscal substituto: {fiscal_substituto['email']}")
         except Exception as e:
             # Log do erro, mas não falha o cancelamento da pendência
             print(f"❌ Erro ao enviar email de cancelamento da pendência {pendencia_id}: {e}")

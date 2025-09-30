@@ -42,7 +42,8 @@ class RelatorioRepository:
             LEFT JOIN usuario u ON rf.fiscal_usuario_id = u.id
             LEFT JOIN statusrelatorio s ON rf.status_id = s.id
             LEFT JOIN arquivo a ON rf.arquivo_id = a.id
-            WHERE rf.contrato_id = $1 ORDER BY rf.created_at DESC
+            WHERE rf.contrato_id = $1 AND rf.ativo = TRUE
+            ORDER BY rf.created_at DESC
         """
         records = await self.conn.fetch(query, contrato_id)
         return [dict(r) for r in records]
@@ -58,7 +59,7 @@ class RelatorioRepository:
             LEFT JOIN usuario u ON rf.fiscal_usuario_id = u.id
             LEFT JOIN statusrelatorio s ON rf.status_id = s.id
             LEFT JOIN arquivo a ON rf.arquivo_id = a.id
-            WHERE rf.id = $1
+            WHERE rf.id = $1 AND rf.ativo = TRUE
         """
         record = await self.conn.fetchrow(query, relatorio_id)
         return dict(record) if record else None
@@ -93,7 +94,7 @@ class RelatorioRepository:
             LEFT JOIN statusrelatorio s ON rf.status_id = s.id
             LEFT JOIN arquivo a ON rf.arquivo_id = a.id
             LEFT JOIN pendenciarelatorio p ON rf.pendencia_id = p.id
-            WHERE rf.contrato_id = $1 AND s.nome = 'Pendente de Análise'
+            WHERE rf.contrato_id = $1 AND rf.ativo = TRUE AND s.nome = 'Pendente de Análise'
             ORDER BY rf.created_at DESC
         """
         records = await self.conn.fetch(query, contrato_id)
@@ -111,7 +112,7 @@ class RelatorioRepository:
             LEFT JOIN usuario u ON rf.fiscal_usuario_id = u.id
             LEFT JOIN statusrelatorio s ON rf.status_id = s.id
             LEFT JOIN arquivo a ON rf.arquivo_id = a.id
-            WHERE rf.pendencia_id = $1
+            WHERE rf.pendencia_id = $1 AND rf.ativo = TRUE
             ORDER BY rf.created_at DESC
         """
         records = await self.conn.fetch(query, pendencia_id)
@@ -152,7 +153,7 @@ class RelatorioRepository:
             JOIN statusrelatorio s ON rf.status_id = s.id
             LEFT JOIN arquivo a ON rf.arquivo_id = a.id
             LEFT JOIN pendenciarelatorio p ON rf.pendencia_id = p.id
-            WHERE s.nome = 'Pendente de Análise'
+            WHERE c.ativo = TRUE AND rf.ativo = TRUE AND s.nome = 'Pendente de Análise'
             ORDER BY rf.created_at ASC
         """
         records = await self.conn.fetch(query)
