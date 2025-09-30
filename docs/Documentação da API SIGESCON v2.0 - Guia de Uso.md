@@ -1,6 +1,16 @@
-### **Documentação da API SIGESCON v2.0 \- Guia de Uso para Desenvolvedores**
+### **Documentação da API SIGESCON v2.5 \- Guia de Uso para Desenvolvedores**
 
 **Bem-vindo à API do SIGESCON\!** Este guia irá ajudá-lo a entender como interagir com os nossos recursos, autenticar-se e executar os principais fluxos de trabalho do sistema.
+
+### **🆕 Novidades da Versão 2.5 (Setembro 2025)**
+
+- ✅ **Sistema de Configurações**: Gerenciamento dinâmico de parâmetros do sistema
+- ✅ **Pendências Automáticas Configuráveis**: Criação automática com periodicidade definida pelo admin
+- ✅ **Lembretes Dinâmicos**: Configuração de quando e com que frequência enviar lembretes
+- ✅ **Dashboard Administrativo Completo**: Métricas em tempo real e gestão de pendências
+- ✅ **Gestão de Pendências Avançada**: Separação entre vencidas e pendentes
+- ✅ **Filtros Avançados**: Contratos por vencimento e status
+- ✅ **Alertas de Contratos**: Notificações configuráveis de vencimento
 
 ### **1\. Visão Geral e Conceitos**
 
@@ -423,7 +433,357 @@ Observações importantes:
 - Para listar todos os perfis de um usuário, utilize os endpoints acima.
 - Na criação de usuário (`POST /usuarios/`), o campo `perfil_id` é sempre ignorado (criação sem perfil). Conceda perfis via `POST /api/v1/usuarios/{id}/perfis/conceder` ou use o atalho `POST /usuarios/com-perfis`.
 
-### **8. Tratamento de Erros**
+### **8. Sistema de Configurações (NOVO - v2.5)**
+
+O SIGESCON agora possui um sistema completo de configurações dinâmicas que permite aos administradores ajustar parâmetros do sistema sem necessidade de alteração de código.
+
+#### **8.1. Endpoints de Configuração**
+
+**Listar todas as configurações:**
+```
+GET /api/v1/config/
+```
+- **Permissões:** Apenas Administradores
+- **Resposta:** Array com todas as configurações do sistema
+
+**Buscar configuração específica:**
+```
+GET /api/v1/config/{chave}
+```
+- **Permissões:** Apenas Administradores
+- **Parâmetros:** `chave` - Identificador único da configuração
+- **Resposta:** Objeto com dados da configuração
+
+**Atualizar configuração:**
+```
+PATCH /api/v1/config/{chave}
+```
+- **Permissões:** Apenas Administradores
+- **Body:** `{ "valor": "novo_valor" }`
+- **Resposta:** Configuração atualizada
+
+#### **8.2. Configurações de Pendências Automáticas**
+
+**Obter intervalo de pendências automáticas:**
+```
+GET /api/v1/config/pendencias/intervalo-dias
+```
+- **Permissões:** Apenas Administradores
+- **Resposta:** `{ "intervalo_dias": 60 }`
+- **Descrição:** Retorna o intervalo em dias configurado para criação automática de pendências
+
+**Atualizar intervalo:**
+```
+PATCH /api/v1/config/pendencias/intervalo-dias
+```
+- **Permissões:** Apenas Administradores
+- **Body:** `{ "intervalo_dias": 90 }` (mínimo: 1, máximo: 365)
+- **Resposta:** Configuração atualizada
+- **Exemplo de uso:** Com intervalo de 60 dias, um contrato de 1 ano (365 dias) gerará 6 pendências automáticas
+
+#### **8.3. Configurações de Lembretes**
+
+**Obter configurações de lembretes:**
+```
+GET /api/v1/config/lembretes/config
+```
+- **Permissões:** Apenas Administradores
+- **Resposta:**
+```json
+{
+  "dias_antes_vencimento_inicio": 30,
+  "intervalo_dias_lembrete": 5
+}
+```
+- **Descrição:**
+  - `dias_antes_vencimento_inicio`: Quantos dias antes do vencimento começar a enviar lembretes
+  - `intervalo_dias_lembrete`: A cada quantos dias repetir os lembretes
+
+**Atualizar configurações de lembretes:**
+```
+PATCH /api/v1/config/lembretes/config
+```
+- **Permissões:** Apenas Administradores
+- **Body:**
+```json
+{
+  "dias_antes_vencimento_inicio": 30,
+  "intervalo_dias_lembrete": 5
+}
+```
+- **Validações:**
+  - `dias_antes_vencimento_inicio`: 1-90 dias
+  - `intervalo_dias_lembrete`: 1-30 dias
+- **Exemplo:** Com 30 dias antes e intervalo de 5 dias, serão enviados lembretes em: 30, 25, 20, 15, 10, 5 dias antes e no vencimento (7 lembretes)
+
+### **9. Pendências Automáticas (NOVO - v2.5)**
+
+Sistema avançado para criação automática de pendências baseado no período do contrato.
+
+#### **9.1. Preview de Pendências Automáticas**
+
+```
+POST /api/v1/contratos/{contrato_id}/pendencias-automaticas/preview
+```
+- **Permissões:** Apenas Administradores
+- **Descrição:** Visualiza quais pendências serão criadas sem realmente criá-las
+- **Body:** `{ "intervalo_dias": 60 }` (opcional, usa configuração padrão se omitido)
+- **Resposta:**
+```json
+{
+  "pendencias_previstas": [
+    {
+      "numero": 1,
+      "titulo": "1º Relatório Fiscal",
+      "data_prazo": "2025-11-30",
+      "dias_desde_inicio": 60,
+      "dias_ate_fim": 305
+    },
+    {
+      "numero": 2,
+      "titulo": "2º Relatório Fiscal",
+      "data_prazo": "2026-01-29",
+      "dias_desde_inicio": 120,
+      "dias_ate_fim": 245
+    }
+  ],
+  "total_pendencias": 6,
+  "intervalo_utilizado": 60,
+  "periodo_contrato": {
+    "data_inicio": "2025-10-01",
+    "data_fim": "2026-09-30",
+    "total_dias": 365
+  }
+}
+```
+
+#### **9.2. Criar Pendências Automáticas**
+
+```
+POST /api/v1/contratos/{contrato_id}/pendencias-automaticas/criar
+```
+- **Permissões:** Apenas Administradores
+- **Descrição:** Cria efetivamente as pendências automáticas
+- **Body:** `{ "intervalo_dias": 60 }` (opcional)
+- **Efeitos:**
+  - Cria todas as pendências calculadas
+  - Envia email ao fiscal principal com lista completa
+  - Envia email ao fiscal substituto (se houver)
+- **Resposta:**
+```json
+{
+  "pendencias_criadas": [
+    {
+      "id": 150,
+      "descricao": "1º Relatório Fiscal",
+      "data_prazo": "2025-11-30",
+      "status": "Pendente"
+    }
+  ],
+  "total_criadas": 6,
+  "emails_enviados": [
+    "fiscal@example.com",
+    "substituto@example.com"
+  ]
+}
+```
+
+### **10. Dashboard Administrativo (NOVO - v2.5)**
+
+Sistema completo de dashboard com métricas em tempo real e gestão de pendências.
+
+#### **10.1. Dashboard Completo**
+
+```
+GET /api/v1/dashboard/admin/completo
+```
+- **Permissões:** Apenas Administradores
+- **Descrição:** Retorna todos os contadores e métricas do sistema
+- **Resposta:**
+```json
+{
+  "contadores": {
+    "total_contratos": 45,
+    "contratos_ativos": 38,
+    "total_usuarios": 25,
+    "total_pendencias": 120,
+    "pendencias_vencidas": 8,
+    "pendencias_aguardando_analise": 15,
+    "relatorios_pendentes_analise": 12
+  },
+  "alertas": {
+    "contratos_proximos_vencimento_30": 5,
+    "contratos_proximos_vencimento_60": 8,
+    "contratos_proximos_vencimento_90": 12
+  }
+}
+```
+
+#### **10.2. Gestão de Pendências Vencidas**
+
+```
+GET /api/v1/dashboard/admin/pendencias-vencidas
+```
+- **Permissões:** Apenas Administradores
+- **Query Params:** `limit` (padrão: 50, máximo: 200)
+- **Descrição:** Lista pendências com prazo vencido que ainda não foram concluídas
+- **Resposta:**
+```json
+{
+  "pendencias": [
+    {
+      "id": 45,
+      "descricao": "1º Relatório Fiscal",
+      "data_prazo": "2025-09-15",
+      "dias_atraso": 15,
+      "contrato_numero": "CT-2025-001",
+      "fiscal_nome": "João Silva",
+      "fiscal_email": "joao@example.com",
+      "status": "Pendente"
+    }
+  ],
+  "total_pendencias_vencidas": 8,
+  "limit": 50
+}
+```
+
+#### **10.3. Gestão de Pendências Pendentes**
+
+```
+GET /api/v1/dashboard/admin/pendencias-pendentes
+```
+- **Permissões:** Apenas Administradores
+- **Query Params:** `limit` (padrão: 50, máximo: 200)
+- **Descrição:** Lista pendências ainda não vencidas
+- **Resposta:** Estrutura similar às pendências vencidas, mas com `dias_restantes` em vez de `dias_atraso`
+
+#### **10.4. Contratos Próximos ao Vencimento**
+
+```
+GET /api/v1/dashboard/admin/contratos-proximos-vencimento
+```
+- **Permissões:** Apenas Administradores
+- **Query Params:** `dias_antecedencia` (padrão: 90, mínimo: 30, máximo: 365)
+- **Descrição:** Lista contratos que vencerão dentro do período especificado
+- **Resposta:**
+```json
+{
+  "contratos": [
+    {
+      "id": 10,
+      "numero": "CT-2025-010",
+      "objeto": "Manutenção de software",
+      "data_fim": "2025-12-31",
+      "dias_restantes": 92,
+      "status": "Ativo",
+      "gestor_nome": "Maria Gestora",
+      "valor": 50000.00
+    }
+  ],
+  "total": 12,
+  "dias_antecedencia": 90
+}
+```
+
+#### **10.5. Relatórios Pendentes de Análise**
+
+```
+GET /api/v1/dashboard/admin/relatorios-pendentes-analise
+```
+- **Permissões:** Apenas Administradores
+- **Descrição:** Lista relatórios enviados pelos fiscais aguardando análise
+- **Resposta:**
+```json
+{
+  "relatorios": [
+    {
+      "id": 78,
+      "pendencia_id": 45,
+      "pendencia_descricao": "1º Relatório Fiscal",
+      "contrato_numero": "CT-2025-001",
+      "fiscal_nome": "João Silva",
+      "data_envio": "2025-09-28T10:30:00",
+      "dias_aguardando": 2,
+      "mes_competencia": "2025-09-01",
+      "arquivo_nome": "relatorio_setembro.pdf"
+    }
+  ],
+  "total": 12
+}
+```
+
+#### **10.6. Cancelar Pendência**
+
+```
+PATCH /api/v1/dashboard/admin/cancelar-pendencia/{pendencia_id}
+```
+- **Permissões:** Apenas Administradores
+- **Descrição:** Cancela uma pendência existente
+- **Efeitos:**
+  - Status da pendência muda para "Cancelada"
+  - Fiscal recebe email informando o cancelamento
+- **Resposta:**
+```json
+{
+  "id": 45,
+  "descricao": "1º Relatório Fiscal",
+  "status": "Cancelada",
+  "cancelada_em": "2025-09-30T14:20:00",
+  "email_enviado": true
+}
+```
+
+### **11. Fluxo Completo: Pendências Automáticas + Lembretes (NOVO)**
+
+Este é o fluxo end-to-end das novas funcionalidades.
+
+#### **Passo 1: Admin Configura o Sistema**
+
+1. **Configurar intervalo de pendências automáticas:**
+```
+PATCH /api/v1/config/pendencias/intervalo-dias
+Body: { "intervalo_dias": 60 }
+```
+
+2. **Configurar lembretes:**
+```
+PATCH /api/v1/config/lembretes/config
+Body: {
+  "dias_antes_vencimento_inicio": 30,
+  "intervalo_dias_lembrete": 5
+}
+```
+
+#### **Passo 2: Admin Cria Contrato e Pendências Automáticas**
+
+1. **Criar contrato** (via `POST /api/v1/contratos/`)
+2. **Visualizar preview:**
+```
+POST /api/v1/contratos/{id}/pendencias-automaticas/preview
+```
+3. **Criar pendências:**
+```
+POST /api/v1/contratos/{id}/pendencias-automaticas/criar
+```
+
+#### **Passo 3: Sistema Envia Lembretes Automaticamente**
+
+O scheduler executa diariamente:
+- Verifica pendências próximas ao vencimento
+- Calcula dias de lembrete baseado nas configurações (30, 25, 20, 15, 10, 5, 0)
+- Envia emails aos fiscais nos dias configurados
+
+#### **Passo 4: Admin Monitora via Dashboard**
+
+```
+GET /api/v1/dashboard/admin/completo
+```
+- Visualiza métricas em tempo real
+- Identifica pendências vencidas
+- Verifica relatórios aguardando análise
+- Acompanha contratos próximos ao vencimento
+
+### **12. Tratamento de Erros**
 
 A API usa códigos de status HTTP padrão e retorna um corpo de resposta JSON para fornecer detalhes sobre o erro.
 

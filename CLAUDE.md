@@ -1,11 +1,20 @@
-# 🚀 CLAUDE.md - SIGESCON FastAPI
+# 🚀 CLAUDE.md - SIGESCON FastAPI v2.5
 
 ## 📖 Visão Geral do Projeto
 
 O **SIGESCON** (Sistema de Gestão de Contratos) é uma API robusta desenvolvida em **FastAPI** para gerenciamento completo do ciclo de vida de contratos governamentais. O projeto está em **produção** e oferece funcionalidades avançadas de gestão, fiscalização e relatórios.
 
 ### 🎯 Objetivo Principal
-Sistema completo para gerenciar contratos, usuários, fiscalizações e relatórios com fluxo de aprovação, notificações automáticas e sistema de auditoria.
+Sistema completo para gerenciar contratos, usuários, fiscalizações e relatórios com fluxo de aprovação, notificações automáticas, sistema de auditoria, pendências automáticas configuráveis e lembretes dinâmicos.
+
+### 🆕 Última Atualização: Setembro 2025
+**Novas Funcionalidades:**
+- ✅ Sistema de Pendências Automáticas Configuráveis
+- ✅ Sistema de Lembretes Dinâmicos com Configuração via Admin
+- ✅ Dashboard Administrativo Completo com Gestão de Pendências
+- ✅ Filtros Avançados de Contratos (vencimento, status)
+- ✅ Página de Administração no Frontend
+- ✅ Gestão Completa de Pendências (Vencidas/Pendentes)
 
 ---
 
@@ -242,8 +251,27 @@ chmod +x run_tests.sh
 
 ### Notificações
 - **Emails Automáticos** - SMTP assíncrono
-- **Scheduler** - APScheduler para lembretes
+- **Scheduler Configurável** - APScheduler com configurações dinâmicas
 - **Templates** - Emails personalizados por tipo
+- **Lembretes Dinâmicos** - Intervalos configuráveis pelo administrador
+
+### Pendências Automáticas (NOVO)
+- **Criação Automática** - Sistema calcula pendências baseado em intervalo configurável
+- **Configuração via Admin** - Administrador define periodicidade (1-365 dias)
+- **Notificação por Email** - Fiscais recebem lista completa de pendências criadas
+- **Nomenclatura Automática** - Sequencial: "1º Relatório Fiscal", "2º Relatório Fiscal", etc.
+
+### Sistema de Lembretes Configuráveis (NOVO)
+- **Configuração Dinâmica** - Admin define quando começar e intervalo
+- **Cálculo Automático** - Sistema determina quantos lembretes serão enviados
+- **Preview em Tempo Real** - Interface mostra impacto das configurações
+- **Flexibilidade Total** - De 1-90 dias antes, intervalos de 1-30 dias
+
+### Dashboard Administrativo Completo (NOVO)
+- **Gestão de Pendências** - Vencidas e Pendentes separadas
+- **Contadores em Tempo Real** - Contratos, usuários, pendências
+- **Alertas de Vencimento** - Contratos próximos ao vencimento
+- **Relatórios Pendentes** - Análise de relatórios aguardando aprovação
 
 ---
 
@@ -319,6 +347,36 @@ GET    /api/v1/contratados                              # Empresas/pessoas
 GET    /api/v1/perfis                                   # Tipos de perfil
 GET    /api/v1/modalidades                              # Modalidades de contrato
 GET    /api/v1/status                                   # Status possíveis
+```
+
+### Configurações do Sistema (NOVO)
+```
+GET    /api/v1/config/                                  # Listar todas configurações
+GET    /api/v1/config/{chave}                          # Buscar configuração específica
+PATCH  /api/v1/config/{chave}                          # Atualizar configuração
+GET    /api/v1/config/pendencias/intervalo-dias        # Intervalo pendências automáticas
+PATCH  /api/v1/config/pendencias/intervalo-dias        # Atualizar intervalo
+GET    /api/v1/config/lembretes/config                 # Configurações de lembretes
+PATCH  /api/v1/config/lembretes/config                 # Atualizar lembretes
+```
+
+### Dashboard Administrativo (NOVO)
+```
+GET    /api/v1/dashboard/admin/completo                     # Dashboard completo
+GET    /api/v1/dashboard/admin/melhorado                    # Dashboard melhorado
+GET    /api/v1/dashboard/admin/contratos-com-pendencias     # Contratos com pendências
+GET    /api/v1/dashboard/admin/contratos-com-relatorios-pendentes  # Relatórios pendentes
+GET    /api/v1/dashboard/admin/pendencias-vencidas          # Pendências vencidas
+GET    /api/v1/dashboard/admin/pendencias-pendentes         # Pendências pendentes
+GET    /api/v1/dashboard/admin/contratos-proximos-vencimento # Contratos vencendo
+GET    /api/v1/dashboard/admin/relatorios-pendentes-analise # Relatórios para analisar
+PATCH  /api/v1/dashboard/admin/cancelar-pendencia/{id}      # Cancelar pendência
+```
+
+### Pendências Automáticas (NOVO)
+```
+POST   /api/v1/contratos/{id}/pendencias-automaticas/preview   # Preview de pendências
+POST   /api/v1/contratos/{id}/pendencias-automaticas/criar     # Criar pendências automáticas
 ```
 
 ### Monitoramento
@@ -721,25 +779,46 @@ SELECT numero, objeto, data_assinatura FROM contratos WHERE data_exclusao IS NUL
 - [x] **Gerenciamento de Arquivos** - Listar, baixar e excluir arquivos com isolamento
 - [x] **Relatórios e Pendências** - Workflow implementado
 - [x] **Sistema de Emails** - SMTP assíncrono
-- [x] **Scheduler** - Notificações automáticas
+- [x] **Scheduler Configurável** - Notificações automáticas com configuração dinâmica
 - [x] **Middleware** - Auditoria e logging
 - [x] **Testes** - Cobertura abrangente incluindo contexto e isolamento
 - [x] **Documentação** - Swagger protegido
 
-### 🚀 Em Produção
+### 🆕 Funcionalidades Novas (v2.5)
+- [x] **Sistema de Configurações** - Repository, service e endpoints completos
+- [x] **Pendências Automáticas** - Criação configurável com preview
+- [x] **Lembretes Dinâmicos** - Configuração de dias antes e intervalos
+- [x] **Dashboard Administrativo** - Completo com todos os contadores
+- [x] **Gestão de Pendências** - Vencidas, Pendentes, Canceladas
+- [x] **Filtros Avançados** - Contratos por vencimento e status
+- [x] **Página de Administração** - Interface completa no frontend
+- [x] **Alertas de Contratos** - Próximos ao vencimento configurável
+
+### 🚀 Em Produção - v2.5
 O sistema está **100% funcional** e em **produção ativa**, oferecendo todas as funcionalidades do sistema Flask original com melhorias significativas em:
 
-#### **Novas Funcionalidades Implementadas:**
+#### **Funcionalidades Core:**
 - **Isolamento Automático de Dados** - Fiscal vê apenas seus contratos, Gestor vê apenas os seus
 - **Contexto de Sessão Persistente** - Alternância real entre perfis sem relogin
 - **Permissões Hierárquicas** - Controle granular baseado no perfil ativo
 - **Sistema de Múltiplos Perfis Completo** - Sem dependência de estruturas legadas
 
+#### **Funcionalidades Avançadas (v2.5):**
+- **Pendências Automáticas Configuráveis** - Admin define intervalo (1-365 dias)
+- **Sistema de Lembretes Dinâmico** - Configuração de quando e com que frequência enviar
+- **Dashboard Completo** - Métricas em tempo real com drill-down
+- **Gestão Inteligente de Pendências** - Separação entre vencidas e pendentes
+- **Alertas de Vencimento** - Notificações configuráveis de contratos
+- **Preview de Impacto** - Interface mostra resultado das configurações
+
 #### **Melhorias Técnicas:**
 - **Performance e Manutenibilidade** aprimoradas
 - **Arquitetura Clean** com isolamento real de dados
+- **Configurações no Banco** - Não mais hardcoded
+- **Scheduler Inteligente** - Usa configurações dinâmicas
 - **Testes Abrangentes** validando todo o fluxo de contexto
 - **API RESTful** com isolamento transparente
+- **Documentação Completa** - Claude.md e /docs atualizados
 
 ---
 
