@@ -15,7 +15,7 @@ from app.api.routers import (
     contratado_router, auth_router, usuario_router, perfil_router,
     modalidade_router, status_router, status_relatorio_router,
     status_pendencia_router, contrato_router, pendencia_router, relatorio_router,
-    arquivo_router, dashboard_router
+    arquivo_router, dashboard_router, config_router
 )
 from app.api.routers import usuario_perfil_router
 # Imports dos sistemas avançados
@@ -207,6 +207,9 @@ print(f"✅ Router de arquivos registrado: {API_PREFIX}/arquivos")
 
 app.include_router(dashboard_router.router, prefix=API_PREFIX)
 print(f"✅ Router de dashboard registrado: {API_PREFIX}/dashboard")
+
+app.include_router(config_router.router, prefix=API_PREFIX)
+print(f"✅ Router de configurações registrado: {API_PREFIX}/config")
 
 
 # Routers de tabelas auxiliares
