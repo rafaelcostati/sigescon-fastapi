@@ -73,3 +73,36 @@ class ConfigService:
 
         config_update = ConfigUpdate(valor=str(intervalo_dias))
         return await self.update_config('pendencias_automaticas_intervalo_dias', config_update)
+
+    async def get_lembretes_config(self) -> dict:
+        """Retorna as configurações de lembretes de pendências"""
+        dias_antes_inicio = await self.config_repo.get_lembretes_dias_antes_inicio()
+        intervalo_dias = await self.config_repo.get_lembretes_intervalo_dias()
+        return {
+            "dias_antes_vencimento_inicio": dias_antes_inicio,
+            "intervalo_dias_lembrete": intervalo_dias
+        }
+
+    async def update_lembretes_config(self, dias_antes_inicio: int, intervalo_dias: int) -> dict:
+        """Atualiza as configurações de lembretes de pendências"""
+        # Validações
+        if dias_antes_inicio < 1 or dias_antes_inicio > 90:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Dias antes do vencimento deve estar entre 1 e 90 dias"
+            )
+        
+        if intervalo_dias < 1 or intervalo_dias > 30:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Intervalo entre lembretes deve estar entre 1 e 30 dias"
+            )
+
+        # Atualiza as configurações
+        await self.update_config('lembretes_dias_antes_vencimento_inicio', ConfigUpdate(valor=str(dias_antes_inicio)))
+        await self.update_config('lembretes_intervalo_dias', ConfigUpdate(valor=str(intervalo_dias)))
+
+        return {
+            "dias_antes_vencimento_inicio": dias_antes_inicio,
+            "intervalo_dias_lembrete": intervalo_dias
+        }

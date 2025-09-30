@@ -25,3 +25,7 @@ class Config(ConfigBase):
 
 class PendenciasIntervaloDiasUpdate(BaseModel):
     intervalo_dias: int = Field(..., ge=1, le=365, description="Intervalo em dias entre pendências automáticas (1-365)")
+
+class LembretesConfigUpdate(BaseModel):
+    dias_antes_vencimento_inicio: int = Field(..., ge=1, le=90, description="Quantos dias antes do vencimento começar a enviar lembretes (1-90)")
+    intervalo_dias_lembrete: int = Field(..., ge=1, le=30, description="A cada quantos dias enviar lembretes (1-30)")

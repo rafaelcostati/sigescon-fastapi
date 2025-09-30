@@ -8,7 +8,7 @@ from app.schemas.usuario_schema import Usuario
 from app.api.permissions import admin_required
 from app.repositories.config_repo import ConfigRepository
 from app.services.config_service import ConfigService
-from app.schemas.config_schema import Config, ConfigUpdate, PendenciasIntervaloDiasUpdate
+from app.schemas.config_schema import Config, ConfigUpdate, PendenciasIntervaloDiasUpdate, LembretesConfigUpdate
 
 router = APIRouter(
     prefix="/config",
@@ -88,3 +88,41 @@ async def update_pendencias_intervalo_dias(
     - **intervalo_dias**: Número de dias entre cada pendência automática (1-365)
     """
     return await service.update_pendencias_intervalo_dias(update_data.intervalo_dias)
+
+
+@router.get("/lembretes/config", response_model=dict, summary="Obter configurações de lembretes")
+async def get_lembretes_config(
+    service: ConfigService = Depends(get_config_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Retorna as configurações de lembretes de pendências.
+    Requer permissão de administrador.
+    
+    Retorna:
+    - **dias_antes_vencimento_inicio**: Quantos dias antes do vencimento começar a enviar lembretes
+    - **intervalo_dias_lembrete**: A cada quantos dias enviar lembretes até o vencimento
+    """
+    return await service.get_lembretes_config()
+
+
+@router.patch("/lembretes/config", response_model=dict, summary="Atualizar configurações de lembretes")
+async def update_lembretes_config(
+    update_data: LembretesConfigUpdate,
+    service: ConfigService = Depends(get_config_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Atualiza as configurações de lembretes de pendências.
+    Requer permissão de administrador.
+    
+    - **dias_antes_vencimento_inicio**: Quantos dias antes do vencimento começar a enviar (1-90)
+    - **intervalo_dias_lembrete**: A cada quantos dias enviar lembretes (1-30)
+    
+    Exemplo: dias_antes_vencimento_inicio=30 e intervalo_dias_lembrete=5
+    Resultado: Lembretes serão enviados 30, 25, 20, 15, 10, 5 dias antes e no dia do vencimento.
+    """
+    return await service.update_lembretes_config(
+        update_data.dias_antes_vencimento_inicio,
+        update_data.intervalo_dias_lembrete
+    )

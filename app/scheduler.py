@@ -10,6 +10,7 @@ from app.services.email_service import EmailService
 async def check_deadlines_async():
     """
     Função assíncrona que o scheduler irá executar para verificar os prazos.
+    Usa configurações dinâmicas do banco de dados.
     """
     print("Executando verificação de prazos de pendências...")
     pool = None
@@ -17,17 +18,38 @@ async def check_deadlines_async():
     try:
         pool = await get_db_pool()
         async with pool.acquire() as conn:
-            pendencia_repo = PendenciaRepository(conn)
-            pendencias = await pendencia_repo.get_due_pendencias()
+            from app.repositories.config_repo import ConfigRepository
             
+            pendencia_repo = PendenciaRepository(conn)
+            config_repo = ConfigRepository(conn)
+            
+            # Busca configurações dinâmicas
+            dias_antes_inicio = await config_repo.get_lembretes_dias_antes_inicio()
+            intervalo_dias = await config_repo.get_lembretes_intervalo_dias()
+            
+            print(f"📋 Configurações de lembretes: Início={dias_antes_inicio} dias antes, Intervalo={intervalo_dias} dias")
+            
+            # Calcula os dias de lembrete baseado nas configurações
+            dias_lembrete = []
+            dia_atual = dias_antes_inicio
+            while dia_atual >= 0:
+                dias_lembrete.append(dia_atual)
+                dia_atual -= intervalo_dias
+            
+            # Garante que o dia 0 (vencimento) esteja incluído
+            if 0 not in dias_lembrete:
+                dias_lembrete.append(0)
+            
+            dias_lembrete = sorted(set(dias_lembrete), reverse=True)  # Remove duplicatas e ordena
+            print(f"📅 Lembretes serão enviados nos seguintes dias antes do vencimento: {dias_lembrete}")
+            
+            pendencias = await pendencia_repo.get_due_pendencias()
             today = date.today()
             
+            emails_enviados = 0
             for p in pendencias:
                 prazo = p['data_prazo']
                 dias_restantes = (prazo - today).days
-                
-                # Envia lembrete 15, 5, 3 dias antes, ou no dia do vencimento
-                dias_lembrete = [15, 5, 3, 0]
                 
                 if dias_restantes in dias_lembrete:
                     subject = f"Lembrete de Prazo: Pendência do Contrato {p['nr_contrato']}"
@@ -50,9 +72,15 @@ Este é um lembrete automático sobre uma pendência de relatório para o contra
 Por favor, não se esqueça de submeter o relatório a tempo.
                     """
                     await EmailService.send_email(p['fiscal_email'], subject, body, is_html=True)
+                    emails_enviados += 1
+                    print(f"✅ Email enviado para {p['fiscal_nome']} - Pendência vence em {dias_restantes} dia(s)")
+            
+            print(f"📧 Total de emails de lembrete enviados: {emails_enviados}")
                     
     except Exception as e:
         print(f"ERRO ao executar a verificação de prazos: {e}")
+        import traceback
+        print(traceback.format_exc())
     finally:
         if pool:
             await close_db_pool()

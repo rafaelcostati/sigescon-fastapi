@@ -274,8 +274,13 @@ class NotificationService:
             logger.info(f"Lote de emails processado: {success_count}/{len(emails_to_send)} enviados")
     
     async def check_deadline_reminders(self) -> List[Dict]:
-        """Verifica pendências próximas do vencimento"""
+        """
+        Verifica pendências próximas do vencimento usando configurações dinâmicas.
+        A configuração determina quantos dias antes do vencimento começar a enviar
+        e a cada quantos dias repetir os lembretes.
+        """
         from app.repositories.pendencia_repo import PendenciaRepository
+        from app.repositories.config_repo import ConfigRepository
         from app.core.database import get_connection
 
         # Esta função seria chamada pelo scheduler
@@ -285,6 +290,31 @@ class NotificationService:
         try:
             async for conn in get_connection():
                 pendencia_repo = PendenciaRepository(conn)
+                config_repo = ConfigRepository(conn)
+                
+                # Busca configurações dinâmicas
+                dias_antes_inicio = await config_repo.get_lembretes_dias_antes_inicio()
+                intervalo_dias = await config_repo.get_lembretes_intervalo_dias()
+                
+                logger.info(f"Configurações de lembretes: Início={dias_antes_inicio} dias antes, Intervalo={intervalo_dias} dias")
+                
+                # Calcula os dias de lembrete baseado nas configurações
+                dias_lembrete = []
+                dia_atual = dias_antes_inicio
+                while dia_atual >= 0:
+                    dias_lembrete.append(dia_atual)
+                    dia_atual -= intervalo_dias
+                
+                # Garante que o dia 0 (vencimento) esteja incluído
+                if 0 not in dias_lembrete:
+                    dias_lembrete.append(0)
+                
+                # Remove duplicatas e adiciona 1 dia de atraso
+                dias_lembrete = sorted(set(dias_lembrete), reverse=True)
+                dias_lembrete.append(-1)  # 1 dia de atraso
+                
+                logger.info(f"Lembretes serão enviados nos dias: {dias_lembrete}")
+                
                 pendencias_vencendo = await pendencia_repo.get_due_pendencias()
             
             today = date.today()
@@ -296,8 +326,8 @@ class NotificationService:
                 
                 dias_restantes = (prazo - today).days
                 
-                # Envia lembrete em intervalos específicos
-                if dias_restantes in [15, 7, 3, 1, 0, -1]:  # Incluindo 1 dia de atraso
+                # Envia lembrete em intervalos configurados
+                if dias_restantes in dias_lembrete:
                     priority = "urgent" if dias_restantes <= 0 else "high" if dias_restantes <= 1 else "normal"
                     notification_type = NotificationType.PRAZO_VENCIDO if dias_restantes < 0 else NotificationType.PRAZO_VENCENDO
                     

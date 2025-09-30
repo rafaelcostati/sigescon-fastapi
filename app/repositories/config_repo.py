@@ -48,3 +48,23 @@ class ConfigRepository:
             except (ValueError, TypeError):
                 return 60  # Valor padrão
         return 60  # Valor padrão
+
+    async def get_lembretes_dias_antes_inicio(self) -> int:
+        """Busca quantos dias antes do vencimento começar a enviar lembretes"""
+        config = await self.get_config('lembretes_dias_antes_vencimento_inicio')
+        if config:
+            try:
+                return int(config['valor'])
+            except (ValueError, TypeError):
+                return 30  # Valor padrão: 30 dias antes
+        return 30  # Valor padrão
+
+    async def get_lembretes_intervalo_dias(self) -> int:
+        """Busca o intervalo de dias entre lembretes"""
+        config = await self.get_config('lembretes_intervalo_dias')
+        if config:
+            try:
+                return int(config['valor'])
+            except (ValueError, TypeError):
+                return 5  # Valor padrão: a cada 5 dias
+        return 5  # Valor padrão
