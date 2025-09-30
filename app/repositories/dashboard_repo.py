@@ -1318,3 +1318,90 @@ class DashboardRepository:
                 'altos_60_dias': 0,
                 'medios_90_dias': 0
             }
+
+    async def get_garantias_proximas_vencimento_admin(self, dias_antecedencia: int = 90) -> List[Dict[str, Any]]:
+        """
+        Busca contratos com garantias próximas ao vencimento (dentro do prazo especificado)
+        Para envio de alertas aos administradores
+        """
+        try:
+            # Primeiro verifica se as tabelas existem
+            check_query = """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name IN ('contrato', 'contratado', 'usuario', 'status')
+            """
+            existing_tables = await self.conn.fetch(check_query)
+            table_names = [row['table_name'] for row in existing_tables]
+
+            required_tables = ['contrato', 'contratado', 'usuario', 'status']
+            missing_tables = [table for table in required_tables if table not in table_names]
+
+            if missing_tables:
+                print(f"Tabelas não encontradas: {missing_tables}. Retornando lista vazia.")
+                return []
+
+            query = """
+            SELECT
+                c.id as contrato_id,
+                c.nr_contrato as contrato_numero,
+                c.objeto as contrato_objeto,
+                c.data_inicio,
+                c.garantia as data_garantia,
+                (c.garantia - CURRENT_DATE)::int as dias_para_vencer,
+
+                -- Informações do contratado
+                ct.nome as contratado_nome,
+                ct.cnpj as contratado_cnpj,
+
+                -- Responsáveis
+                u_fiscal.nome as fiscal_nome,
+                u_fiscal.email as fiscal_email,
+                u_gestor.nome as gestor_nome,
+                u_gestor.email as gestor_email,
+
+                -- Status do contrato
+                s.nome as status_nome,
+
+                -- Classificação de urgência baseada nos dias restantes
+                CASE
+                    WHEN (c.garantia - CURRENT_DATE) <= 30 THEN 'CRÍTICO'
+                    WHEN (c.garantia - CURRENT_DATE) <= 60 THEN 'ALTO'
+                    WHEN (c.garantia - CURRENT_DATE) <= 90 THEN 'MÉDIO'
+                    ELSE 'BAIXO'
+                END as nivel_urgencia,
+
+                -- Valor do contrato para priorização
+                c.valor_global,
+                c.valor_anual
+
+            FROM contrato c
+            JOIN contratado ct ON c.contratado_id = ct.id
+            JOIN usuario u_fiscal ON c.fiscal_id = u_fiscal.id
+            JOIN usuario u_gestor ON c.gestor_id = u_gestor.id
+            JOIN status s ON c.status_id = s.id
+            WHERE
+                c.ativo = true
+                AND s.nome = 'Ativo'  -- Apenas contratos ativos
+                AND c.garantia IS NOT NULL
+                AND c.garantia > CURRENT_DATE  -- Ainda não venceu
+                AND c.garantia <= (CURRENT_DATE + INTERVAL '%s days')  -- Dentro do prazo de antecedência
+            ORDER BY
+                -- Ordena por urgência (mais próximos primeiro) e depois por valor (maiores primeiro)
+                CASE
+                    WHEN (c.garantia - CURRENT_DATE) <= 30 THEN 1
+                    WHEN (c.garantia - CURRENT_DATE) <= 60 THEN 2
+                    WHEN (c.garantia - CURRENT_DATE) <= 90 THEN 3
+                    ELSE 4
+                END,
+                c.garantia ASC,
+                COALESCE(c.valor_global, c.valor_anual, 0) DESC
+            """ % dias_antecedencia
+
+            rows = await self.conn.fetch(query)
+            return [dict(row) for row in rows]
+
+        except Exception as e:
+            print(f"Erro ao buscar garantias próximas ao vencimento: {e}. Retornando lista vazia.")
+            return []

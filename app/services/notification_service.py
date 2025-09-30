@@ -22,6 +22,7 @@ class NotificationType(Enum):
     PRAZO_VENCIDO = "prazo_vencido"
     CONTRATO_CRIADO = "contrato_criado"
     CONTRATO_VENCENDO = "contrato_vencendo"
+    GARANTIA_VENCENDO = "garantia_vencendo"
 
 @dataclass
 class NotificationContext:
@@ -48,6 +49,7 @@ class NotificationTemplates:
             NotificationType.PRAZO_VENCIDO: f"🔴 URGENTE: Prazo vencido - {data.get('nr_contrato', 'N/A')}",
             NotificationType.CONTRATO_CRIADO: f"Novo contrato atribuído: {data.get('nr_contrato', 'N/A')}",
             NotificationType.CONTRATO_VENCENDO: f"⚠️ Contrato vencendo - {data.get('nr_contrato', 'N/A')}",
+            NotificationType.GARANTIA_VENCENDO: f"⚠️ Garantia contratual vencendo - {data.get('nr_contrato', 'N/A')}",
         }
         return subjects.get(notification_type, "Notificação do SIGESCON")
     
@@ -129,7 +131,7 @@ Sistema SIGESCON
         elif notification_type == NotificationType.PRAZO_VENCENDO:
             dias = data.get('dias_restantes', 0)
             urgencia = "🔴 URGENTE!" if dias <= 1 else "⚠️ Atenção!"
-            
+
             return f"""
 {urgencia}
 
@@ -146,7 +148,31 @@ Há uma pendência com prazo próximo do vencimento:
 Atenciosamente,
 Sistema SIGESCON
             """
-        
+
+        elif notification_type == NotificationType.GARANTIA_VENCENDO:
+            dias = data.get('dias_restantes', 0)
+            urgencia = "🔴 CRÍTICO!" if dias <= 30 else "⚠️ Atenção!"
+
+            return f"""
+{urgencia}
+
+Prezados Administradores,
+
+A garantia contratual está próxima do vencimento:
+
+📊 Contrato: {data.get('nr_contrato', 'N/A')}
+📋 Objeto: {data.get('contrato_objeto', 'N/A')}
+🏢 Contratado: {data.get('contratado_nome', 'N/A')}
+📅 Vencimento da Garantia: {data.get('data_garantia', 'N/A')} ({dias} dia(s))
+👤 Fiscal: {data.get('fiscal_nome', 'N/A')}
+👤 Gestor: {data.get('gestor_nome', 'N/A')}
+
+Por favor, providenciar a renovação da garantia com antecedência para evitar problemas contratuais.
+
+Atenciosamente,
+Sistema SIGESCON
+            """
+
         return f"Notificação do sistema SIGESCON.\n\nDados: {data}"
 
 class NotificationService:
@@ -348,13 +374,13 @@ class NotificationScheduler:
             logger.error(f"Erro ao verificar lembretes de prazo: {e}")
     
     async def check_contract_expiration_alerts(self):
-        """Task para verificar contratos próximos ao vencimento"""
+        """Task para verificar contratos e garantias próximos ao vencimento (executada a cada 5 dias às 10h)"""
         try:
             from app.services.contract_alert_service import ContractAlertService
             await ContractAlertService.send_daily_alerts()
-            logger.info("Verificação de contratos próximos ao vencimento concluída.")
+            logger.info("Verificação de contratos e garantias próximos ao vencimento concluída.")
         except Exception as e:
-            logger.error(f"Erro ao verificar contratos próximos ao vencimento: {e}")
+            logger.error(f"Erro ao verificar contratos e garantias próximos ao vencimento: {e}")
     
     def start_scheduler(self):
         """Inicia o agendador de tarefas"""
@@ -377,18 +403,19 @@ class NotificationScheduler:
             max_instances=1
         )
         
-        # Verifica contratos próximos ao vencimento todos os dias às 9h
+        # Verifica contratos e garantias próximos ao vencimento a cada 5 dias às 10h
         self.scheduler.add_job(
             self.check_contract_expiration_alerts,
             'cron',
-            hour=9,
+            day='*/5',
+            hour=10,
             minute=0,
             id='check_contract_expiration',
             max_instances=1
         )
         
         self.scheduler.start()
-        logger.info("Scheduler de notificações iniciado (incluindo alertas de contratos)")
+        logger.info("Scheduler de notificações iniciado (alertas de contratos/garantias a cada 5 dias às 10h)")
     
     def stop_scheduler(self):
         """Para o agendador"""

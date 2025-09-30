@@ -97,65 +97,172 @@ class ContractAlertService:
             logger.error(f"❌ Erro no processo de alertas de contratos: {e}")
     
     @staticmethod
-    async def check_contracts_by_days(target_days: int) -> List[Dict[str, Any]]:
+    async def check_contracts_by_milestone(milestone_days: int) -> List[Dict[str, Any]]:
         """
-        Busca contratos que vencem exatamente em X dias
+        Busca contratos que estão na faixa do marco (<=90, <=60, <=30 dias)
+        e ainda não foram notificados para este marco específico
         """
         try:
             async for conn in get_connection():
                 dashboard_repo = DashboardRepository(conn)
-                
-                # Buscar todos os contratos próximos ao vencimento
-                contratos = await dashboard_repo.get_contratos_proximos_vencimento_admin(target_days + 1)
-                
-                # Filtrar apenas os que vencem exatamente em target_days
-                contratos_filtrados = [
-                    contrato for contrato in contratos 
-                    if contrato['dias_para_vencer'] == target_days
-                ]
-                
-                return contratos_filtrados
-                
+
+                # Buscar contratos próximos ao vencimento dentro da faixa do marco
+                contratos = await dashboard_repo.get_contratos_proximos_vencimento_admin(milestone_days)
+
+                # Filtrar apenas contratos dentro da faixa do marco atual
+                # Ex: para marco 60, pega contratos com <= 60 dias E que não foram notificados ainda
+                if milestone_days == 90:
+                    # Marco 90: contratos entre 61 e 90 dias
+                    contratos_filtrados = [c for c in contratos if 61 <= c['dias_para_vencer'] <= 90]
+                elif milestone_days == 60:
+                    # Marco 60: contratos entre 31 e 60 dias
+                    contratos_filtrados = [c for c in contratos if 31 <= c['dias_para_vencer'] <= 60]
+                elif milestone_days == 30:
+                    # Marco 30: contratos com <= 30 dias
+                    contratos_filtrados = [c for c in contratos if c['dias_para_vencer'] <= 30]
+                else:
+                    contratos_filtrados = contratos
+
+                # Verificar quais já foram notificados para este marco
+                contratos_pendentes = []
+                for contrato in contratos_filtrados:
+                    # Verificar se já existe notificação para este contrato neste marco
+                    check_query = """
+                        SELECT 1 FROM notification_log
+                        WHERE notification_type = 'contract_expiration'
+                        AND contrato_id = $1
+                        AND alert_milestone = $2
+                    """
+                    exists = await conn.fetchval(check_query, contrato['contrato_id'], milestone_days)
+
+                    if not exists:
+                        contratos_pendentes.append(contrato)
+
+                logger.info(f"Encontrados {len(contratos_pendentes)} contratos para notificar no marco de {milestone_days} dias")
+                return contratos_pendentes
+
         except Exception as e:
-            logger.error(f"Erro ao buscar contratos que vencem em {target_days} dias: {e}")
+            logger.error(f"Erro ao buscar contratos no marco de {milestone_days} dias: {e}")
             return []
     
+    @staticmethod
+    async def check_garantias_by_milestone(milestone_days: int) -> List[Dict[str, Any]]:
+        """
+        Busca contratos com garantias que estão na faixa do marco (<=90, <=60, <=30 dias)
+        e ainda não foram notificados para este marco específico
+        """
+        try:
+            async for conn in get_connection():
+                dashboard_repo = DashboardRepository(conn)
+
+                # Buscar garantias próximas ao vencimento dentro da faixa do marco
+                garantias = await dashboard_repo.get_garantias_proximas_vencimento_admin(milestone_days)
+
+                # Filtrar apenas garantias dentro da faixa do marco atual
+                if milestone_days == 90:
+                    # Marco 90: garantias entre 61 e 90 dias
+                    garantias_filtradas = [g for g in garantias if 61 <= g['dias_para_vencer'] <= 90]
+                elif milestone_days == 60:
+                    # Marco 60: garantias entre 31 e 60 dias
+                    garantias_filtradas = [g for g in garantias if 31 <= g['dias_para_vencer'] <= 60]
+                elif milestone_days == 30:
+                    # Marco 30: garantias com <= 30 dias
+                    garantias_filtradas = [g for g in garantias if g['dias_para_vencer'] <= 30]
+                else:
+                    garantias_filtradas = garantias
+
+                # Verificar quais já foram notificados para este marco
+                garantias_pendentes = []
+                for garantia in garantias_filtradas:
+                    # Verificar se já existe notificação para esta garantia neste marco
+                    check_query = """
+                        SELECT 1 FROM notification_log
+                        WHERE notification_type = 'garantia_expiration'
+                        AND contrato_id = $1
+                        AND alert_milestone = $2
+                    """
+                    exists = await conn.fetchval(check_query, garantia['contrato_id'], milestone_days)
+
+                    if not exists:
+                        garantias_pendentes.append(garantia)
+
+                logger.info(f"Encontrados {len(garantias_pendentes)} garantias para notificar no marco de {milestone_days} dias")
+                return garantias_pendentes
+
+        except Exception as e:
+            logger.error(f"Erro ao buscar garantias no marco de {milestone_days} dias: {e}")
+            return []
+
     @staticmethod
     async def send_daily_alerts():
         """
         Método principal para ser chamado diariamente
-        Verifica e envia alertas para contratos que vencem em 90, 60 ou 30 dias
+        Verifica e envia alertas para contratos e garantias que vencem em 90, 60 ou 30 dias
         """
         try:
-            logger.info("🚀 Iniciando processo diário de alertas de contratos")
-            
+            logger.info("🚀 Iniciando processo diário de alertas de contratos e garantias")
+
             admin_emails = await ContractAlertService.get_admin_emails()
-            
+
             if not admin_emails:
                 logger.warning("Nenhum administrador encontrado para envio de alertas")
                 return
-            
+
             total_alerts = 0
-            
-            # Verificar cada marco de dias
-            for days in [90, 60, 30]:
-                contratos = await ContractAlertService.check_contracts_by_days(days)
-                
-                logger.info(f"Encontrados {len(contratos)} contratos que vencem em {days} dias")
-                
-                for contrato in contratos:
-                    success = await EmailService.send_contract_expiration_alert(
-                        admin_emails=admin_emails,
-                        contract_data=contrato,
-                        days_remaining=days
-                    )
-                    
-                    if success:
-                        total_alerts += 1
-                        logger.info(f"✅ Alerta enviado: {contrato['contrato_numero']} ({days} dias)")
-            
+
+            async for conn in get_connection():
+                # Verificar cada marco de dias para CONTRATOS
+                for milestone in [90, 60, 30]:
+                    contratos = await ContractAlertService.check_contracts_by_milestone(milestone)
+
+                    logger.info(f"Encontrados {len(contratos)} contratos que vencem em {milestone} dias")
+
+                    for contrato in contratos:
+                        success = await EmailService.send_contract_expiration_alert(
+                            admin_emails=admin_emails,
+                            contract_data=contrato,
+                            days_remaining=milestone
+                        )
+
+                        if success:
+                            # Registrar notificação enviada
+                            insert_query = """
+                                INSERT INTO notification_log (notification_type, contrato_id, alert_milestone)
+                                VALUES ('contract_expiration', $1, $2)
+                                ON CONFLICT (notification_type, contrato_id, alert_milestone) DO NOTHING
+                            """
+                            await conn.execute(insert_query, contrato['contrato_id'], milestone)
+
+                            total_alerts += 1
+                            logger.info(f"✅ Alerta de contrato enviado: {contrato['contrato_numero']} ({milestone} dias)")
+
+                # Verificar cada marco de dias para GARANTIAS
+                for milestone in [90, 60, 30]:
+                    garantias = await ContractAlertService.check_garantias_by_milestone(milestone)
+
+                    logger.info(f"Encontrados {len(garantias)} garantias que vencem em {milestone} dias")
+
+                    for garantia in garantias:
+                        success = await EmailService.send_garantia_expiration_alert(
+                            admin_emails=admin_emails,
+                            garantia_data=garantia,
+                            days_remaining=milestone
+                        )
+
+                        if success:
+                            # Registrar notificação enviada
+                            insert_query = """
+                                INSERT INTO notification_log (notification_type, contrato_id, alert_milestone)
+                                VALUES ('garantia_expiration', $1, $2)
+                                ON CONFLICT (notification_type, contrato_id, alert_milestone) DO NOTHING
+                            """
+                            await conn.execute(insert_query, garantia['contrato_id'], milestone)
+
+                            total_alerts += 1
+                            logger.info(f"✅ Alerta de garantia enviado: {garantia['contrato_numero']} ({milestone} dias)")
+
             logger.info(f"🎯 Processo diário concluído: {total_alerts} alertas enviados")
-            
+
         except Exception as e:
             logger.error(f"❌ Erro no processo diário de alertas: {e}")
 

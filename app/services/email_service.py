@@ -191,5 +191,49 @@ Sistema de Gestão de Contratos - SIGESCON
         for email in admin_emails:
             if await EmailService.send_email(email, subject, body):
                 success_count += 1
-        
+
+        return success_count > 0
+
+    @staticmethod
+    async def send_garantia_expiration_alert(
+        admin_emails: list[str],
+        garantia_data: dict,
+        days_remaining: int
+    ) -> bool:
+        """
+        Envia alerta de vencimento de garantia contratual para administradores
+        """
+        urgency = "CRÍTICO" if days_remaining <= 30 else "ALTO" if days_remaining <= 60 else "MÉDIO"
+
+        subject = f"🚨 ALERTA {urgency}: Garantia do Contrato {garantia_data['contrato_numero']} vence em {days_remaining} dias"
+
+        body = f"""
+ALERTA DE VENCIMENTO DE GARANTIA CONTRATUAL
+
+Contrato: {garantia_data['contrato_numero']}
+Objeto: {garantia_data['contrato_objeto']}
+Contratado: {garantia_data['contratado_nome']}
+CNPJ: {garantia_data.get('contratado_cnpj', 'N/I')}
+Data de Vencimento da Garantia: {garantia_data['data_garantia']}
+Dias Restantes: {days_remaining}
+Nível de Urgência: {urgency}
+
+Responsáveis:
+- Gestor: {garantia_data['gestor_nome']} ({garantia_data['gestor_email']})
+- Fiscal: {garantia_data['fiscal_nome']} ({garantia_data['fiscal_email']})
+
+Valor do Contrato: R$ {garantia_data.get('valor_global', 'N/I')}
+
+AÇÃO NECESSÁRIA:
+Por favor, providenciar a renovação da garantia contratual com antecedência para evitar problemas contratuais.
+A garantia contratual é essencial para a continuidade e segurança da execução do contrato.
+
+Sistema de Gestão de Contratos - SIGESCON
+        """
+
+        success_count = 0
+        for email in admin_emails:
+            if await EmailService.send_email(email, subject, body):
+                success_count += 1
+
         return success_count > 0
