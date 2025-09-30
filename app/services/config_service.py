@@ -159,7 +159,8 @@ class ConfigService:
                     # Deleta registro do banco
                     await arquivo_repo.delete_arquivo(arquivo_id_anterior)
             
-            # Salva o novo arquivo (usa contrato_id = 0 para indicar que é um arquivo global)
+            # Salva o novo arquivo (usa None para indicar que é um arquivo global sem vínculo com contrato)
+            # Note: passamos 0 para o file_service apenas para criar o diretório, mas não vinculamos ao contrato
             original_filename, file_path, file_size = await file_service.save_upload_file(0, file)
             
             # Determina o tipo MIME
@@ -171,13 +172,12 @@ class ConfigService:
             }
             tipo_mime = mime_types.get(ext, 'application/octet-stream')
             
-            # Registra no banco de dados na tabela arquivo
-            arquivo = await arquivo_repo.create_arquivo(
+            # Registra no banco de dados na tabela arquivo com contrato_id = None (arquivo global)
+            arquivo = await arquivo_repo.create_arquivo_global(
                 nome_arquivo=original_filename,
                 path_armazenamento=file_path,
                 tipo_arquivo=tipo_mime,
-                tamanho_bytes=file_size,
-                contrato_id=0  # 0 indica arquivo global do sistema
+                tamanho_bytes=file_size
             )
             arquivo_id = arquivo['id']
             
