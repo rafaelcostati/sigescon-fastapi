@@ -1,6 +1,6 @@
 # app/schemas/config_schema.py
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class ConfigBase(BaseModel):
@@ -41,3 +41,41 @@ class ModeloRelatorioResponse(BaseModel):
     success: bool = Field(..., description="Indica se a operação foi bem-sucedida")
     message: str = Field(..., description="Mensagem descritiva da operação")
     modelo: Optional[ModeloRelatorioInfo] = Field(None, description="Informações do modelo (quando aplicável)")
+
+class AlertasVencimentoConfig(BaseModel):
+    """Configurações de alertas de vencimento de contratos"""
+    ativo: bool = Field(..., description="Se os alertas estão ativos")
+    dias_antes: int = Field(..., ge=1, le=365, description="Quantos dias antes do vencimento começar os alertas (1-365)")
+    periodicidade_dias: int = Field(..., ge=1, le=90, description="A cada quantos dias reenviar o alerta (1-90)")
+    perfis_destino: List[str] = Field(..., description="Perfis que receberão os alertas: Administrador, Gestor, Fiscal")
+    hora_envio: str = Field(..., description="Hora do dia para enviar (formato HH:MM)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "ativo": True,
+                "dias_antes": 90,
+                "periodicidade_dias": 30,
+                "perfis_destino": ["Administrador", "Gestor"],
+                "hora_envio": "10:00"
+            }
+        }
+
+class AlertasVencimentoConfigUpdate(BaseModel):
+    """Schema para atualizar configurações de alertas de vencimento"""
+    ativo: bool = Field(..., description="Se os alertas estão ativos")
+    dias_antes: int = Field(..., ge=1, le=365, description="Quantos dias antes do vencimento começar os alertas (1-365)")
+    periodicidade_dias: int = Field(..., ge=1, le=90, description="A cada quantos dias reenviar o alerta (1-90)")
+    perfis_destino: List[str] = Field(..., description="Perfis que receberão os alertas")
+    hora_envio: str = Field(..., pattern=r'^([0-1][0-9]|2[0-3]):[0-5][0-9]$', description="Hora do dia para enviar (formato HH:MM)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "ativo": True,
+                "dias_antes": 90,
+                "periodicidade_dias": 30,
+                "perfis_destino": ["Gestor", "Fiscal"],
+                "hora_envio": "10:00"
+            }
+        }

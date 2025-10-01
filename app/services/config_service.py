@@ -4,8 +4,9 @@ from fastapi import HTTPException, status, UploadFile
 from app.repositories.config_repo import ConfigRepository
 from app.repositories.arquivo_repo import ArquivoRepository
 from app.services.file_service import FileService
-from app.schemas.config_schema import Config, ConfigUpdate, ConfigCreate, ModeloRelatorioInfo, ModeloRelatorioResponse
+from app.schemas.config_schema import Config, ConfigUpdate, ConfigCreate, ModeloRelatorioInfo, ModeloRelatorioResponse, AlertasVencimentoConfig, AlertasVencimentoConfigUpdate
 import os
+import json
 
 class ConfigService:
     def __init__(self, config_repo: ConfigRepository):
@@ -242,4 +243,108 @@ class ConfigService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Erro ao remover modelo: {str(e)}"
+            )
+    
+    # ==================== Alertas de Vencimento ====================
+    
+    async def get_alertas_vencimento_config(self) -> AlertasVencimentoConfig:
+        """Retorna configurações de alertas de vencimento"""
+        try:
+            print("🔍 DEBUG: Chamando config_repo.get_alertas_vencimento_config()")
+            config_data = await self.config_repo.get_alertas_vencimento_config()
+            print(f"✅ DEBUG: Dados recebidos do repo: {config_data}")
+            
+            # Parse perfis_destino de JSON string para lista
+            perfis_destino = json.loads(config_data['perfis_destino'])
+            print(f"✅ DEBUG: Perfis parseados: {perfis_destino}")
+            
+            return AlertasVencimentoConfig(
+                ativo=config_data['ativo'],
+                dias_antes=config_data['dias_antes'],
+                periodicidade_dias=config_data['periodicidade_dias'],
+                perfis_destino=perfis_destino,
+                hora_envio=config_data['hora_envio']
+            )
+        except Exception as e:
+            # Se não encontrou as configurações no banco, retorna valores padrão
+            # Isso permite que a aplicação funcione antes da migração ser executada
+            print(f"⚠️ DEBUG: Exceção capturada: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return AlertasVencimentoConfig(
+                ativo=True,
+                dias_antes=90,
+                periodicidade_dias=30,
+                perfis_destino=['Administrador'],
+                hora_envio='10:00'
+            )
+    
+    async def update_alertas_vencimento_config(
+        self, 
+        config: AlertasVencimentoConfigUpdate
+    ) -> AlertasVencimentoConfig:
+        """Atualiza configurações de alertas de vencimento"""
+        
+        # Validações
+        if config.dias_antes < 1 or config.dias_antes > 365:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Dias antes do vencimento deve estar entre 1 e 365 dias"
+            )
+        
+        if config.periodicidade_dias < 1 or config.periodicidade_dias > 90:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Periodicidade deve estar entre 1 e 90 dias"
+            )
+        
+        # Valida perfis
+        perfis_validos = ['Administrador', 'Gestor', 'Fiscal']
+        for perfil in config.perfis_destino:
+            if perfil not in perfis_validos:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Perfil inválido: {perfil}. Perfis válidos: {', '.join(perfis_validos)}"
+                )
+        
+        if not config.perfis_destino:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Deve haver pelo menos um perfil de destino"
+            )
+        
+        # Valida formato de hora (HH:MM)
+        try:
+            hora_parts = config.hora_envio.split(':')
+            if len(hora_parts) != 2:
+                raise ValueError()
+            hora = int(hora_parts[0])
+            minuto = int(hora_parts[1])
+            if hora < 0 or hora > 23 or minuto < 0 or minuto > 59:
+                raise ValueError()
+        except:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Formato de hora inválido. Use HH:MM (ex: 10:00)"
+            )
+        
+        try:
+            # Atualiza todas as configurações
+            await self.config_repo.update_alertas_vencimento_completo(
+                ativo=config.ativo,
+                dias_antes=config.dias_antes,
+                periodicidade_dias=config.periodicidade_dias,
+                perfis_destino=config.perfis_destino,
+                hora_envio=config.hora_envio
+            )
+            
+            # Retorna as configurações atualizadas
+            return await self.get_alertas_vencimento_config()
+        
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erro ao atualizar configurações: {str(e)}"
             )

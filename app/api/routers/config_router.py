@@ -11,7 +11,7 @@ from app.repositories.config_repo import ConfigRepository
 from app.repositories.arquivo_repo import ArquivoRepository
 from app.services.config_service import ConfigService
 from app.services.file_service import FileService
-from app.schemas.config_schema import Config, ConfigUpdate, PendenciasIntervaloDiasUpdate, LembretesConfigUpdate, ModeloRelatorioInfo, ModeloRelatorioResponse
+from app.schemas.config_schema import Config, ConfigUpdate, PendenciasIntervaloDiasUpdate, LembretesConfigUpdate, ModeloRelatorioInfo, ModeloRelatorioResponse, AlertasVencimentoConfig, AlertasVencimentoConfigUpdate
 
 router = APIRouter(
     prefix="/config",
@@ -25,6 +25,7 @@ def get_config_service(conn: asyncpg.Connection = Depends(get_connection)) -> Co
     )
 
 # --- Endpoints ---
+# IMPORTANTE: Rotas específicas devem vir ANTES das rotas genéricas com path parameters!
 
 @router.get("/", response_model=List[Config], summary="Listar todas as configurações")
 async def list_configs(
@@ -36,33 +37,6 @@ async def list_configs(
     Requer permissão de administrador.
     """
     return await service.get_all_configs()
-
-
-@router.get("/{chave}", response_model=Config, summary="Buscar configuração por chave")
-async def get_config(
-    chave: str,
-    service: ConfigService = Depends(get_config_service),
-    admin_user: Usuario = Depends(admin_required)
-):
-    """
-    Busca uma configuração específica pela chave.
-    Requer permissão de administrador.
-    """
-    return await service.get_config(chave)
-
-
-@router.patch("/{chave}", response_model=Config, summary="Atualizar configuração")
-async def update_config(
-    chave: str,
-    config_update: ConfigUpdate,
-    service: ConfigService = Depends(get_config_service),
-    admin_user: Usuario = Depends(admin_required)
-):
-    """
-    Atualiza o valor de uma configuração.
-    Requer permissão de administrador.
-    """
-    return await service.update_config(chave, config_update)
 
 
 @router.get("/pendencias/intervalo-dias", response_model=dict, summary="Obter intervalo de dias para pendências")
@@ -229,3 +203,119 @@ async def download_modelo_relatorio(
         filename=arquivo['nome_original'],
         media_type='application/octet-stream'
     )
+
+
+# ==================== Alertas de Vencimento ====================
+
+@router.get("/alertas-vencimento", response_model=AlertasVencimentoConfig, summary="Obter configurações de alertas de vencimento")
+async def get_alertas_vencimento_config(
+    service: ConfigService = Depends(get_config_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Retorna as configurações de alertas de vencimento de contratos.
+    Requer permissão de administrador.
+    
+    Retorna:
+    - **ativo**: Se os alertas estão ativos
+    - **dias_antes**: Quantos dias antes do vencimento começar os alertas
+    - **periodicidade_dias**: A cada quantos dias reenviar o alerta
+    - **perfis_destino**: Lista de perfis que receberão os alertas
+    - **hora_envio**: Hora do dia para enviar os alertas (HH:MM)
+    """
+    print("🔥 DEBUG ROUTER: Endpoint /alertas-vencimento chamado")
+    print(f"🔥 DEBUG ROUTER: Service type: {type(service)}")
+    print(f"🔥 DEBUG ROUTER: Admin user: {admin_user.nome if admin_user else 'None'}")
+    result = await service.get_alertas_vencimento_config()
+    print(f"🔥 DEBUG ROUTER: Resultado do service: {result}")
+    return result
+
+
+@router.patch("/alertas-vencimento", response_model=AlertasVencimentoConfig, summary="Atualizar configurações de alertas de vencimento")
+async def update_alertas_vencimento_config(
+    config: AlertasVencimentoConfigUpdate,
+    service: ConfigService = Depends(get_config_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Atualiza as configurações de alertas de vencimento de contratos.
+    Requer permissão de administrador.
+    
+    - **ativo**: Ativar ou desativar alertas (true/false)
+    - **dias_antes**: Dias antes do vencimento para começar (1-365)
+    - **periodicidade_dias**: Dias entre cada reenvio (1-90)
+    - **perfis_destino**: Array de perfis ["Administrador", "Gestor", "Fiscal"]
+    - **hora_envio**: Hora do envio no formato HH:MM (ex: "10:00")
+    
+    **Exemplos de uso:**
+    
+    1. Alertas para Gestores, 90 dias antes, a cada 30 dias:
+    ```json
+    {
+        "ativo": true,
+        "dias_antes": 90,
+        "periodicidade_dias": 30,
+        "perfis_destino": ["Gestor"],
+        "hora_envio": "10:00"
+    }
+    ```
+    
+    2. Alertas para Gestores E Fiscais, 60 dias antes, a cada 15 dias:
+    ```json
+    {
+        "ativo": true,
+        "dias_antes": 60,
+        "periodicidade_dias": 15,
+        "perfis_destino": ["Gestor", "Fiscal"],
+        "hora_envio": "09:00"
+    }
+    ```
+    
+    3. Alertas apenas para Administradores (relatório completo):
+    ```json
+    {
+        "ativo": true,
+        "dias_antes": 120,
+        "periodicidade_dias": 45,
+        "perfis_destino": ["Administrador"],
+        "hora_envio": "08:00"
+    }
+    ```
+    
+    **Comportamento:**
+    - **Administrador**: Recebe relatório consolidado de TODOS os contratos vencendo
+    - **Gestor**: Recebe apenas alertas dos contratos que gerencia
+    - **Fiscal**: Recebe apenas alertas dos contratos que fiscaliza
+    """
+    return await service.update_alertas_vencimento_config(config)
+
+
+# ==================== Rotas Genéricas (DEVEM VIR POR ÚLTIMO!) ====================
+# IMPORTANTE: Estas rotas com path parameters capturam qualquer string
+# Por isso devem estar NO FINAL, depois de todas as rotas específicas
+
+@router.get("/{chave}", response_model=Config, summary="Buscar configuração por chave")
+async def get_config(
+    chave: str,
+    service: ConfigService = Depends(get_config_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Busca uma configuração específica pela chave.
+    Requer permissão de administrador.
+    """
+    return await service.get_config(chave)
+
+
+@router.patch("/{chave}", response_model=Config, summary="Atualizar configuração")
+async def update_config(
+    chave: str,
+    config_update: ConfigUpdate,
+    service: ConfigService = Depends(get_config_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Atualiza o valor de uma configuração.
+    Requer permissão de administrador.
+    """
+    return await service.update_config(chave, config_update)

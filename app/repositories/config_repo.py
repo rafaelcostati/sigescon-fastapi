@@ -162,3 +162,83 @@ class ConfigRepository:
         """)
         
         return arquivo_id
+    
+    # ==================== Alertas de Vencimento ====================
+    
+    async def get_alertas_vencimento_config(self) -> Dict:
+        """
+        Busca todas as configurações de alertas de vencimento
+        Retorna dict com todas as configs ou valores padrão
+        """
+        configs = await self.conn.fetch("""
+            SELECT chave, valor
+            FROM configuracao_sistema
+            WHERE chave LIKE 'alertas_vencimento%'
+        """)
+        
+        config_dict = {c['chave']: c['valor'] for c in configs}
+        
+        # Valores padrão caso não existam
+        return {
+            'ativo': config_dict.get('alertas_vencimento_ativo', 'true').lower() == 'true',
+            'dias_antes': int(config_dict.get('alertas_vencimento_dias_antes', '90')),
+            'periodicidade_dias': int(config_dict.get('alertas_vencimento_periodicidade_dias', '30')),
+            'perfis_destino': config_dict.get('alertas_vencimento_perfis_destino', '["Administrador"]'),
+            'hora_envio': config_dict.get('alertas_vencimento_hora_envio', '10:00')
+        }
+    
+    async def update_alertas_vencimento_ativo(self, ativo: bool) -> None:
+        """Ativa ou desativa os alertas de vencimento"""
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = $1, updated_at = NOW()
+            WHERE chave = 'alertas_vencimento_ativo'
+        """, 'true' if ativo else 'false')
+    
+    async def update_alertas_vencimento_dias_antes(self, dias: int) -> None:
+        """Atualiza quantos dias antes do vencimento começar alertas"""
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = $1, updated_at = NOW()
+            WHERE chave = 'alertas_vencimento_dias_antes'
+        """, str(dias))
+    
+    async def update_alertas_vencimento_periodicidade(self, dias: int) -> None:
+        """Atualiza periodicidade de reenvio dos alertas"""
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = $1, updated_at = NOW()
+            WHERE chave = 'alertas_vencimento_periodicidade_dias'
+        """, str(dias))
+    
+    async def update_alertas_vencimento_perfis(self, perfis: list) -> None:
+        """Atualiza perfis que receberão os alertas"""
+        import json
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = $1, updated_at = NOW()
+            WHERE chave = 'alertas_vencimento_perfis_destino'
+        """, json.dumps(perfis))
+    
+    async def update_alertas_vencimento_hora(self, hora: str) -> None:
+        """Atualiza hora de envio dos alertas"""
+        await self.conn.execute("""
+            UPDATE configuracao_sistema
+            SET valor = $1, updated_at = NOW()
+            WHERE chave = 'alertas_vencimento_hora_envio'
+        """, hora)
+    
+    async def update_alertas_vencimento_completo(
+        self,
+        ativo: bool,
+        dias_antes: int,
+        periodicidade_dias: int,
+        perfis_destino: list,
+        hora_envio: str
+    ) -> None:
+        """Atualiza todas as configurações de alertas de vencimento de uma vez"""
+        await self.update_alertas_vencimento_ativo(ativo)
+        await self.update_alertas_vencimento_dias_antes(dias_antes)
+        await self.update_alertas_vencimento_periodicidade(periodicidade_dias)
+        await self.update_alertas_vencimento_perfis(perfis_destino)
+        await self.update_alertas_vencimento_hora(hora_envio)
