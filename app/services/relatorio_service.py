@@ -1,7 +1,8 @@
 # app/services/relatorio_service.py
 import os
 from typing import List, Optional
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, status, UploadFile, Request
+import logging
 
 # Repositórios
 from app.repositories.relatorio_repo import RelatorioRepository
@@ -11,14 +12,20 @@ from app.repositories.contrato_repo import ContratoRepository
 from app.repositories.status_relatorio_repo import StatusRelatorioRepository
 from app.repositories.status_pendencia_repo import StatusPendenciaRepository
 from app.repositories.usuario_repo import UsuarioRepository
-from app.repositories.perfil_repo import PerfilRepository 
+from app.repositories.perfil_repo import PerfilRepository
 
 # Services
 from app.services.file_service import FileService
+from app.services.audit_integration import (
+    audit_aprovar_relatorio,
+    audit_rejeitar_relatorio
+)
 
 # Schemas
 from app.schemas.relatorio_schema import Relatorio, RelatorioCreate, RelatorioAnalise
 from app.schemas.usuario_schema import Usuario
+
+logger = logging.getLogger(__name__)
 
 class RelatorioService:
     def __init__(self,
@@ -157,7 +164,13 @@ class RelatorioService:
         except Exception as e:
             print(f"❌ Erro ao enviar notificação para admin: {e}")
 
-    async def analisar_relatorio(self, relatorio_id: int, analise_data: RelatorioAnalise) -> Relatorio:
+    async def analisar_relatorio(
+        self,
+        relatorio_id: int,
+        analise_data: RelatorioAnalise,
+        current_user: Optional[Usuario] = None,
+        request: Optional[Request] = None
+    ) -> Relatorio:
         relatorio = await self.relatorio_repo.get_relatorio_by_id(relatorio_id)
         if not relatorio:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relatório não encontrado")
@@ -182,20 +195,43 @@ class RelatorioService:
 
         if status_nome == 'Aprovado':
             # Aprova o relatório e conclui a pendência
-            await self._aprovar_relatorio(relatorio, contrato, pendencia, fiscal)
+            await self._aprovar_relatorio(relatorio, contrato, pendencia, fiscal, current_user, request)
 
         elif status_nome == 'Rejeitado com Pendência':
             # Rejeita o relatório e volta pendência para 'Pendente'
-            await self._rejeitar_relatorio(relatorio, contrato, pendencia, fiscal, analise_data.observacoes_aprovador)
+            await self._rejeitar_relatorio(relatorio, contrato, pendencia, fiscal, analise_data.observacoes_aprovador, current_user, request)
 
         return Relatorio.model_validate(relatorio_atualizado)
 
-    async def _aprovar_relatorio(self, relatorio: dict, contrato: dict, pendencia: dict, fiscal: dict):
+    async def _aprovar_relatorio(
+        self,
+        relatorio: dict,
+        contrato: dict,
+        pendencia: dict,
+        fiscal: dict,
+        current_user: Optional[Usuario] = None,
+        request: Optional[Request] = None
+    ):
         """Processa aprovação do relatório"""
         try:
             # Muda status da pendência para 'Concluída'
             status_concluida = next(s for s in await self.status_pendencia_repo.get_all() if s['nome'] == 'Concluída')
             await self.pendencia_repo.update_pendencia_status(pendencia['id'], status_concluida['id'])
+
+            # Log de auditoria
+            if current_user and contrato:
+                try:
+                    await audit_aprovar_relatorio(
+                        conn=self.relatorio_repo.conn,
+                        request=request,
+                        usuario=current_user,
+                        relatorio_id=relatorio['id'],
+                        pendencia_titulo=pendencia['titulo'],
+                        contrato_nr=contrato['nr_contrato'],
+                        perfil_usado=current_user.perfil_ativo if hasattr(current_user, 'perfil_ativo') else None
+                    )
+                except Exception as e:
+                    logger.warning(f"Erro ao criar log de auditoria para aprovação de relatório {relatorio['id']}: {e}")
 
             # Envia email de aprovação para o fiscal
             from app.services.email_templates import EmailTemplates
@@ -212,12 +248,37 @@ class RelatorioService:
         except Exception as e:
             print(f"❌ Erro ao processar aprovação: {e}")
 
-    async def _rejeitar_relatorio(self, relatorio: dict, contrato: dict, pendencia: dict, fiscal: dict, observacoes: str = None):
+    async def _rejeitar_relatorio(
+        self,
+        relatorio: dict,
+        contrato: dict,
+        pendencia: dict,
+        fiscal: dict,
+        observacoes: str = None,
+        current_user: Optional[Usuario] = None,
+        request: Optional[Request] = None
+    ):
         """Processa rejeição do relatório"""
         try:
             # Volta status da pendência para 'Pendente' para que o fiscal possa reenviar
             status_pendente = next(s for s in await self.status_pendencia_repo.get_all() if s['nome'] == 'Pendente')
             await self.pendencia_repo.update_pendencia_status(pendencia['id'], status_pendente['id'])
+
+            # Log de auditoria
+            if current_user and contrato:
+                try:
+                    await audit_rejeitar_relatorio(
+                        conn=self.relatorio_repo.conn,
+                        request=request,
+                        usuario=current_user,
+                        relatorio_id=relatorio['id'],
+                        pendencia_titulo=pendencia['titulo'],
+                        contrato_nr=contrato['nr_contrato'],
+                        motivo=observacoes,
+                        perfil_usado=current_user.perfil_ativo if hasattr(current_user, 'perfil_ativo') else None
+                    )
+                except Exception as e:
+                    logger.warning(f"Erro ao criar log de auditoria para rejeição de relatório {relatorio['id']}: {e}")
 
             # Envia email de rejeição para o fiscal
             from app.services.email_templates import EmailTemplates

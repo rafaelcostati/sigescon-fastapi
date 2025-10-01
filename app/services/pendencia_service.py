@@ -1,6 +1,7 @@
 # app/services/pendencia_service.py
-from typing import List
-from fastapi import HTTPException, status
+from typing import List, Optional
+from fastapi import HTTPException, status, Request
+import logging
 
 # Repositórios
 from app.repositories.pendencia_repo import PendenciaRepository
@@ -14,6 +15,12 @@ from app.schemas.usuario_schema import Usuario
 
 # Services
 from app.services.email_service import EmailService
+from app.services.audit_integration import (
+    audit_criar_pendencia,
+    audit_atualizar_pendencia
+)
+
+logger = logging.getLogger(__name__)
 
 class PendenciaService:
     def __init__(self,
@@ -37,16 +44,39 @@ class PendenciaService:
         if not await self.status_pendencia_repo.get_by_id(pendencia.status_pendencia_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status de pendência não encontrado")
 
-    async def create_pendencia(self, contrato_id: int, pendencia_create: PendenciaCreate) -> Pendencia:
+    async def create_pendencia(
+        self,
+        contrato_id: int,
+        pendencia_create: PendenciaCreate,
+        current_user: Optional[Usuario] = None,
+        request: Optional[Request] = None
+    ) -> Pendencia:
         """Cria uma nova pendência e envia notificação por email para o fiscal e fiscal substituto"""
         await self._validate_foreign_keys(pendencia_create, contrato_id)
 
         # Cria a pendência no banco de dados
         new_pendencia_data = await self.pendencia_repo.create_pendencia(contrato_id, pendencia_create)
 
+        # Busca dados do contrato para o log de auditoria
+        contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
+
+        # Log de auditoria
+        if current_user and contrato:
+            try:
+                await audit_criar_pendencia(
+                    conn=self.pendencia_repo.conn,
+                    request=request,
+                    usuario=current_user,
+                    pendencia_id=new_pendencia_data['id'],
+                    titulo_pendencia=pendencia_create.titulo,
+                    contrato_nr=contrato['nr_contrato'],
+                    perfil_usado=current_user.perfil_ativo if hasattr(current_user, 'perfil_ativo') else None
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao criar log de auditoria para pendência {new_pendencia_data['id']}: {e}")
+
         # === NOTIFICAÇÃO POR EMAIL COM TEMPLATES ===
         try:
-            contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
             if contrato:
                 from app.services.email_templates import EmailTemplates
 
@@ -95,19 +125,46 @@ class PendenciaService:
         
         return Pendencia.model_validate(pendencia_data)
 
-    async def update_pendencia_status(self, pendencia_id: int, novo_status_id: int) -> Pendencia:
+    async def update_pendencia_status(
+        self,
+        pendencia_id: int,
+        novo_status_id: int,
+        current_user: Optional[Usuario] = None,
+        request: Optional[Request] = None
+    ) -> Pendencia:
         """Atualiza o status de uma pendência"""
         # Verifica se a pendência existe
-        if not await self.pendencia_repo.get_pendencia_by_id(pendencia_id):
+        pendencia_antiga = await self.pendencia_repo.get_pendencia_by_id(pendencia_id)
+        if not pendencia_antiga:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pendência não encontrada")
-        
+
         # Verifica se o status existe
-        if not await self.status_pendencia_repo.get_by_id(novo_status_id):
+        novo_status = await self.status_pendencia_repo.get_by_id(novo_status_id)
+        if not novo_status:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status de pendência não encontrado")
-        
+
+        # Busca status antigo
+        status_antigo = await self.status_pendencia_repo.get_by_id(pendencia_antiga['status_pendencia_id'])
+
         # Atualiza o status
         await self.pendencia_repo.update_pendencia_status(pendencia_id, novo_status_id)
-        
+
+        # Log de auditoria
+        if current_user:
+            try:
+                await audit_atualizar_pendencia(
+                    conn=self.pendencia_repo.conn,
+                    request=request,
+                    usuario=current_user,
+                    pendencia_id=pendencia_id,
+                    titulo_pendencia=pendencia_antiga['titulo'],
+                    status_anterior=status_antigo['nome'] if status_antigo else None,
+                    status_novo=novo_status['nome'],
+                    perfil_usado=current_user.perfil_ativo if hasattr(current_user, 'perfil_ativo') else None
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao criar log de auditoria para pendência {pendencia_id}: {e}")
+
         # Retorna a pendência atualizada
         return await self.get_pendencia_by_id(pendencia_id)
 

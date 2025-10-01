@@ -15,7 +15,7 @@ from app.api.routers import (
     contratado_router, auth_router, usuario_router, perfil_router,
     modalidade_router, status_router, status_relatorio_router,
     status_pendencia_router, contrato_router, pendencia_router, relatorio_router,
-    arquivo_router, dashboard_router, config_router
+    arquivo_router, dashboard_router, config_router, audit_log_router
 )
 from app.api.routers import usuario_perfil_router
 # Imports dos sistemas avançados
@@ -211,6 +211,9 @@ print(f"✅ Router de dashboard registrado: {API_PREFIX}/dashboard")
 app.include_router(config_router.router, prefix=API_PREFIX)
 print(f"✅ Router de configurações registrado: {API_PREFIX}/config")
 
+app.include_router(audit_log_router.router, prefix=API_PREFIX)
+print(f"✅ Router de auditoria registrado: {API_PREFIX}/audit-logs")
+
 
 # Routers de tabelas auxiliares
 app.include_router(perfil_router.router, prefix=API_PREFIX)
@@ -374,6 +377,14 @@ tags_metadata = [
     {
         "name": "Dashboard",
         "description": "Endpoints para dashboards administrativos e do fiscal",
+    },
+    {
+        "name": "Auditoria",
+        "description": "Logs de auditoria e rastreamento de ações no sistema",
+    },
+    {
+        "name": "Configurações",
+        "description": "Configurações gerais do sistema (pendências, lembretes, alertas)",
     }
 ]
 

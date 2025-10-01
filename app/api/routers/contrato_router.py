@@ -1,6 +1,6 @@
 # app/api/routers/contrato_router.py
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
 from typing import List, Optional
 from datetime import date
@@ -65,7 +65,9 @@ async def _create_contrato_logic(
     data_doe: Optional[date],
     garantia: Optional[date],
     documento_contrato: List[UploadFile],
-    service: ContratoService
+    service: ContratoService,
+    current_user: Usuario,
+    request: Request
 ):
     """Lógica comum para criação de contrato"""
     contrato_create = ContratoCreate(
@@ -88,13 +90,14 @@ async def _create_contrato_logic(
         data_doe=data_doe,
         garantia=garantia
     )
-    return await service.create_contrato(contrato_create, documento_contrato)
+    return await service.create_contrato(contrato_create, documento_contrato, current_user, request)
 
 # --- Endpoints ---
 
 # Rota POST com barra final
 @router.post("/", response_model=Contrato, status_code=status.HTTP_201_CREATED)
 async def create_contrato_with_slash(
+    request: Request,
     nr_contrato: str = Form(...),
     objeto: str = Form(...),
     data_inicio: date = Form(...),
@@ -122,12 +125,13 @@ async def create_contrato_with_slash(
         nr_contrato, objeto, data_inicio, data_fim, contratado_id,
         modalidade_id, status_id, gestor_id, fiscal_id, valor_anual,
         valor_global, base_legal, termos_contratuais, fiscal_substituto_id,
-        pae, doe, data_doe, garantia, documento_contrato, service
+        pae, doe, data_doe, garantia, documento_contrato, service, admin_user, request
     )
 
 # Rota POST sem barra final
 @router.post("", response_model=Contrato, status_code=status.HTTP_201_CREATED)
 async def create_contrato(
+    request: Request,
     nr_contrato: str = Form(...),
     objeto: str = Form(...),
     data_inicio: date = Form(...),
@@ -155,7 +159,7 @@ async def create_contrato(
         nr_contrato, objeto, data_inicio, data_fim, contratado_id,
         modalidade_id, status_id, gestor_id, fiscal_id, valor_anual,
         valor_global, base_legal, termos_contratuais, fiscal_substituto_id,
-        pae, doe, data_doe, garantia, documento_contrato, service
+        pae, doe, data_doe, garantia, documento_contrato, service, admin_user, request
     )
 
 
@@ -335,6 +339,7 @@ async def get_contrato_by_id(
 
 @router.patch("/{contrato_id}", response_model=Contrato)
 async def update_contrato(
+    request: Request,
     contrato_id: int,
     # Campos opcionais do formulário - apenas os campos que podem ser atualizados
     nr_contrato: Optional[str] = Form(None),
@@ -438,17 +443,19 @@ async def update_contrato(
     
     # Chama o service passando o arquivo se fornecido
     updated_contrato = await service.update_contrato(
-        contrato_id=contrato_id, 
-        contrato_update=contrato_update, 
-        documento_contrato=documento_contrato
+        contrato_id=contrato_id,
+        contrato_update=contrato_update,
+        documento_contrato=documento_contrato,
+        current_user=admin_user,
+        request=request
     )
-    
+
     if not updated_contrato:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Contrato não encontrado para atualização"
         )
-    
+
     return updated_contrato
 
 @router.delete("/{contrato_id}", status_code=status.HTTP_204_NO_CONTENT)

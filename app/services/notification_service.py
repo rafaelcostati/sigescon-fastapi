@@ -411,7 +411,43 @@ class NotificationScheduler:
             logger.info("Verificação de contratos e garantias próximos ao vencimento concluída.")
         except Exception as e:
             logger.error(f"Erro ao verificar contratos e garantias próximos ao vencimento: {e}")
-    
+
+    async def check_escalation(self):
+        """Task para verificar escalonamento de pendências vencidas (executada diariamente às 9h)"""
+        from app.core.database import get_connection
+        from app.repositories.config_repo import ConfigRepository
+        from app.repositories.pendencia_repo import PendenciaRepository
+        from app.repositories.contrato_repo import ContratoRepository
+        from app.repositories.usuario_repo import UsuarioRepository
+        from app.services.escalation_service import EscalationService
+        from app.services.email_service import EmailService
+
+        try:
+            async for conn in get_connection():
+                config_repo = ConfigRepository(conn)
+                pendencia_repo = PendenciaRepository(conn)
+                contrato_repo = ContratoRepository(conn)
+                usuario_repo = UsuarioRepository(conn)
+                email_service = EmailService()
+
+                escalation_service = EscalationService(
+                    config_repo=config_repo,
+                    pendencia_repo=pendencia_repo,
+                    contrato_repo=contrato_repo,
+                    usuario_repo=usuario_repo,
+                    email_service=email_service
+                )
+
+                resultado = await escalation_service.verificar_e_escalonar_pendencias()
+                logger.info(
+                    f"Verificação de escalonamento concluída. "
+                    f"Emails gestor: {resultado['emails_gestor']}, "
+                    f"Emails admin: {resultado['emails_admin']}, "
+                    f"Total pendências: {resultado['total_pendencias_escalonadas']}"
+                )
+        except Exception as e:
+            logger.error(f"Erro ao verificar escalonamento de pendências: {e}")
+
     def start_scheduler(self):
         """Inicia o agendador de tarefas"""
         # Processa fila de emails a cada 5 minutos
@@ -443,9 +479,19 @@ class NotificationScheduler:
             id='check_contract_expiration',
             max_instances=1
         )
-        
+
+        # Verifica escalonamento de pendências vencidas todos os dias às 9h
+        self.scheduler.add_job(
+            self.check_escalation,
+            'cron',
+            hour=9,
+            minute=0,
+            id='check_escalation',
+            max_instances=1
+        )
+
         self.scheduler.start()
-        logger.info("Scheduler de notificações iniciado (alertas de contratos/garantias a cada 5 dias às 10h)")
+        logger.info("Scheduler de notificações iniciado (alertas de contratos/garantias a cada 5 dias às 10h, escalonamento diário às 9h)")
     
     def stop_scheduler(self):
         """Para o agendador"""

@@ -1,12 +1,17 @@
 # app/services/config_service.py
 from typing import List, Optional
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, status, UploadFile, Request
+import logging
 from app.repositories.config_repo import ConfigRepository
 from app.repositories.arquivo_repo import ArquivoRepository
 from app.services.file_service import FileService
+from app.services.audit_integration import audit_atualizar_configuracao
 from app.schemas.config_schema import Config, ConfigUpdate, ConfigCreate, ModeloRelatorioInfo, ModeloRelatorioResponse, AlertasVencimentoConfig, AlertasVencimentoConfigUpdate
+from app.schemas.usuario_schema import Usuario
 import os
 import json
+
+logger = logging.getLogger(__name__)
 
 class ConfigService:
     def __init__(self, config_repo: ConfigRepository):
@@ -67,7 +72,12 @@ class ConfigService:
         """Retorna o intervalo de dias configurado para pendências automáticas"""
         return await self.config_repo.get_pendencias_intervalo_dias()
 
-    async def update_pendencias_intervalo_dias(self, intervalo_dias: int) -> Config:
+    async def update_pendencias_intervalo_dias(
+        self,
+        intervalo_dias: int,
+        current_user: Optional[Usuario] = None,
+        request: Optional[Request] = None
+    ) -> Config:
         """Atualiza o intervalo de dias para pendências automáticas"""
         if intervalo_dias < 1 or intervalo_dias > 365:
             raise HTTPException(
@@ -75,8 +85,28 @@ class ConfigService:
                 detail="Intervalo deve estar entre 1 e 365 dias"
             )
 
+        # Busca valor anterior
+        valor_anterior = await self.config_repo.get_pendencias_intervalo_dias()
+
         config_update = ConfigUpdate(valor=str(intervalo_dias))
-        return await self.update_config('pendencias_automaticas_intervalo_dias', config_update)
+        updated = await self.update_config('pendencias_automaticas_intervalo_dias', config_update)
+
+        # Log de auditoria
+        if current_user:
+            try:
+                await audit_atualizar_configuracao(
+                    conn=self.config_repo.conn,
+                    request=request,
+                    usuario=current_user,
+                    chave_config='pendencias_automaticas_intervalo_dias',
+                    valor_anterior=valor_anterior,
+                    valor_novo=intervalo_dias,
+                    perfil_usado=current_user.perfil_ativo if hasattr(current_user, 'perfil_ativo') else None
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao criar log de auditoria para config pendencias_automaticas_intervalo_dias: {e}")
+
+        return updated
 
     async def get_lembretes_config(self) -> dict:
         """Retorna as configurações de lembretes de pendências"""
@@ -340,11 +370,65 @@ class ConfigService:
             
             # Retorna as configurações atualizadas
             return await self.get_alertas_vencimento_config()
-        
+
         except HTTPException:
             raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Erro ao atualizar configurações: {str(e)}"
+            )
+
+    # ==================== Escalonamento de Pendências ====================
+
+    async def get_escalonamento_config(self) -> dict:
+        """Retorna as configurações de escalonamento de pendências"""
+        return await self.config_repo.get_escalonamento_config()
+
+    async def update_escalonamento_config(self, config: 'EscalonamentoConfigUpdate') -> dict:
+        """
+        Atualiza as configurações de escalonamento de pendências
+
+        Args:
+            config: Configurações de escalonamento
+
+        Returns:
+            Configurações atualizadas
+        """
+        # Validações
+        if config.dias_gestor < 1 or config.dias_gestor > 90:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Dias para notificar gestor deve estar entre 1 e 90"
+            )
+
+        if config.dias_admin < 1 or config.dias_admin > 180:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Dias para notificar administrador deve estar entre 1 e 180"
+            )
+
+        if config.dias_admin <= config.dias_gestor:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Dias para notificar administrador deve ser maior que dias para notificar gestor"
+            )
+
+        try:
+            # Atualiza as configurações
+            await self.config_repo.update_escalonamento_completo(
+                ativo=config.ativo,
+                dias_gestor=config.dias_gestor,
+                dias_admin=config.dias_admin
+            )
+
+            # Retorna as configurações atualizadas
+            return await self.get_escalonamento_config()
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erro ao atualizar configurações de escalonamento: {str(e)}"
             )

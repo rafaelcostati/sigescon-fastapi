@@ -1,6 +1,6 @@
 # app/api/routers/pendencia_router.py
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 
@@ -52,13 +52,14 @@ def get_pendencia_automatica_service(conn: asyncpg.Connection = Depends(get_conn
 
 @router.post("/", response_model=Pendencia, status_code=status.HTTP_201_CREATED)
 async def create_pendencia(
+    request: Request,
     contrato_id: int,
     pendencia: PendenciaCreate,
     service: PendenciaService = Depends(get_pendencia_service),
     admin_user: Usuario = Depends(admin_required)
 ):
     """Cria uma nova pendência para um contrato. Requer permissão de administrador."""
-    return await service.create_pendencia(contrato_id, pendencia)
+    return await service.create_pendencia(contrato_id, pendencia, admin_user, request)
 
 
 @router.get("/", response_model=List[Pendencia])

@@ -1,6 +1,6 @@
 # app/api/routers/relatorio_router.py
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from typing import List
 from datetime import date
 
@@ -102,6 +102,7 @@ async def list_relatorios_without_slash(
 
 @router.patch("/{relatorio_id}/analise", response_model=Relatorio)
 async def analisar_relatorio(
+    request: Request,
     contrato_id: int,
     relatorio_id: int,
     analise_data: RelatorioAnalise,
@@ -109,4 +110,4 @@ async def analisar_relatorio(
     admin_user: Usuario = Depends(admin_required)
 ):
     """Aprova ou rejeita um relatório. Requer permissão de administrador."""
-    return await service.analisar_relatorio(relatorio_id, analise_data)
+    return await service.analisar_relatorio(relatorio_id, analise_data, admin_user, request)

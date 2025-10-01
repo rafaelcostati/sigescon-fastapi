@@ -1,6 +1,6 @@
 # app/api/routers/config_router.py
 import asyncpg
-from fastapi import APIRouter, Depends, status, File, UploadFile
+from fastapi import APIRouter, Depends, status, File, UploadFile, Request
 from fastapi.responses import FileResponse
 from typing import List, Optional
 
@@ -11,7 +11,7 @@ from app.repositories.config_repo import ConfigRepository
 from app.repositories.arquivo_repo import ArquivoRepository
 from app.services.config_service import ConfigService
 from app.services.file_service import FileService
-from app.schemas.config_schema import Config, ConfigUpdate, PendenciasIntervaloDiasUpdate, LembretesConfigUpdate, ModeloRelatorioInfo, ModeloRelatorioResponse, AlertasVencimentoConfig, AlertasVencimentoConfigUpdate
+from app.schemas.config_schema import Config, ConfigUpdate, PendenciasIntervaloDiasUpdate, LembretesConfigUpdate, ModeloRelatorioInfo, ModeloRelatorioResponse, AlertasVencimentoConfig, AlertasVencimentoConfigUpdate, EscalonamentoConfig, EscalonamentoConfigUpdate
 
 router = APIRouter(
     prefix="/config",
@@ -54,6 +54,7 @@ async def get_pendencias_intervalo_dias(
 
 @router.patch("/pendencias/intervalo-dias", response_model=Config, summary="Atualizar intervalo de dias")
 async def update_pendencias_intervalo_dias(
+    request: Request,
     update_data: PendenciasIntervaloDiasUpdate,
     service: ConfigService = Depends(get_config_service),
     admin_user: Usuario = Depends(admin_required)
@@ -64,7 +65,7 @@ async def update_pendencias_intervalo_dias(
 
     - **intervalo_dias**: Número de dias entre cada pendência automática (1-365)
     """
-    return await service.update_pendencias_intervalo_dias(update_data.intervalo_dias)
+    return await service.update_pendencias_intervalo_dias(update_data.intervalo_dias, admin_user, request)
 
 
 @router.get("/lembretes/config", response_model=dict, summary="Obter configurações de lembretes")
@@ -288,6 +289,66 @@ async def update_alertas_vencimento_config(
     - **Fiscal**: Recebe apenas alertas dos contratos que fiscaliza
     """
     return await service.update_alertas_vencimento_config(config)
+
+
+# ==================== Escalonamento de Pendências ====================
+
+@router.get("/escalonamento", response_model=EscalonamentoConfig, summary="Obter configurações de escalonamento")
+async def get_escalonamento_config(
+    service: ConfigService = Depends(get_config_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Retorna as configurações de escalonamento de pendências vencidas.
+    Requer permissão de administrador.
+
+    Retorna:
+    - **ativo**: Se o sistema de escalonamento está ativo
+    - **dias_gestor**: Dias após vencimento para notificar o gestor
+    - **dias_admin**: Dias após vencimento para notificar o administrador
+
+    **Como funciona:**
+
+    1. Quando uma pendência vence e não é resolvida
+    2. Após **X dias** (dias_gestor), o **gestor do contrato** é notificado
+    3. Após **Y dias** (dias_admin), o **administrador** é notificado
+    4. Os emails continuam até a pendência ser resolvida
+    """
+    return await service.get_escalonamento_config()
+
+
+@router.patch("/escalonamento", response_model=EscalonamentoConfig, summary="Atualizar configurações de escalonamento")
+async def update_escalonamento_config(
+    config: EscalonamentoConfigUpdate,
+    service: ConfigService = Depends(get_config_service),
+    admin_user: Usuario = Depends(admin_required)
+):
+    """
+    Atualiza as configurações de escalonamento de pendências vencidas.
+    Requer permissão de administrador.
+
+    - **ativo**: Ativar ou desativar escalonamento (true/false)
+    - **dias_gestor**: Dias após vencimento para notificar gestor (1-90)
+    - **dias_admin**: Dias após vencimento para notificar admin (1-180)
+
+    **Regra importante:** `dias_admin` deve ser maior que `dias_gestor`
+
+    **Exemplo de configuração:**
+    ```json
+    {
+        "ativo": true,
+        "dias_gestor": 7,
+        "dias_admin": 14
+    }
+    ```
+
+    **Fluxo:**
+    1. Pendência vence no dia 01/01
+    2. Dia 08/01 (7 dias depois): Gestor recebe email
+    3. Dia 15/01 (14 dias depois): Administrador recebe email
+    4. Se não resolvida, emails continuam periodicamente
+    """
+    return await service.update_escalonamento_config(config)
 
 
 # ==================== Rotas Genéricas (DEVEM VIR POR ÚLTIMO!) ====================

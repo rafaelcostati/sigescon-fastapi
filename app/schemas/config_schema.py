@@ -79,3 +79,35 @@ class AlertasVencimentoConfigUpdate(BaseModel):
                 "hora_envio": "10:00"
             }
         }
+
+
+class EscalonamentoConfig(BaseModel):
+    """Configurações de escalonamento de pendências vencidas"""
+    ativo: bool = Field(..., description="Se o sistema de escalonamento está ativo")
+    dias_gestor: int = Field(..., ge=1, le=90, description="Dias após vencimento para notificar o gestor (1-90)")
+    dias_admin: int = Field(..., ge=1, le=180, description="Dias após vencimento para notificar o administrador (1-180)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "ativo": True,
+                "dias_gestor": 7,
+                "dias_admin": 14
+            }
+        }
+
+
+class EscalonamentoConfigUpdate(BaseModel):
+    """Schema para atualizar configurações de escalonamento"""
+    ativo: bool = Field(..., description="Se o sistema de escalonamento está ativo")
+    dias_gestor: int = Field(..., ge=1, le=90, description="Dias após vencimento para notificar o gestor (1-90)")
+    dias_admin: int = Field(..., ge=1, le=180, description="Dias após vencimento para notificar o administrador (1-180)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "ativo": True,
+                "dias_gestor": 7,
+                "dias_admin": 14
+            }
+        }

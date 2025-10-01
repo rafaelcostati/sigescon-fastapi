@@ -242,3 +242,63 @@ class ConfigRepository:
         await self.update_alertas_vencimento_periodicidade(periodicidade_dias)
         await self.update_alertas_vencimento_perfis(perfis_destino)
         await self.update_alertas_vencimento_hora(hora_envio)
+
+    # ==================== Escalonamento de Pendências ====================
+
+    async def get_escalonamento_ativo(self) -> bool:
+        """Retorna se o sistema de escalonamento está ativo"""
+        config = await self.get_config('escalonamento_ativo')
+        if config:
+            return config['valor'].lower() == 'true'
+        return True  # Ativo por padrão
+
+    async def get_escalonamento_dias_gestor(self) -> int:
+        """Retorna dias após vencimento para notificar gestor"""
+        config = await self.get_config('escalonamento_gestor_dias')
+        if config:
+            try:
+                return int(config['valor'])
+            except (ValueError, TypeError):
+                return 7  # Padrão: 7 dias
+        return 7
+
+    async def get_escalonamento_dias_admin(self) -> int:
+        """Retorna dias após vencimento para notificar admin"""
+        config = await self.get_config('escalonamento_admin_dias')
+        if config:
+            try:
+                return int(config['valor'])
+            except (ValueError, TypeError):
+                return 14  # Padrão: 14 dias
+        return 14
+
+    async def get_escalonamento_config(self) -> Dict:
+        """Retorna todas as configurações de escalonamento"""
+        return {
+            'ativo': await self.get_escalonamento_ativo(),
+            'dias_gestor': await self.get_escalonamento_dias_gestor(),
+            'dias_admin': await self.get_escalonamento_dias_admin()
+        }
+
+    async def update_escalonamento_ativo(self, ativo: bool) -> None:
+        """Atualiza se o escalonamento está ativo"""
+        await self.update_config('escalonamento_ativo', str(ativo).lower())
+
+    async def update_escalonamento_dias_gestor(self, dias: int) -> None:
+        """Atualiza dias para notificar gestor"""
+        await self.update_config('escalonamento_gestor_dias', str(dias))
+
+    async def update_escalonamento_dias_admin(self, dias: int) -> None:
+        """Atualiza dias para notificar admin"""
+        await self.update_config('escalonamento_admin_dias', str(dias))
+
+    async def update_escalonamento_completo(
+        self,
+        ativo: bool,
+        dias_gestor: int,
+        dias_admin: int
+    ) -> None:
+        """Atualiza todas as configurações de escalonamento de uma vez"""
+        await self.update_escalonamento_ativo(ativo)
+        await self.update_escalonamento_dias_gestor(dias_gestor)
+        await self.update_escalonamento_dias_admin(dias_admin)

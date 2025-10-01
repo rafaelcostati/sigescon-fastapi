@@ -1,7 +1,7 @@
 # app/services/contrato_service.py
 import math
 from typing import List, Optional, Dict
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, status, UploadFile, Request
 import logging
 
 # Repositórios
@@ -15,12 +15,17 @@ from app.repositories.arquivo_repo import ArquivoRepository
 # Services
 from app.services.file_service import FileService
 from app.services.email_service import EmailService
+from app.services.audit_integration import (
+    audit_criar_contrato,
+    audit_atualizar_contrato
+)
 
 # Schemas
 from app.schemas.contrato_schema import (
     Contrato, ContratoCreate, ContratoUpdate,
     ContratoPaginated, ContratoList
 )
+from app.schemas.usuario_schema import Usuario
 
 logger = logging.getLogger(__name__)
 class ContratoService:
@@ -128,19 +133,25 @@ class ContratoService:
                 )
                 await EmailService.send_email(old_fiscal['email'], subject, body, is_html=True)
 
-    async def create_contrato(self, contrato_create: ContratoCreate, files: Optional[List[UploadFile]] = None) -> Contrato:
+    async def create_contrato(
+        self,
+        contrato_create: ContratoCreate,
+        files: Optional[List[UploadFile]] = None,
+        current_user: Optional[Usuario] = None,
+        request: Optional[Request] = None
+    ) -> Contrato:
         """Cria um novo contrato e, opcionalmente, anexa múltiplos arquivos"""
-        
+
         # Dados recebidos validados pelo Pydantic
-        
+
         # Validação de chaves estrangeiras
         await self._validate_foreign_keys(contrato_create)
-        
+
         # Validação de número duplicado
         if await self.contrato_repo.exists_nr_contrato(contrato_create.nr_contrato):
             next_available = await self.contrato_repo.get_next_available_nr_contrato()
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Já existe um contrato ativo com o número '{contrato_create.nr_contrato}'. Sugestão: use o número '{next_available}'."
             )
 
@@ -167,9 +178,32 @@ class ContratoService:
                     )
                     # Vincula o ID do arquivo ao contrato
                     await self.arquivo_repo.link_arquivo_to_contrato(arquivo_data['id'], contrato_id)
-        
+
         # Retorna o contrato completo com JOINs
         contrato_response = Contrato.model_validate(new_contrato_data)
+
+        # Log de auditoria
+        if current_user:
+            try:
+                await audit_criar_contrato(
+                    conn=self.contrato_repo.conn,
+                    request=request,
+                    usuario=current_user,
+                    contrato_id=contrato_id,
+                    dados_contrato={
+                        'nr_contrato': contrato_create.nr_contrato,
+                        'objeto': contrato_create.objeto,
+                        'contratado_id': contrato_create.contratado_id,
+                        'gestor_id': contrato_create.gestor_id,
+                        'fiscal_id': contrato_create.fiscal_id,
+                        'valor_global': str(contrato_create.valor_global) if contrato_create.valor_global else None,
+                        'data_inicio': str(contrato_create.data_inicio),
+                        'data_fim': str(contrato_create.data_fim)
+                    },
+                    perfil_usado=current_user.perfil_ativo if hasattr(current_user, 'perfil_ativo') else None
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao criar log de auditoria para contrato {contrato_id}: {e}")
 
         # Envio de emails de notificação
         try:
@@ -212,7 +246,9 @@ class ContratoService:
         self,
         contrato_id: int,
         contrato_update: ContratoUpdate,
-        documento_contrato: Optional[List[UploadFile]] = None
+        documento_contrato: Optional[List[UploadFile]] = None,
+        current_user: Optional[Usuario] = None,
+        request: Optional[Request] = None
     ) -> Optional[Contrato]:
         """
         Atualiza um contrato existente, incluindo upload de múltiplos arquivos opcionais.
@@ -223,7 +259,7 @@ class ContratoService:
             existing_contrato = await self.contrato_repo.find_contrato_by_id(contrato_id)
             if not existing_contrato:
                 return None
-            
+
             # Valida chaves estrangeiras antes da atualização
             print(f"\n=== DEBUG - Iniciando validação foreign keys ===")
             await self._validate_foreign_keys(contrato_update)
@@ -290,6 +326,47 @@ class ContratoService:
             updated_contrato = await self.contrato_repo.update_contrato(contrato_id, contrato_update)
             print(f"Resultado do repositório: {updated_contrato}")
             print(f"=== FIM DEBUG - Repositório ===\n")
+
+            # Log de auditoria
+            if current_user and existing_contrato:
+                try:
+                    # Preparar dados anteriores
+                    dados_anteriores = {
+                        'objeto': existing_contrato.get('objeto'),
+                        'valor_global': str(existing_contrato.get('valor_global')) if existing_contrato.get('valor_global') else None,
+                        'gestor_id': existing_contrato.get('gestor_id'),
+                        'fiscal_id': existing_contrato.get('fiscal_id'),
+                        'data_inicio': str(existing_contrato.get('data_inicio')) if existing_contrato.get('data_inicio') else None,
+                        'data_fim': str(existing_contrato.get('data_fim')) if existing_contrato.get('data_fim') else None
+                    }
+
+                    # Preparar dados novos
+                    dados_novos = {}
+                    if contrato_update.objeto is not None:
+                        dados_novos['objeto'] = contrato_update.objeto
+                    if contrato_update.valor_global is not None:
+                        dados_novos['valor_global'] = str(contrato_update.valor_global)
+                    if contrato_update.gestor_id is not None:
+                        dados_novos['gestor_id'] = contrato_update.gestor_id
+                    if contrato_update.fiscal_id is not None:
+                        dados_novos['fiscal_id'] = contrato_update.fiscal_id
+                    if contrato_update.data_inicio is not None:
+                        dados_novos['data_inicio'] = str(contrato_update.data_inicio)
+                    if contrato_update.data_fim is not None:
+                        dados_novos['data_fim'] = str(contrato_update.data_fim)
+
+                    await audit_atualizar_contrato(
+                        conn=self.contrato_repo.conn,
+                        request=request,
+                        usuario=current_user,
+                        contrato_id=contrato_id,
+                        nr_contrato=existing_contrato['nr_contrato'],
+                        dados_anteriores=dados_anteriores,
+                        dados_novos=dados_novos,
+                        perfil_usado=current_user.perfil_ativo if hasattr(current_user, 'perfil_ativo') else None
+                    )
+                except Exception as e:
+                    logger.warning(f"Erro ao criar log de auditoria para contrato {contrato_id}: {e}")
 
             return updated_contrato
             
